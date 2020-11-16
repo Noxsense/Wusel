@@ -250,7 +250,7 @@ impl Food {
            energy_per_bite: u32,
            food_per_bite: u32,
            water_per_bite: u32
-    ) -> Self {
+          ) -> Self {
         Self {
             name: name,
 
@@ -324,7 +324,7 @@ impl Need {
 
     const DEFAULT_NEED_DECAY_PER_MINUTE: [u32; 7] = [
         1, 1, 1, 1, 0/*health*/, 1, 1,
-        ];
+    ];
 
     fn name(&self) -> &str {
         return match self {
@@ -392,6 +392,18 @@ struct Wusel {
 // https://stackoverflow.com/a/32936288/14029561
 
 impl Wusel {
+
+    /** From full to 0, how many ticks does it need, when it's only normally decreasing. */
+    const WUSEL_FULL_NEEDS: [(Need, u32); 7]
+        = [ (Need::WATER, (24 * 60 * 2) * 3) // 3 days until dehydrate.
+        , (Need::FOOD, (24 * 60 * 2) * 7) // a week until starve.
+        , (Need::WARMTH, (8 * 60 * 2)) // 8h until freeze to death.
+        , (Need::SLEEP,  (24 * 60 * 2) * 7) // a week until suffer from sleep loss.
+        , (Need::HEALTH, (24 * 60 * 2) * 14) // 2 weeks until die of illness.
+        , (Need::LOVE, (24 * 60 * 2) * 14) // 2 weeks until become lonely.
+        , (Need::FUN, (24 * 60 * 2) * 14) // 2 weeks until unmotivated and depressive.
+        ];
+
     /** Create a new Wusel with name. */
     fn new(name: String, female: bool) -> Self {
         let mut new = Self {
@@ -410,8 +422,10 @@ impl Wusel {
             abilities: vec![],
         };
 
-        /* Initiate all known needs to 0, critical. */
-        for n in &Need::VALUES { new.needs.push((*n, 0)); }
+        /* Initiate all known needs to FULL. */
+        for (n, full) in &Self::WUSEL_FULL_NEEDS {
+            new.needs.push((*n, *full));
+        }
 
         return new;
     }
@@ -423,9 +437,7 @@ impl Wusel {
     fn xy(name: String) -> Self { Self::new(name, false) }
 
     /** Show position of its body. */
-    fn show_pos(self: &Self) -> String {
-        return self.body.show_pos();
-    }
+    fn show_pos(self: &Self) -> String { self.body.show_pos() }
 
     /** Move position of its body. */
     fn go(self: &mut Self, direction: Direction) { self.body.go(direction) }
@@ -476,57 +488,73 @@ impl Wusel {
     }
 
     fn show_overview(self: &Self) {
+        println!("==={:=<40}", "");
         /* Show name. */
-        print!("{}", self.name);
+        print!("  {}", self.name);
 
         /* Show Gender.. [\u2640 (9792) female, \u2642 (9794) male]. */
-        print!(" {}\n", match self.female {
+        print!("  {}\n", match self.female {
             true => "\u{2640}",
             _ => "\u{2642}",
         });
 
         /* Show age. */
-        print!("{age} days ", age = self.age());
+        print!(" {age} days ", age = self.age());
 
         /* Show life and age. */
         match self.life {
-            Life::ALIVE => print!("(alive)"),
-            Life::DEAD => print!("(dead)"),
-            Life::GHOST => print!("(ghost)"),
+            Life::ALIVE => println!("(alive)"),
+            Life::DEAD => println!("(dead)"),
+            Life::GHOST => println!("(ghost)"),
         }
 
-        print!("\n");
-
         /* Show needs. */
-        println!("--- NEEDS: {:-<20}", "");
+        println!("---{:-<40}", " NEEDS: ");
         self.show_needs();
 
         /* Show abilities. */
-        println!("--- ABILITIES: {:-<16}", "");
+        println!("---{:-<40}", " ABILITIES: ");
         self.show_abilities();
 
         /* Show relations. */
         // TODO (2020-11-16) show relations.
+        println!("{:_<43}", "");
     }
 
     /** Show all assigned needs. */
     fn show_needs(self: &Self) {
         for (n, v) in self.needs.iter() {
-            println!("{name:>15} {value:5} {last:.>bar_len$} ",
-                name = n.name(),
-                value = v,
-                bar_len = *v as usize, last = "");
+
+            let full = Self::default_need_full(n);
+
+            let max_len = 20;
+            let bar_len = (*v / full * max_len) as usize;
+
+            println!(" {name:>14} {value:5} {last:.>bar_len$} ",
+                     name = n.name(),
+                     value = v,
+                     bar_len = bar_len, last = "");
         }
     }
 
     /** Print the Wusel's abilities. */
     fn show_abilities(self: &Self) {
-       for (ability, value) in &self.abilities {
-           println!("{a:>15} {v:5} {bar:*<v$}",
-                    a = ability.name(),
-                    v = *value as usize,
-                    bar = "");
-       }
+        for (ability, value) in &self.abilities {
+            println!("{a:>15} {v:5} {bar:*<v$}",
+                     a = ability.name(),
+                     v = *value as usize,
+                     bar = "");
+        }
+    }
+
+    /** Get the default need value. */
+    fn default_need_full(need: &Need) -> u32 {
+        for (n, v) in Self::WUSEL_FULL_NEEDS.iter() {
+            if n == need {
+                return *v;
+            }
+        }
+        return 0; // else return 0, if not an default need.
     }
 
     /** Get the value for a need.
@@ -538,7 +566,7 @@ impl Wusel {
         for i in 0..(size) {
             let (n, v) = self.needs[i];
             if n == need { return v; }
-                // return assigned value
+            // return assigned value
         }
         /* If not found: Append with default Need value. */
         let default: u32 = 0;
