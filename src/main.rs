@@ -4,7 +4,6 @@ use std::io;
 
 /** The main method of the wusel world. */
 fn main() -> Result<(), io::Error> {
-    liv::test_wusel_walking();
     liv::test_wusel_eats();
 
     let mut world: liv::World = liv::World::new(80, 30);
@@ -115,9 +114,6 @@ fn main() -> Result<(), io::Error> {
 
 
 mod liv {
-    static WORLD_HEIGHT: u32 = 100;
-    static WORLD_WIDTH: u32 = 100;
-
     /** The place of existence, time and relations. */
     pub struct World {
         height: u32,
@@ -172,7 +168,7 @@ mod liv {
             let w = Wusel::new(id, name, female);
 
             /* Add wusel to positions, start at 0. */
-            let pos_idx = self.pos_to_idx(w.position);
+            let pos_idx = self.pos_to_idx(w.get_position());
             if pos_idx < self.positions.len() {
                 self.positions[pos_idx].push((Self::CHAR_WUSEL, w.id));
             }
@@ -521,12 +517,12 @@ mod liv {
 
     impl Way {
         pub const NEIGHBOURING: [Self; 8] = [
-           Self::NW,Self::N, Self::NE, // north
-           Self::W,          Self::E, // same longitude
-           Self::SW,Self::S, Self::SE, // south
+            Self::NW,Self::N, Self::NE, // north
+            Self::W,          Self::E, // same longitude
+            Self::SW,Self::S, Self::SE, // south
         ];
-        /** Get the offesets to walk, to get to the way point. */
-        pub fn as_direction_tuple(&self) -> (i8,i8) {
+        /** Get the offsets to walk, to get to the way point. */
+        pub fn as_direction_tuple(self: &Self) -> (i8,i8) {
             match self {
                 /* Go north. */
                 Way::NW => return (-1,  1),
@@ -545,88 +541,36 @@ mod liv {
         }
     }
 
-    /** A world body reprensentation, objects in the world have. */
-    pub struct Thing {
-        /* Position */
-        pos_x: u32, // unsigned int 32
-        pos_y: u32, // unsigned int 32
-
-    }
-
-    impl Thing {
-        fn new(x: u32, y: u32) -> Self {
-            Self { pos_x: x, pos_y: y }
-        }
-
-        /** Show position of npc. */
-        fn show_pos(self: &Self) -> String {
-            return format!("(x: {} | y: {})", self.pos_x, self.pos_y);
-        }
-
-        /** Move the thing in certain way. */
-        fn step(self: &mut Self, way: Way) {
-            /* Mutable variable. Will contain the possible new position. */
-            let mut _x: i64 = self.pos_x as i64;
-            let mut _y: i64 = self.pos_y as i64;
-
-            /* Determine changes. */
-            let change = way.as_direction_tuple();
-            _x += change.0 as i64;
-            _y += change.1 as i64;
-
-            if _x > (WORLD_HEIGHT as i64) || _x < 0 {
-                println!("Already at Vertical Bordee.");
-            } else {
-                /* Apply to real position. */
-                self.pos_x = _x as u32;
-            }
-
-            if _y > (WORLD_WIDTH as i64) || _y < 0 {
-                println!("Already at Horizontal Border");
-            } else {
-                /* Apply to real position. */
-                self.pos_y = _y as u32;
-            }
-        }
-
-        /** Place the thing on a new Position. */
-        fn place_at(self: &mut Self, new_x: u32, new_y: u32) {
-            self.pos_x = if new_x <= WORLD_HEIGHT { new_x } else { WORLD_HEIGHT };
-            self.pos_y = if new_y <= WORLD_WIDTH { new_y } else { WORLD_WIDTH };
-        }
-
-    }
-
     /** Something a Wusel can consume. */
     pub struct Food {
         name: String,
 
-        body: Thing,
+        position: (u32, u32),
 
         available: f32, // 1.0f whole, 0.0f gone.
-        bites: u32, // eats an xth part per minute of this food. => partition_per_bite
+        bites: u32, // eats an x-th part per minute of this food. => partition_per_bite
 
         /* Per bite. */
         needed_energy: u32, // needed energy to eat; eg. eating a cup of Water or eating raw meat
-        satisfied_food: u32, // satiesfies hunger need.
-        satisfied_water: u32, // satiesfies water need.
+        satisfied_food: u32, // satisfies hunger need.
+        satisfied_water: u32, // satisfies water need.
 
-        spoils_after: u32, // spoils after 0: infinite, or N daya.
+        spoils_after: u32, // spoils after 0: infinite, or N days.
         age: u32,
     }
 
     impl Food {
         fn new(name: String,
-                   bites: u32,
-                   energy_per_bite: u32,
-                   food_per_bite: u32,
-                   water_per_bite: u32,
-                   spoils: u32,
-                   ) -> Self {
+               bites: u32,
+               energy_per_bite: u32,
+               food_per_bite: u32,
+               water_per_bite: u32,
+               spoils: u32,
+               ) -> Self {
             Self {
                 name: name,
 
-                body: Thing::new(0, 0), // start at center.
+                position: (0, 0), // start at root
 
                 available: 1.0f32, // start fully.
                 bites: bites, // => 0.5 per minute
@@ -635,7 +579,7 @@ mod liv {
                 satisfied_food: food_per_bite,
                 satisfied_water: water_per_bite,
 
-                spoils_after: spoils, // after days, o: do noy spoil.
+                spoils_after: spoils, // after days, 0: does not spoil.
                 age: 0,
             }
         }
@@ -832,7 +776,6 @@ mod liv {
         /* Name */
         name: String,
 
-        body: Thing,
         position: (u32, u32),
 
         female: bool, // female => able to bear children, male => able to inject children
@@ -869,8 +812,7 @@ mod liv {
                 id: id,
                 name: name,
 
-                body: Thing::new(0, 0),
-                position: (0, 0),
+                position: (0, 0), // start at root
 
                 female: female,
                 pregnant: false,
@@ -892,14 +834,8 @@ mod liv {
         }
 
         /** Show position of its body. */
-        fn show_pos(self: &Self) -> String {
-            self.body.show_pos()
-        }
-
-        /** Move position of its body. */
-        fn step(self: &mut Self, way: Way) {
-            self.body.step(way);
-            self.position = (self.body.pos_x, self.body.pos_y);
+        pub fn get_position(self: &Self) -> (u32, u32) {
+            (self.position.0, self.position.1)
         }
 
         /** Tick one unit.
@@ -1151,43 +1087,6 @@ mod liv {
         }
     }
 
-    /** Simple Test of stepping works. */
-    pub fn test_wusel_walking() {
-        let mut w0 = Wusel::new(0, String::from("Test Eat"), true);
-
-        w0.step(Way::N); // 0,1
-        println!("{} at {}", w0.get_name(), w0.show_pos());
-        assert_eq!(w0.body.pos_x, 0); assert_eq!(w0.body.pos_y, 1);
-
-        w0.step(Way::E); // 1,1
-        println!("{} at {}", w0.get_name(), w0.show_pos());
-        assert_eq!(w0.body.pos_x, 1); assert_eq!(w0.body.pos_y, 1);
-
-        w0.step(Way::S); // 1,0
-        println!("{} at {}", w0.get_name(), w0.show_pos());
-        assert_eq!(w0.body.pos_x, 1); assert_eq!(w0.body.pos_y, 0);
-
-        w0.step(Way::W); // 0,0
-        println!("{} at {}", w0.get_name(), w0.show_pos());
-        assert_eq!(w0.body.pos_x, 0); assert_eq!(w0.body.pos_y, 0);
-
-        w0.step(Way::NE); // 1,1
-        println!("{} at {}", w0.get_name(), w0.show_pos());
-        assert_eq!(w0.body.pos_x, 1); assert_eq!(w0.body.pos_y, 1);
-
-        w0.step(Way::SE); // 2,0
-        println!("{} at {}", w0.get_name(), w0.show_pos());
-        assert_eq!(w0.body.pos_x, 2); assert_eq!(w0.body.pos_y, 0);
-
-        w0.step(Way::NW); // 1,1
-        println!("{} at {}", w0.get_name(), w0.show_pos());
-        assert_eq!(w0.body.pos_x, 1); assert_eq!(w0.body.pos_y, 1);
-
-        w0.step(Way::SW); // 0,0
-        println!("{} at {}", w0.get_name(), w0.show_pos());
-        assert_eq!(w0.body.pos_x, 0); assert_eq!(w0.body.pos_y, 0);
-    }
-
     /** Simple Test if eating works. */
     pub fn test_wusel_eats() {
         let mut w0 = Wusel::new(0, String::from("Test Eat"), false);
@@ -1195,7 +1094,7 @@ mod liv {
         let mut sushi = Food::new(String::from("Sushi"), 2, 1, 5, 2, 2);
         println!("Food: {}", sushi.show());
 
-        sushi.body.place_at(0, 1);
+        sushi.position = (0, 1);
 
         w0.eat(&mut sushi);
         w0.show_overview();
