@@ -161,16 +161,16 @@ mod liv {
         pub const TICKS_PER_DAY: usize = 2880; // 24h by 0.5 minutes
 
         /** Get width of the world. */
-        pub fn get_width(&self) -> u32 {
+        pub fn get_width(self: &Self) -> u32 {
             self.width
         }
 
         /** Get height of the world. */
-        pub fn get_height(&self) -> u32 {
+        pub fn get_height(self: &Self) -> u32 {
             self.height
         }
 
-        pub fn get_clock(&self) -> usize {
+        pub fn get_clock(self: &Self) -> usize {
             self.clock
         }
 
@@ -214,7 +214,7 @@ mod liv {
             }
         }
 
-        /** Abort an assinged task from an available wusel (by index). */
+        /** Abort an assigned task from an available wusel (by index). */
         pub fn abort_task_from_wusel(self: &mut Self, wusel_index: usize, task_index: usize) {
             if wusel_index < self.wusels.len() {
                 /* Remove task. */
@@ -307,8 +307,8 @@ mod liv {
         fn wusel_identifier_to_index(self: &Self, id: usize) -> usize {
             for i in 0 .. self.wusels.len() {
                 if self.wusels[i].id == id {
-                    return i;
-                } // return matching id.
+                    return i; // return matching id.
+                }
             }
             return self.wusels.len();
         }
@@ -356,7 +356,7 @@ mod liv {
 
         /** Get the positions of all active wusels. */
         #[allow(dead_code)]
-        pub fn get_all_wusels_positions(&self) -> Vec<(u32, u32)> {
+        pub fn get_all_wusels_positions(self: &Self) -> Vec<(u32, u32)> {
             let mut positions = vec![];
             for w in self.wusels.iter() {
                 positions.push((w.position.0, w.position.1));
@@ -365,9 +365,9 @@ mod liv {
         }
 
         /** Check all positions.
-         * Recalculate all positions, if they really consist what they promis. */
+         * Recalculate all positions, if they really consist what they promised. */
         #[allow(dead_code)]
-        pub fn recalculate_all_positions(&mut self) {
+        pub fn recalculate_all_positions(self: &mut Self) {
             self.positions = vec![vec![]; self.width as usize * self.height as usize];
 
             let valid_idx = self.positions.len();
@@ -387,12 +387,12 @@ mod liv {
 
         /** Get the `positions` index for the requesting position.
          * If the position is not in world, this index is not in [0,positions.len()).*/
-        fn pos_to_idx(&self, pos: (u32, u32)) -> usize {
+        fn pos_to_idx(self: &Self, pos: (u32, u32)) -> usize {
             (pos.0 + self.width * pos.1) as usize
         }
 
         /** Get all the positions as they are. */
-        pub fn get_positions(&self) -> Vec<Vec<(char, usize)>> {
+        pub fn get_positions(self: &Self) -> Vec<Vec<(char, usize)>> {
             self.positions.clone()
         }
 
@@ -417,7 +417,7 @@ mod liv {
                 if let Some(task) = w.pop_ongoing_task() {
                     ongoing_tasks.push(task);
                 } else {
-                    /* Wusel is currently unbusy. => maybe apply an idle/auto task. */
+                    /* Wusel is currently not busy. => maybe apply an idle/auto task. */
                 }
 
                 /* If pregnant: Maybe push out the child => Failure, Early or too late. */
@@ -522,7 +522,7 @@ mod liv {
                     task.duration += 1; // XXX stop from ending early.
 
                     // XXX calculate the path for a certain reach/depth, go first step.
-                    // XXX where to save the precalculated path?
+                    // XXX where to save the pre-calculated path?
                 },
                 TaskTag::GetFromPos(x,y) => {
                     println!("Pick from Goal: ({}, {}).", x, y);
@@ -553,17 +553,17 @@ mod liv {
                 },
             }
 
-            // XXX (2020-11-16) implement pre-conditon testsing. remove place holder.
+            // XXX (2020-11-16) implement pre-condition testing. Remove place holder.
             let dissatisfied: u8 = rand::random::<u8>() % 11;
 
-            /* Check, if precondition are satified.
+            /* Check, if precondition are satisfied.
              * Maybe proceed to satisfy those condition. */
             for i in 0u8..10 {
-                println!("Check Task Conditon {}", i, );
+                println!("Check Task Condition {}", i, );
                 if i == dissatisfied {
                     println!(" - Condition not satisfied, satisfy first.");
 
-                    // XXX satisfy preconditon.
+                    // XXX satisfy pre-condition.
                     // proceed(precondition_subtask);
 
                     self.wusels[actor_index].tasklist.push(task); // put back to ongoing.
@@ -807,7 +807,7 @@ mod liv {
         GHOST,
     }
 
-    /** A need, the wusel needs to satisfy to survive. */
+    /** A need, the Wusel needs to satisfy to survive. */
     #[derive(Copy, Clone, PartialEq)]
     pub enum Need {
         WATER, FOOD, SLEEP, LOVE, FUN, WARMTH, HEALTH,
@@ -826,7 +826,7 @@ mod liv {
             0/*warmth*/, 0/*health*/, // by outer sources
         ];
 
-        fn name(&self) -> &str {
+        fn name(self: &Self) -> &str {
             return match self {
                 Self::WATER => "water", Self::FOOD   => "food"  ,
                 Self::WARMTH => "warmth", Self::SLEEP => "sleep",
@@ -835,7 +835,7 @@ mod liv {
             }
         }
 
-        fn get_default_decay(&self) -> u32 {
+        fn get_default_decay(self: &Self) -> u32 {
             for i in 0 .. Self::VALUES.len() {
                 if self == &Self::VALUES[i] {
                     return Self::DEFAULT_NEED_DECAY_PER_MINUTE[i];
@@ -845,7 +845,7 @@ mod liv {
         }
     }
 
-    /** An ability, the wusel can learn to improve their lifestyle. */
+    /** An ability, the Wusel can learn to improve their lifestyle. */
     #[derive(Copy, Clone, PartialEq)]
     pub enum Ability {
         COOKING,
@@ -855,7 +855,7 @@ mod liv {
     }
 
     impl Ability {
-        fn name(&self) -> &str {
+        fn name(self: &Self) -> &str {
             return match self {
                 Self::COOKING => "cooking",
                 Self::COMMUNICATION => "communication",
@@ -930,13 +930,13 @@ mod liv {
     pub enum TaskTag {
         WaitLike,
         MoveToPos(u32, u32),
-        GetFromPos(u32, u32), // pick up a thing from positon.
-        PutAtPos(u32, u32), // drop something at pos.
+        GetFromPos(u32, u32), // pick up a thing from position.
+        PutAtPos(u32, u32), // drop something at position.
         MeetWith(usize, bool, bool), // commute with another wusel (id)
     }
 
     impl Task {
-        /** Get the approximatly rest time (im ticks), this task needs. */
+        /** Get the approximately rest time (in ticks), this task needs. */
         fn get_rest_time(self: &Self) -> usize {
             self.duration - self.done_steps
         }
@@ -1034,7 +1034,7 @@ mod liv {
             return self.is_alive()
         }
 
-        /** Count a new day to the lived lifed. */
+        /** Count a new day to the lived lived. */
         fn add_new_day(self: &mut Self) {
             if self.is_alive() {
                 /* Age one day. */
@@ -1063,7 +1063,7 @@ mod liv {
         }
 
         /** Get name of the Wusel. */
-        fn get_name(&self) -> String {
+        fn get_name(self: &Self) -> String {
             self.name.clone()
         }
 
@@ -1211,7 +1211,6 @@ mod liv {
          * This may create a new value, with default input changed by the change value.
          * @return the new value.*/
         fn add_need(self: &mut Self, need: Need, change_value: u32) -> u32 {
-            // 3x iterating. O(3n + c)
             let current = self.get_need(need) as i64; // get current value (or default)
 
             let mut changed = current + (change_value as i64);
