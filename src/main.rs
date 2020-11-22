@@ -25,7 +25,7 @@ fn main() -> Result<(), io::Error> {
         .set_passive_part(liv::TaskTag::WaitLike)
         .set_duration(5 /*ticks*/);
 
-    let walking: liv::TaskBuilder = liv::TaskBuilder::new(
+    let mut walking: liv::TaskBuilder = liv::TaskBuilder::new(
         String::from("Walking"))
         // .set_passive_part(String::from("Any Book"))
         .set_passive_part(liv::TaskTag::MoveToPos(10, 10))
@@ -51,7 +51,7 @@ fn main() -> Result<(), io::Error> {
     // wusel.improve(liv::Ability::FITNESS);
     // wusel.improve(liv::Ability::FINESSE);
 
-    println!("World Clock: {}", world.get_clock());
+    println!("World Clock: {}", world.get_time());
     world.show_wusel_overview();
     for i in 0usize..4 { world.show_wusel_tasklist_for(i); }
     println!("\n\n");
@@ -59,7 +59,7 @@ fn main() -> Result<(), io::Error> {
     world.select_wusel(1);
     world.show_wusel_tasklist();
 
-    println!("World Clock: {}", world.get_clock());
+    println!("World Clock: {}", world.get_time());
     world.show_wusel_overview();
     for i in 0usize..4 { world.show_wusel_tasklist_for(i); }
     println!("\n\n");
@@ -80,14 +80,14 @@ fn main() -> Result<(), io::Error> {
 
     world.assign_task_to_wusel(0, reading.clone());
 
-    println!("World Clock: {}", world.get_clock());
+    println!("World Clock: {}", world.get_time());
     world.show_wusel_overview();
     for i in 0usize..4 { world.show_wusel_tasklist_for(i); }
 
     /* Spend time until almost frozen. */
     for _ in 0..900 { world.tick(); }
 
-    println!("World Clock: {}", world.get_clock());
+    println!("World Clock: {}", world.get_time());
     world.show_wusel_overview();
     for i in 0usize..4 { world.show_wusel_tasklist_for(i); }
 
@@ -95,38 +95,72 @@ fn main() -> Result<(), io::Error> {
 
     print!("\n");
 
-    // fn draw_the_grid() {
-    {
+    /* Draw the field and make some real automation. */
+    for _ in 0..60 {
         // world.recalculate_all_positions();
+        draw_field(world.get_width() as usize, world.get_height() as usize, world.get_positions());
 
-        let positions = world.get_positions();
-        let h = world.get_height();
-        let w = world.get_width();
+        /* Tick the world, maybe print the ongoing tasks. */
+        print!("Time: {}\n", world.get_time());
+        world.tick();
 
-        println!("{side}{side:->len$}", side = "+", len = (w+1) as usize); // top side.
-
-        let mut y = h - 1;
-        loop {
-            print!("|"); // left border.
-            for x in 0u32 .. w {
-                // draw position. (x,y)
-                let on_pos = &positions[(y*w + x) as usize];
-                print!("{}", if on_pos.len() < 1 { '`' } else {
-                    on_pos[0].0 // type indicator.
-                });
+        /* Give some unbusy wusels the task to move around. */
+        let unbusy = world.get_unbusy_wusels();
+        for widx in unbusy {
+            if rand::random::<bool>() {
+                /* Walk randomly somewhere. */
+                walking = walking.set_passive_part(liv::TaskTag::MoveToPos(
+                        rand::random::<u32>() % world.get_width(),
+                        rand::random::<u32>() % world.get_height()));
+                world.assign_task_to_wusel(widx, walking.clone());
             }
-            print!("|\n"); // right border and new line.
-            if y == 0 { break; } else { y -= 1; }
         }
 
-        println!("{side}{side:->len$}", side = "+", len = (w+1) as usize); // bot side.
+        std::thread::sleep_ms(500); // wait.
     }
 
     Ok(())
 }
 
+/** Clean he view and draw the field, put the cursor, two lines below the field, to write there. */
+fn draw_field(w: usize, h: usize, positions: Vec<Vec<(char, usize)>>) {
+    /* Draw field. */
+    for p in 0..positions.len() {
+        let on_pos = &positions[p];
+        print!("{pos}{sym}",
+               pos = termion::cursor::Goto(
+                   (p % w) as u16 + 2, // x
+                   (p / w) as u16 + 2), // y
+               sym = if on_pos.len() < 1 { '`' } else { on_pos[0].0 });
+    }
+
+    /* Draw border. */
+    let mut i: u16 = 0;
+    let w2: u16 = w as u16 + 2;
+    let h2: u16 = h as u16 + 2;
+    let around: u16 = (w2 * h2) as u16;
+    while i < around {
+        /* Draw symbol. */
+        print!("{pos}{border}",
+               pos = termion::cursor::Goto(i % w2 + 1, i / w2 + 1),
+               border = match i % w2 {
+                   _ if i == 0 || i == w2 - 1 || i == around - w2 || i == around - 1 => "+",
+                   0 => "|",
+                   x if x == (w2-1) => "|",
+                   _ => "=",
+               });
+        /* Go around field. */
+        i += if i < w2 || i >= around - w2 -1 || i % w2 == w2 - 1 { 1 } else {w2 - 1 };
+    }
+
+    /* Positiion to below field, clear everything below. */
+    print!("{pos}{clear}",
+           pos = termion::cursor::Goto(1, h as u16 + 4),
+           clear = termion::clear::AfterCursor);
+}
 
 
+///////////////////////////////////////////////////////////////////////////////
 
 mod liv {
     /** The place of existence, time and relations. */
@@ -170,7 +204,7 @@ mod liv {
             self.height
         }
 
-        pub fn get_clock(self: &Self) -> usize {
+        pub fn get_time(self: &Self) -> usize {
             self.clock
         }
 
@@ -180,10 +214,6 @@ mod liv {
          * ID is the current wusel count.
          * TODO (2020-11-20) what is about dead wusels and decreasing length? */
         pub fn new_wusel(self: &mut Self, name: String, female: bool) {
-            println!("Create a new wusel at time {}, with the name {} {}",
-                     self.clock,
-                     name, match female { true => "\u{2640}", _ => "\u{2642}"});
-
             let id = self.wusels_created; // almost identifier (for a long time unique)
             let w = Wusel::new(id, name, female); // new wusel at (0,0)
 
@@ -205,6 +235,17 @@ mod liv {
         /** Get the index of the wusel, which is currently selected. */
         pub fn get_selected_wusel(self: &Self) -> usize {
             self.wusel_selected
+        }
+
+        /** Get the indices of all wusels, which are currently having no tasks to do. */
+        pub fn get_unbusy_wusels(self: &Self) -> Vec<usize> {
+            let mut unbusy: Vec<usize> = vec![];
+            for i in 0..self.wusels.len() {
+                if self.wusels[i].tasklist.len() < 1 {
+                    unbusy.push(i);
+                }
+            }
+            return unbusy;
         }
 
         /** Give an available wusel (by index) a new task. */
@@ -235,7 +276,7 @@ mod liv {
                 println!("There is no wusel to show.");
                 return;
             }
-            self.wusels[wusel_index].show_overview();
+            println!("{}", self.wusels[wusel_index].show_overview());
         }
 
         /** Print tasklist of (selected) wusel to std::out.*/
@@ -278,7 +319,7 @@ mod liv {
                 let other_name = self.wusels[other_id].get_name();
 
                 /* Print Relation. */
-                print!("[{:?}: {}]", other_name, Self::print_relation(relation));
+                print!("[{:?}: {}]", other_name, relation.show());
                 has_relations = true;
             }
 
@@ -287,20 +328,6 @@ mod liv {
             }
 
             println!("");
-        }
-
-        /** Print a relation to a String. */
-        fn print_relation(relation: &Relation) -> String {
-            return format!("'{official}' \u{263a}{friendly} \u{2665}{romance}{kinship}",
-                           official = relation.officially,
-                           friendly = relation.friendship,
-                           romance = relation.romance,
-                           kinship = match relation.kindred_distance {
-                               -1 => "",
-                               0 => " Self?",
-                               1 => " Siblings|Parents|Kids",
-                               _ => "Related",
-                           });
         }
 
         /** Get an index for the wusel with the requesting index.
@@ -381,8 +408,6 @@ mod liv {
                 if idx < valid_idx {
                     self.positions[idx].push((Self::CHAR_WUSEL, w.id));
                 }
-
-                println!("[DEBUG] idx({} \u{2190} {:?}): add ({},{})", idx, pos, Self::CHAR_WUSEL, w.id);
             }
         }
 
@@ -461,20 +486,14 @@ mod liv {
         /** Proceed the task in this world.
          * @return true, if they are still ongoing. */
         fn proceed(self: &mut World, mut task: Task) -> bool {
-
-            println!("\nWorld proceeds task: {}", task.name);
-            println!(" - steps: {}/{}", task.done_steps, task.duration);
+            /* World proceeds task. */
 
             let wusel_size = self.wusels.len();
             let actor_index = self.wusel_identifier_to_index(task.active_actor_id);
 
             if actor_index >= wusel_size {
-                println!(" - actor not available.");
-                return false; // abort.
+                return false; // abort, because actor unavailable
             }
-
-            println!(" - actor: ID: {} => IDX: {}",
-                     task.active_actor_id, actor_index);
 
             // let mut actor: &mut Wusel;
             let still_running: bool;
@@ -560,10 +579,7 @@ mod liv {
             /* Check, if precondition are satisfied.
              * Maybe proceed to satisfy those condition. */
             for i in 0u8..10 {
-                println!("Check Task Condition {}", i, );
                 if i == dissatisfied {
-                    println!(" - Condition not satisfied, satisfy first.");
-
                     // XXX satisfy pre-condition.
                     // proceed(precondition_subtask);
 
@@ -630,7 +646,8 @@ mod liv {
 
         /** Get the distance between two positions. */
         pub fn get_distance_between(a: (u32, u32), b: (u32, u32)) -> f32 {
-            (((a.0 - b.0).pow(2) + (a.1 - b.1).pow(2)) as f32).sqrt()
+            (((a.0 as i64- b.0 as i64).pow(2) + (a.1 as i64 - b.1 as i64)
+              .pow(2)) as f32).sqrt()
         }
 
         /** Update the relation of two wusels, given by their id. */
@@ -795,6 +812,26 @@ mod liv {
                 kindred_distance: -1,
             }
         }
+
+        pub const RELATION_FRIEND: char = '\u{263a}'; // smiley
+        pub const RELATION_ROMANCE: char = '\u{2665}'; // heart
+
+        /** Print this relation to a String. */
+        pub fn show(self: &Self) -> String {
+            format!("'{official}' {rel_f}{friendly} {rel_r}{romance}{kinship}",
+                    official = self.officially,
+                    rel_f = Self::RELATION_FRIEND,
+                    friendly = self.friendship,
+                    rel_r = Self::RELATION_ROMANCE,
+                    romance = self.romance,
+                    kinship = match self.kindred_distance {
+                        -1 => "",
+                        0 => " Self?",
+                        1 => " Siblings|Parents|Kids",
+                        _ => "Related",
+                    })
+        }
+
     }
 
     /** Life state of a Wusel.
@@ -1093,22 +1130,24 @@ mod liv {
         }
 
         /** Show collected data. */
-        fn show_overview(self: &Self) {
-            println!("==={:=<40}", "");
+        fn show_overview(self: &Self) -> String {
+            let mut s = format!("==={:=<40}\n", "");
 
-            println!("  {}", self.show());
+            s += &format!("  {}\n", self.show());
 
             /* Show needs. */
-            println!("---{:-<40}", " NEEDS: ");
-            self.show_needs();
+            s += &format!("---{:-<40}\n", " NEEDS: ");
+            s += &self.show_needs();
 
             /* Show abilities. */
-            println!("---{:-<40}", " ABILITIES: ");
-            self.show_abilities();
+            s += &format!("---{:-<40}\n", " ABILITIES: ");
+            s += &self.show_abilities();
 
             /* Show relations. */
             // TODO (2020-11-16) show relations.
-            println!("{:_<43}", "");
+            s += &format!("{:_<43}\n", "");
+
+            return s;
         }
 
         /** Print the tasklist (as queue). */
@@ -1138,7 +1177,8 @@ mod liv {
         }
 
         /** Show all assigned needs. */
-        fn show_needs(self: &Self) {
+        fn show_needs(self: &Self) -> String {
+            let mut s = String::new();
             for (n, v) in self.needs.iter() {
 
                 let full = Self::default_need_full(n);
@@ -1146,22 +1186,25 @@ mod liv {
                 let max_len = 20;
                 let bar_len = (*v  * max_len / full) as usize;
 
-                println!(" {name:>14} {value:5} {end:.>bar_len$} ",
+                s += &format!(" {name:>14} {value:5} {end:.>bar_len$} \n",
                          name = n.name(),
                          value = v,
                          bar_len = usize::min(bar_len, max_len as usize),
                          end = "");
             }
+            return s;
         }
 
         /** Print the Wusel's abilities. */
-        fn show_abilities(self: &Self) {
+        fn show_abilities(self: &Self) -> String {
+            let mut s = String::new();
             for (ability, value) in &self.abilities {
-                println!("{a:>15} {v:5} {bar:*<v$}",
+                s += &format!("{a:>15} {v:5} {bar:*<v$}",
                          a = ability.name(),
                          v = *value as usize,
                          bar = "");
             }
+            return s;
         }
 
         /** Get the default need value. */
@@ -1241,7 +1284,6 @@ mod liv {
         /** Append a new task to the task list. */
         fn add_task(self: &mut Self, task_builder: TaskBuilder) {
             /* Task apply self as actor. */
-            println!("Wusel {} received new task '{}'", self.name, task_builder.name);
             let task = task_builder.assign(self);
             self.tasklist.insert(0, task); // revert queue
         }
@@ -1249,9 +1291,6 @@ mod liv {
         /** Abort a task in the task list. */
         fn abort_task(self: &mut Self, index: usize) {
             if index < self.tasklist.len() {
-                println!("Wusel {} aborted a task '{}'",
-                         self.name,
-                         self.tasklist[index].name);
                 self.tasklist.remove(index);
             }
             /* Otherwise no task is aborted. */
