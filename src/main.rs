@@ -31,8 +31,15 @@ fn main() -> Result<(), io::Error> {
         .set_passive_part(liv::TaskTag::MoveToPos(10, 10))
         .set_duration(1 /*ticks*/);
 
+    let talking: liv::TaskBuilder = liv::TaskBuilder::new(
+        String::from("Talking (friendly)"))
+        // .set_passive_part(String::from("Any Book"))
+        .set_passive_part(liv::TaskTag::MeetWith(1, true, false))
+        .set_duration(10 /*ticks*/);
+
     println!("\n----\nCreated a new common Task: {} ({} ticks).", reading.get_name(), reading.get_duration());
     println!("\n----\nCreated a new common Task: {} ({} ticks).", walking.get_name(), walking.get_duration());
+    println!("\n----\nCreated a new common Task: {} ({} ticks).", talking.get_name(), talking.get_duration());
 
     println!("\n\n");
 
@@ -46,20 +53,24 @@ fn main() -> Result<(), io::Error> {
 
     println!("World Clock: {}", world.get_clock());
     world.show_wusel_overview();
+    for i in 0usize..4 { world.show_wusel_tasklist_for(i); }
     println!("\n\n");
 
     world.select_wusel(1);
+    world.show_wusel_tasklist();
 
     println!("World Clock: {}", world.get_clock());
     world.show_wusel_overview();
+    for i in 0usize..4 { world.show_wusel_tasklist_for(i); }
     println!("\n\n");
 
     world.assign_task_to_wusel(0, reading.clone());
     world.tick();
     println!("\n\n");
 
-    world.assign_task_to_wusel(1, reading.clone());
-    world.assign_task_to_wusel(1, walking.clone());
+    world.assign_task_to_wusel(1, reading.clone()); // 1: read
+    world.assign_task_to_wusel(1, walking.clone()); // 1: then run away
+    world.assign_task_to_wusel(2, talking.clone()); // 2: talk with 1 | 1: be then contacted by 2
     world.tick();
     println!("\n\n");
 
@@ -71,12 +82,16 @@ fn main() -> Result<(), io::Error> {
 
     println!("World Clock: {}", world.get_clock());
     world.show_wusel_overview();
+    for i in 0usize..4 { world.show_wusel_tasklist_for(i); }
 
     /* Spend time until almost frozen. */
     for _ in 0..900 { world.tick(); }
 
     println!("World Clock: {}", world.get_clock());
     world.show_wusel_overview();
+    for i in 0usize..4 { world.show_wusel_tasklist_for(i); }
+
+    for i in 0usize..4 { world.show_relations_for(i); }
 
     print!("\n");
 
@@ -122,8 +137,11 @@ mod liv {
 
         clock: usize, // time of the world.
 
-        wusels: Vec<Wusel>, // vector of wusels?
+        wusels: Vec<Wusel>, // vector of wusels
+        wusels_created: usize, // all wusels ever created. => for each wusel identifier.
         wusel_selected: usize, // currently selected wusel
+
+        relations: std::collections::BTreeMap<(usize,usize), Relation>, // vector of wusel relations
     }
 
     impl World {
@@ -134,7 +152,9 @@ mod liv {
                 positions: vec![vec![]; width as usize * height as usize],
                 clock: 0,
                 wusels: vec![],
+                wusels_created: 0,
                 wusel_selected: 0,
+                relations: std::collections::BTreeMap::new(),
             };
         }
 
@@ -181,6 +201,11 @@ mod liv {
             self.wusel_selected = usize::min(selection, self.wusels.len());
         }
 
+        /** Get the index of the wusel, which is currently selected. */
+        pub fn get_selected_wusel(self: &Self) -> usize {
+            self.wusel_selected
+        }
+
         /** Give an available wusel (by index) a new task. */
         pub fn assign_task_to_wusel(self: &mut Self, wusel_index: usize, taskb: TaskBuilder) {
             if wusel_index < self.wusels.len() {
@@ -199,12 +224,82 @@ mod liv {
 
         /** Print overview of (selected) wusel to std::out.*/
         pub fn show_wusel_overview(self: &Self) {
+            self.show_wusel_overview_for(self.wusel_selected);
+        }
+
+        /** Print overview of (selected) wusel to std::out.*/
+        pub fn show_wusel_overview_for(self: &Self, wusel_index: usize) {
             /* No wusel is there to show. */
-            if self.wusels.len() < 1 {
+            if self.wusels.len() <= wusel_index {
                 println!("There is no wusel to show.");
                 return;
             }
-            self.wusels[self.wusel_selected].show_overview();
+            self.wusels[wusel_index].show_overview();
+        }
+
+        /** Print tasklist of (selected) wusel to std::out.*/
+        pub fn show_wusel_tasklist(self: &Self) {
+            self.show_wusel_tasklist_for(self.wusel_selected);
+        }
+
+        /** Print tasklist of (selected) wusel to std::out.*/
+        pub fn show_wusel_tasklist_for(self: &Self, wusel_index: usize) {
+            if wusel_index >= self.wusels.len() {
+                println!("There is no wusel to show.");
+                return;
+            }
+            println!("Tasks of {}: {}",
+                     self.wusels[wusel_index].get_name(),
+                     self.wusels[wusel_index].show_takslist());
+        }
+
+        pub fn show_relations_for(self: &Self, wusel_index: usize) {
+            if wusel_index >= self.wusels.len() {
+                println!("There is no wusel to show.");
+                return;
+            }
+
+            let wusel_id = self.wusels[wusel_index].id;
+
+            print!("Relations with {}: ", self.wusels[wusel_index].get_name());
+
+            let mut has_relations: bool = false;
+
+            for (who, relation) in self.relations.iter() {
+                let other_id: usize;
+
+                /* Get the other wusel.
+                 * Skip where this wusel is even not part in the relation. */
+                if wusel_id == who.0 { other_id = who.1; }
+                else if wusel_id == who.1 { other_id = who.0; }
+                else { continue; } // not in relation
+
+                let other_name = self.wusels[other_id].get_name();
+
+                /* Print Relation. */
+                print!("[{:?}: {}]", other_name, Self::print_relation(relation));
+                has_relations = true;
+            }
+
+            if !has_relations {
+                print!("Has no relations.");
+            }
+
+            println!("");
+        }
+
+        /** Print a relation to a String. */
+        fn print_relation(relation: &Relation) -> String {
+            return format!("'{official}' \u{263a}{friendly} \u{2665}{romance}{kinship}",
+                           official = relation.officially,
+                           friendly = relation.friendship,
+                           romance = relation.romance,
+                           kinship = match relation.kindred_distance {
+                               -1 => "",
+                               0 => " Self?",
+                               1 => " Siblings|Parents|Kids",
+                               _ => "Related",
+                           });
         }
 
         /** Get an index for the wusel with the requesting index.
@@ -310,6 +405,7 @@ mod liv {
             let new_day: bool = self.clock % Self::TICKS_PER_DAY == 0;
 
             let mut ongoing_tasks: Vec<Task> = vec![];
+            let mut new_babies: Vec<(usize, usize, bool)> = vec![];
 
             /* Decay on every object and living. */
             for w in self.wusels.iter_mut() {
@@ -324,10 +420,23 @@ mod liv {
                     /* Wusel is currently unbusy. => maybe apply an idle/auto task. */
                 }
 
+                /* If pregnant: Maybe push out the child => Failure, Early or too late. */
+                if let Some((father, pregnancy_days)) = w.pregnancy {
+                    let maybe_now: u8 = rand::random::<u8>() % 100;
+                    let possibility: u8 = match pregnancy_days {
+                        0 => 90, 1 => 75, _ => 10
+                    };
+                    if (0u8 .. possibility).contains(&maybe_now) {
+                        println!("Pop the baby!");
+                        let female = rand::random::<bool>();
+                        new_babies.push((w.id, father, female));
+                    }
+                }
+
                 w.tick();
                 if new_day {
-                    w.add_new_day()
-                } // add new day to live.
+                    w.add_new_day(); // add new day to live.
+                }
             }
 
             /* Execute ongoing tasks. */
@@ -335,6 +444,16 @@ mod liv {
                 if let Some(t) = ongoing_tasks.pop() {
                     self.proceed(t);
                 }
+            }
+
+            for _ in self.relations.iter() {
+                /* Decay of relations over time. */
+            }
+
+            for baby in new_babies.iter() {
+                println!("New parents {}  and {}: It is a {} ",
+                         baby.0, baby.1,
+                         if baby.2 { "Girl" } else {" Boy" });
             }
         }
 
@@ -413,15 +532,22 @@ mod liv {
                     println!("Drop at Goal: ({}, {}).", x, y);
                     // == MoveToPos(x,y) && drop up on field?
                 },
-                TaskTag::MeetWith(other, nice) => {
-                    println!("Commute with ID: {}, nice: {}.", other, nice);
+                TaskTag::MeetWith(other_id, nice, romantically) => {
+                    println!("Commute with ID: {}, nice: {}.", other_id, nice);
 
-                    let other_index = self.wusel_identifier_to_index(other);
+                    let performance: bool; // how well is the communication
 
-                    if other_index >= self.wusels.len() {
-                        println!("Cannot meet with ID {}! Abort.", other);
-                        return false;
-                    }
+                    performance = true;
+                    // random influence of 10%
+                    // current value and intention
+                    // communication ability
+
+                    self.update_wusel_relations(
+                        task.active_actor_id, other_id,
+                        nice && performance,
+                        romantically && performance);
+
+                    // for each repetition.
 
                     // == MoveToPos(other.x, other.y) && drop up on field?
                 },
@@ -504,6 +630,31 @@ mod liv {
         /** Get the distance between two positions. */
         pub fn get_distance_between(a: (u32, u32), b: (u32, u32)) -> f32 {
             (((a.0 - b.0).pow(2) + (a.1 - b.1).pow(2)) as f32).sqrt()
+        }
+
+        /** Update the relation of two wusels, given by their id. */
+        pub fn update_wusel_relations(self: &mut Self, wusel0_id: usize, wusel1_id: usize, nice: bool, romantic: bool) {
+            /* Decide for a relation key: (Greater ID, Smaller ID). */
+
+            let key = if wusel0_id <= wusel1_id {
+                (wusel0_id, wusel1_id)
+            } else {
+                (wusel1_id, wusel0_id)
+            };
+
+            let change = if nice { 1 } else { -1 };
+
+            /* Get the relation if available.
+             * update a key, guarding against the key possibly not being set. */
+            let rel = self.relations
+                .entry(key)
+                .or_insert_with(Relation::new);
+
+            (*rel).friendship += change;
+
+            if romantic {
+                (*rel).romance += change;
+            }
         }
     }
 
@@ -617,6 +768,30 @@ mod liv {
                 true
             } else {
                 false
+            }
+        }
+    }
+
+    /** Pair of Wusels which may have a relation. */
+    #[derive(Clone, Debug)]
+    pub struct Relation {
+        officially: String, // officially known state (Friends, Spouse, etc..)
+
+        friendship: i32, // shared friendship between both.
+
+        romance: i32, // shared romance between both
+
+        kindred_distance: i32, // blood relation (distance)
+    }
+
+    impl Relation {
+        /** Create a new empty relationship for just met strangers. */
+        fn new() -> Self{
+            Self {
+                officially: String::from("Strangers"),
+                friendship: 0,
+                romance: 0,
+                kindred_distance: -1,
             }
         }
     }
@@ -757,7 +932,7 @@ mod liv {
         MoveToPos(u32, u32),
         GetFromPos(u32, u32), // pick up a thing from positon.
         PutAtPos(u32, u32), // drop something at pos.
-        MeetWith(usize, bool), // commute with another wusel (id)
+        MeetWith(usize, bool, bool), // commute with another wusel (id)
     }
 
     impl Task {
@@ -779,7 +954,7 @@ mod liv {
         position: (u32, u32),
 
         female: bool, // female => able to bear children, male => able to inject children
-        pregnant: bool,
+        pregnancy: Option<(usize, u8)>, // optional pregnancy with father's id and remaining days.
 
         life: Life, // alive | dead | ghost
         lived_days: u32, // last lived day.
@@ -815,7 +990,7 @@ mod liv {
                 position: (0, 0), // start at root
 
                 female: female,
-                pregnant: false,
+                pregnancy: None,
 
                 life: Life::ALIVE,
                 lived_days: 0,
@@ -870,6 +1045,12 @@ mod liv {
                     let (abi, val) = self.abilities[i];
                     self.abilities[i] = (abi, val - 1);
                 }
+
+                /* If pregnant, reduce time until arrival. */
+                self.pregnancy = match self.pregnancy {
+                    Some((father, days)) if days > 0 => Some((father, days - 1)),
+                    _ => self.pregnancy
+                }
             }
         }
 
@@ -905,7 +1086,7 @@ mod liv {
                 Life::GHOST => println!("ghost, "),
             }
             string.push_str(&self.lived_days.to_string());
-            string.push_str("d)");
+            string.push_str("d)"); // days
 
             return string;
         }
@@ -927,6 +1108,32 @@ mod liv {
             /* Show relations. */
             // TODO (2020-11-16) show relations.
             println!("{:_<43}", "");
+        }
+
+        /** Print the tasklist (as queue). */
+        fn show_takslist(self: &Self) -> String {
+            let n = self.tasklist.len();
+            if n < 1 {
+                return String::from("Nothing to do.");
+            }
+            let mut s = String::new();
+            let mut i = n - 1;
+            loop {
+                /* Write task: [Activity Name], */
+                s.push('[');
+                if i == n -1 { s.push('#'); }
+                s.push_str(&self.tasklist[i].name);
+                s.push(']');
+
+                /* Break or next task, if available. */
+                if i == 0 {
+                    break;
+                } else {
+                    s.push_str(", ");
+                    i -= 1;
+                }
+            }
+            return s;
         }
 
         /** Show all assigned needs. */
@@ -1083,6 +1290,21 @@ mod liv {
                 self.add_need(Need::SLEEP, food.needed_energy);
                 self.add_need(Need::FOOD, food.satisfied_food);
                 self.add_need(Need::WATER, food.satisfied_water);
+            }
+        }
+
+        /** Check, if the wusel is pregnant. */
+        #[allow(dead_code)]
+        pub fn is_pregnant(self: &Self) -> bool {
+            return self.pregnancy != None;
+        }
+
+        /** Get the remaining days of an possible Pregnancy. */
+        #[allow(dead_code)]
+        pub fn get_remaining_pregnancy_days(self: &Self) -> Option<u8> {
+            match self.pregnancy {
+                Some((_father, days)) => Some(days),
+                _ => None,
             }
         }
     }
