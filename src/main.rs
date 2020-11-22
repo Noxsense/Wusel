@@ -184,8 +184,8 @@ mod liv {
                      self.clock,
                      name, match female { true => "\u{2640}", _ => "\u{2642}"});
 
-            let id = self.wusels.len();
-            let w = Wusel::new(id, name, female);
+            let id = self.wusels_created; // almost identifier (for a long time unique)
+            let w = Wusel::new(id, name, female); // new wusel at (0,0)
 
             /* Add wusel to positions, start at 0. */
             let pos_idx = self.pos_to_idx(w.get_position());
@@ -194,6 +194,7 @@ mod liv {
             }
 
             self.wusels.push(w);
+            self.wusels_created += 1;
         }
 
         /** Select a wusel by index/living count. */
