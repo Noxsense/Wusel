@@ -530,7 +530,7 @@ mod liv {
                     let stopped: bool
                         = self.let_wusel_walk_to_position(actor_index, (x, y));
 
-                    !stopped // succession, because it's on goal, no success, still walking.
+                    stopped // true == stop == success.
                 },
                 TaskTag::GetFromPos(x,y) => {
                     println!("Pick from Goal: ({}, {}).", x, y);
@@ -541,6 +541,10 @@ mod liv {
                     println!("Drop at Goal: ({}, {}).", x, y);
                     // == MoveToPos(x,y) && drop up on field?
                     true
+                },
+                TaskTag::BeMetFrom(_other_id) => {
+                    println!("Wait for others.");
+                    false // don't succeed; actual progression with other's meeting (or abortion).
                 },
                 TaskTag::MeetWith(other_id, nice, romantically) => {
                     let other_index = self.wusel_identifier_to_index(other_id);
@@ -556,6 +560,12 @@ mod liv {
                         actor_index, other_index,
                         nice, romantically);
 
+                    /* On Final Success with own step,
+                     * also let the BeMetFrom() succeed. */
+                    if actually_talking && task.done_steps + 1 == task.duration {
+                        self.wusels[other_index].notify_ongoing_succeeded();
+                    }
+
                     /* If they are not actually meeting, let the task wait longer.
                      * No succession. */
                     actually_talking
@@ -564,6 +574,7 @@ mod liv {
 
             /* Notify the task succeeded to do a step. */
             if succeeded {
+                println!("[DEBUG] W[{}] Succeeded in doing so.", task.active_actor_id);
                 self.wusels[actor_index].notify_ongoing_succeeded();
             }
         }
@@ -597,32 +608,49 @@ mod liv {
                 return false;
             }
 
+            let active_id = self.wusels[active_index].id;
+            let passive_id = self.wusels[passive_index].id;
+
+            /* Get the passive wusel's current task.
+             * If it is being met by the active, succeed a step with the meeting,
+             * otherwise see below. */
+            let passives_ongoing_task: Option<&Task>
+                = self.wusels[passive_index].peek_ongoing_task();
+
+            let active_is_met = TaskTag::BeMetFrom(active_id);
+
+            let meet = match &passives_ongoing_task {
+                Some(task) if task.passive_part == active_is_met => true,
+                _ => false,
+            };
+
+            if meet {
+                let performance: bool; // how well is the communication
+
+                performance = true;
+                // random influence of 10%
+                // current value and intention
+                // communication ability
+
+                self.update_wusel_relations(
+                    active_id, passive_id,
+                    intention_good && performance,
+                    romantically && performance);
+
+                return true; // they actually met.
+            }
+
             /* If the target does not know yet about the meeting, let them know. */
-            // XXX (2020-11-22) a wusel working on only one task with higher index than active, might look unbusy, but they are not.
-            // XXX SOLVING IDEA: not popping, but referencing with get in tick.
-            if false {
-                return false;
+            if !self.wusels[passive_index].has_task_with(active_is_met) {
+                self.assign_task_to_wusel(
+                    passive_index,
+                    TaskBuilder::new(String::from("Be Met"))
+                    .set_passive_part(active_is_met.clone())
+                    .set_duration(1));
             }
 
             /* If the passive target is not yet ready to talk, wait. */
-            // XXX (2020-11-22) a wusel currently waiting might have popped the task kn tick.
-            if false {
-                return false;
-            }
-
-            let performance: bool; // how well is the communication
-
-            performance = true;
-            // random influence of 10%
-            // current value and intention
-            // communication ability
-
-            self.update_wusel_relations(
-                self.wusels[active_index].id, self.wusels[passive_index].id,
-                intention_good && performance,
-                romantically && performance);
-
-            return true; // they actually met.
+            return false;
         }
 
         /** Let the wusel walk to a position.
@@ -763,7 +791,7 @@ mod liv {
     }
 
     /** Way in the world. */
-    #[derive(Debug, Copy, Clone, PartialEq)]
+    #[derive(Debug, Copy, Clone,  PartialEq)]
     pub enum Way {
         NW, N, NE,
         W,      E,
@@ -1051,13 +1079,14 @@ mod liv {
         passive_part: TaskTag, // position | object-to-be | object | wusel | nothing.
     }
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Copy, Clone, PartialEq)]
     pub enum TaskTag {
         WaitLike,
         MoveToPos(u32, u32),
         GetFromPos(u32, u32), // pick up a thing from position.
         PutAtPos(u32, u32), // drop something at position.
         MeetWith(usize, bool, bool), // commute with another wusel (id)
+        BeMetFrom(usize), // be met by another wusel (id)
     }
 
     impl Task {
@@ -1400,6 +1429,16 @@ mod liv {
                     break; // ongoing task not yet done.
                 }
             }
+        }
+
+        /** Check, if this wusel has a task with the requested passive tag. */
+        fn has_task_with(self: &Self, task_tag: TaskTag) -> bool {
+            for t in self.tasklist.iter() {
+                if t.passive_part == task_tag {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /** Peek the ongoing task. */
