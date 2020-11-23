@@ -309,6 +309,7 @@ mod liv {
                      self.wusels[wusel_index].show_takslist());
         }
 
+        /** Show all relations for a wusel, given by index. */
         pub fn show_relations_for(self: &Self, wusel_index: usize) {
             if wusel_index >= self.wusels.len() {
                 println!("There is no wusel to show.");
@@ -355,7 +356,7 @@ mod liv {
             return self.wusels.len();
         }
 
-        /** Check if the identifer for a requesting wusel is crrently active. */
+        /** Check if the identifier for a requesting wusel is currently active. */
         #[allow(dead_code)]
         fn is_wusel_identifier_active(self: &Self, id: usize) -> bool {
             return self.wusel_identifier_to_index(id) < self.wusels.len();
@@ -386,6 +387,7 @@ mod liv {
                 let old_pos_idx = self.pos_to_idx(old_pos);
                 let new_pos_idx = self.pos_to_idx(new_pos);
 
+                /* Representation in positions. */
                 let wusel_indicator = (Self::CHAR_WUSEL, id);
 
                 /* Remove from old positions[idx]. */
@@ -398,7 +400,6 @@ mod liv {
 
                 /* Add to new positions[idx]. */
                 self.positions[new_pos_idx].push(wusel_indicator);
-
             }
         }
 
@@ -573,9 +574,9 @@ mod liv {
          * If not, the active wusels walk to the passive wusel.
          * The passive wusel must be free or ready to receive the active wusel's approaches.
          * If not, let the active wait for longer and add the request to the passive wusel.
-         * The outcome may be influenced by random and the communocation abilites the active member.
+         * The outcome may be influenced by random and the communication abilities the active member.
          *
-         * #Return, if they actually met (true), or only precondintions needed to be satisfied (false). */
+         * #Return, if they actually met (true), or only preconditions needed to be satisfied (false). */
         fn let_two_wusels_meet(self: &mut Self, active_index: usize, passive_index: usize, intention_good: bool, romantically: bool) -> bool {
             println!("Meet with {}, nice: {}.", self.wusels[passive_index].show(), intention_good);
 
@@ -916,7 +917,6 @@ mod liv {
                         _ => "Related",
                     })
         }
-
     }
 
     /** Life state of a Wusel.
