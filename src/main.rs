@@ -1,6 +1,15 @@
 extern crate rand;
 
 use std::io;
+// use std::io::{Read, Write, stdout, stdin};
+// use termion::raw::IntoRawMode;
+
+// TODO (2020-11-22) TUI/CUI: Look at termion: https://github.com/redox-os/termion/tree/master/examples
+// TODO (2020-11-22) TUI/CUI: Look at termion: https://lib.rs/crates/termion
+// TODO (2020-11-22) TUI/CUI: Look at termion: https://github.com/redox-os/games/blob/master/src/minesweeper/main.rs https://raw.githubusercontent.com/redox-os/games/master/src/minesweeper/main.rs
+// TODO (2020-11-22) TUI/CUI: Look at tui (backend termion): https://docs.rs/tui/0.13.0/tui/index.html
+
+// TODO (2020-11-22) Meeting with someone: Need to be close to the one.
 
 /** The main method of the wusel world. */
 fn main() -> Result<(), io::Error> {
@@ -19,32 +28,34 @@ fn main() -> Result<(), io::Error> {
     world.new_wusel("3rd".to_string(), false); // male
     world.new_wusel("4th".to_string(), false); // male
 
+    /* Create an easy talk, without any preconditions.
+     * => no preconditions.
+     * => does 'nothing' for ticks steps. */
     let reading: liv::TaskBuilder = liv::TaskBuilder::new(
         String::from("Reading"))
         // .set_passive_part(String::from("Any Book"))
         .set_passive_part(liv::TaskTag::WaitLike)
         .set_duration(5 /*ticks*/);
 
+    /* Create walking task. (runs until on goal or aborted)
+     * => condition: is able to walk, not on the goal.
+     * => position is now the goal. */
     let mut walking: liv::TaskBuilder = liv::TaskBuilder::new(
         String::from("Walking"))
         // .set_passive_part(String::from("Any Book"))
         .set_passive_part(liv::TaskTag::MoveToPos(10, 10))
         .set_duration(1 /*ticks*/);
 
+    /* Create talking task
+     * => the other wusel needs to exist, needs to be close, then until the time ran out.
+     * => outcome: changed relation and maybe improved ability. */
     let talking: liv::TaskBuilder = liv::TaskBuilder::new(
         String::from("Talking (friendly)"))
         // .set_passive_part(String::from("Any Book"))
         .set_passive_part(liv::TaskTag::MeetWith(1, true, false))
         .set_duration(10 /*ticks*/);
 
-    println!("\n----\nCreated a new common Task: {} ({} ticks).", reading.get_name(), reading.get_duration());
-    println!("\n----\nCreated a new common Task: {} ({} ticks).", walking.get_name(), walking.get_duration());
-    println!("\n----\nCreated a new common Task: {} ({} ticks).", talking.get_name(), talking.get_duration());
-
-    println!("\n\n");
-
     world.tick();
-    println!("\n\n");
 
     // wusel.improve(liv::Ability::COOKING);
     // wusel.improve(liv::Ability::COMMUNICATION);
@@ -95,8 +106,10 @@ fn main() -> Result<(), io::Error> {
 
     print!("\n");
 
+    let duration = std::time::Duration::from_millis(500);
+
     /* Draw the field and make some real automation. */
-    for _ in 0..60 {
+    while false {
         // world.recalculate_all_positions();
         draw_field(world.get_width() as usize, world.get_height() as usize, world.get_positions());
 
@@ -116,7 +129,7 @@ fn main() -> Result<(), io::Error> {
             }
         }
 
-        std::thread::sleep_ms(500); // wait.
+        std::thread::sleep(duration); // wait.
     }
 
     Ok(())
@@ -154,11 +167,11 @@ fn draw_field(w: usize, h: usize, positions: Vec<Vec<(char, usize)>>) {
     }
 
     /* Positiion to below field, clear everything below. */
-    print!("{pos}{clear}",
-           pos = termion::cursor::Goto(1, h as u16 + 4),
+    print!("{pos_clear}{clear}{pos_then}",
+           pos_clear = termion::cursor::Goto(1, h as u16 + 3),
+           pos_then = termion::cursor::Goto(1, h as u16 + 4),
            clear = termion::clear::AfterCursor);
 }
-
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -233,6 +246,7 @@ mod liv {
         }
 
         /** Get the index of the wusel, which is currently selected. */
+        #[allow(dead_code)]
         pub fn get_selected_wusel(self: &Self) -> usize {
             self.wusel_selected
         }
@@ -339,6 +353,12 @@ mod liv {
                 }
             }
             return self.wusels.len();
+        }
+
+        /** Check if the identifer for a requesting wusel is crrently active. */
+        #[allow(dead_code)]
+        fn is_wusel_identifier_active(self: &Self, id: usize) -> bool {
+            return self.wusel_identifier_to_index(id) < self.wusels.len();
         }
 
         /** Get the position of the indexed wusel. */
@@ -503,41 +523,13 @@ mod liv {
                     println!("Wait?");
                 },
                 TaskTag::MoveToPos(x,y) => {
-                    println!("Move Goal: ({}, {}).", x, y);
-                    // XXX easy placeholder walking, ignoring all obstacles.
+                    /* Let the wusel walk; check if they stopped. */
+                    let stopped: bool
+                        = self.let_wusel_walk_to_position(actor_index, (x, y));
 
-                    let apos = self.get_wusel_position(actor_index);
-                    let (actor_x, actor_y) = apos;
-
-                    if actor_x == x && actor_y == y {
-                        println!("Goal ({},{}) reached.", x, y);
-                        return false;
+                    if stopped {
+                        return false; // task stopped.
                     }
-
-                    let neighbours = Self::get_neighbour_positions(
-                        self.width, self.height,
-                        apos);
-
-                    if neighbours.len() < 1 {
-                        println!("Wusel cannot move, it's enclosed, wait forever");
-                        return true;
-                    }
-
-                    let goal: (u32, u32) = (x, y);
-                    let mut closest: (u32, u32) = neighbours[0];
-                    let mut closest_distance: f32 = f32::MAX;
-
-                    for p in neighbours.iter() {
-                        let distance = Self::get_distance_between(goal, *p);
-
-                        if distance < closest_distance {
-                            closest = *p;
-                            closest_distance = distance;
-                        }
-                    }
-
-                    /* move to closest position. */
-                    self.set_wusel_position(actor_index, closest);
 
                     task.duration += 1; // XXX stop from ending early.
 
@@ -553,43 +545,28 @@ mod liv {
                     // == MoveToPos(x,y) && drop up on field?
                 },
                 TaskTag::MeetWith(other_id, nice, romantically) => {
-                    println!("Commute with ID: {}, nice: {}.", other_id, nice);
+                    let other_index = self.wusel_identifier_to_index(other_id);
 
-                    let performance: bool; // how well is the communication
+                    /* Other wusel needs to exist. */
+                    if other_index >= self.wusels.len() {
+                        return false; // task can not be done, without target.
+                    }
 
-                    performance = true;
-                    // random influence of 10%
-                    // current value and intention
-                    // communication ability
+                    /* Check all preconditions, maybe solve one and maybe do the actually meeting. */
+                    let actually_talking = self.let_two_wusels_meet(
+                        actor_index, other_index,
+                        nice, romantically);
 
-                    self.update_wusel_relations(
-                        task.active_actor_id, other_id,
-                        nice && performance,
-                        romantically && performance);
-
-                    // for each repetition.
-
-                    // == MoveToPos(other.x, other.y) && drop up on field?
+                    /* If they are not actually meeting, let the task wait longer. */
+                    if !actually_talking {
+                        // keep going the meeting.
+                        self.wusels[actor_index].tasklist.push(task);
+                        return true;
+                    }
                 },
             }
 
-            // XXX (2020-11-16) implement pre-condition testing. Remove place holder.
-            let dissatisfied: u8 = rand::random::<u8>() % 11;
-
-            /* Check, if precondition are satisfied.
-             * Maybe proceed to satisfy those condition. */
-            for i in 0u8..10 {
-                if i == dissatisfied {
-                    // XXX satisfy pre-condition.
-                    // proceed(precondition_subtask);
-
-                    self.wusels[actor_index].tasklist.push(task); // put back to ongoing.
-                    return true; // still running.
-                }
-            } // if precondition not satisfied, the code will return before here.
-
             /* If not done yet, put back to tasklist (the ongoing task.) */
-
             task.done_steps += 1;
             still_running = task.done_steps < task.duration;
 
@@ -599,6 +576,125 @@ mod liv {
             }
 
             return still_running;
+        }
+
+        /** Arrange the meeting of two wusels.
+         * They must both exist.
+         * They must be close to each other (neighbour fields or shared desk/bench...).
+         * If not, the active wusels walk to the passive wusel.
+         * The passive wusel must be free or ready to receive the active wusel's approaches.
+         * If not, let the active wait for longer and add the request to the passive wusel.
+         * The outcome may be influenced by random and the communocation abilites the active member.
+         *
+         * #Return, if they actually met (true), or only precondintions needed to be satisfied (false). */
+        fn let_two_wusels_meet(self: &mut Self, active_index: usize, passive_index: usize, intention_good: bool, romantically: bool) -> bool {
+            println!("Meet with {}, nice: {}.", self.wusels[passive_index].show(), intention_good);
+
+            /* If not close to the other wusel, use this step to get closer,
+             * return as not yet ready. */
+            let pos_a = self.get_wusel_position(active_index);
+            let pos_o = self.get_wusel_position(passive_index);
+
+            println!("Meet at {:?} and {:?}", pos_a, pos_o);
+
+            /* If they are not close, try to get closer to the passive target. */
+            if Self::get_distance_between(pos_a, pos_o) > 2.0 {
+                /* Try to get closer, create a sub task walking to the current target's
+                 * position. */
+                // XXX if real path finding is implemented this will always calculate the path there, even if the target moves.
+                println!("Follow to {:?}.", pos_o);
+                self.let_wusel_walk_to_position(active_index, pos_o);
+                return false;
+            }
+
+            /* If the target does not know yet about the meeting, let them know. */
+            // XXX (2020-11-22) a wusel working on only one task with higher index than active, might look unbusy, but they are not.
+            // XXX SOLVING IDEA: not popping, but referencing with get in tick.
+            if false {
+                return false;
+            }
+
+            /* If the passive target is not yet ready to talk, wait. */
+            // XXX (2020-11-22) a wusel currently waiting might have popped the task kn tick.
+            if false {
+                return false;
+            }
+
+            let performance: bool; // how well is the communication
+
+            performance = true;
+            // random influence of 10%
+            // current value and intention
+            // communication ability
+
+            self.update_wusel_relations(
+                self.wusels[active_index].id, self.wusels[passive_index].id,
+                intention_good && performance,
+                romantically && performance);
+
+            return true; // they actually met.
+        }
+
+        /** Let the wusel walk to a position.
+         * If the path is already calculated, let it walk the pre-calculated path.
+         * If not, calculate a new path.
+         * If an obstacle occurs, recalculate the path and continue walking.
+         * If the goal, is reached, the walk is done.
+         *
+         * #Return, if wusel has stopped walking / is on goal (true), otherwise true, if they are still walking. */
+        fn let_wusel_walk_to_position(self: &mut Self, wusel_index: usize, goal: (u32, u32)) -> bool {
+            let pos = self.get_wusel_position(wusel_index);
+
+            /* Check if the goal is already reached. */
+            if pos.0 == goal.0 && pos.1 == goal.1 {
+                println!("Reached Goal ({},{}).", goal.0, goal.1);
+                return true; // stopped walking.
+            }
+
+            println!("Move to Goal {:?}.", goal);
+
+            /* Check, if the pre-calculated path is blocked. */
+            if false {
+                /* Abort the pre-calculated, but blocked path. */
+            }
+
+            /* Check, if the path is (still) pre-calculated. */
+            if true {
+                /* Walk the path. */
+                // XXX easy placeholder walking, ignoring all obstacles.
+
+                /* Get the current positions neighbours. */
+                let neighbours = Self::get_neighbour_positions(
+                    self.width, self.height,
+                    pos);
+
+                if neighbours.len() < 1 {
+                    println!("Wusel cannot move, it's enclosed, wait forever");
+                    return true;
+                }
+
+                let goal: (u32, u32) = (goal.0, goal.1);
+                let mut closest: (u32, u32) = neighbours[0];
+                let mut closest_distance: f32 = f32::MAX;
+
+                /* Find clostest neighbour to goal. */
+                for p in neighbours.iter() {
+                    let distance = Self::get_distance_between(goal, *p);
+
+                    if distance < closest_distance {
+                        closest = *p;
+                        closest_distance = distance;
+                    }
+                }
+
+                /* move to closest position. */
+                self.set_wusel_position(wusel_index, closest);
+                return false; // still walking.
+            } else {
+                /* Calculate the path and go it next time. */
+                println!("Calculate the path to {:?}", goal);
+                return false; // still walking.
+            }
         }
 
         /** Get the (valid) neighbours for a position. */
@@ -813,8 +909,8 @@ mod liv {
             }
         }
 
-        pub const RELATION_FRIEND: char = '\u{263a}'; // smiley
-        pub const RELATION_ROMANCE: char = '\u{2665}'; // heart
+        pub const RELATION_FRIEND: char = '\u{2639}'; // smiley
+        pub const RELATION_ROMANCE: char = '\u{2661}'; // heart
 
         /** Print this relation to a String. */
         pub fn show(self: &Self) -> String {
@@ -919,11 +1015,13 @@ mod liv {
         }
 
         /** Get the name of the future task or all then created tasks. */
+        #[allow(dead_code)]
         pub fn get_name(self: &Self) -> String {
             self.name.clone()
         }
 
         /** Get the duration of the future task or all then created tasks. */
+        #[allow(dead_code)]
         pub fn get_duration(self: &Self) -> usize {
             self.duration
         }
