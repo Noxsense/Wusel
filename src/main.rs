@@ -460,8 +460,10 @@ mod liv {
                  * While peeking, this may remove done tasks and maybe return Nothing. */
                 w.auto_clean_tasks();
 
-                if let Some(task) = w.pop_ongoing_task() {
-                    ongoing_tasks.push(task);
+                /* Peek into the ongoing task, and maybe proceed them.
+                 * This may lead to remove the done task. */
+                if let Some(task) = w.peek_ongoing_task() {
+                   ongoing_tasks.push(task.clone());
                 } else {
                     /* Wusel is currently not busy. => maybe apply an idle/auto task. */
                 }
@@ -479,15 +481,13 @@ mod liv {
                     }
                 }
 
-                w.tick();
-                if new_day {
-                    w.add_new_day(); // add new day to live.
-                }
+                w.tick(new_day);
             }
 
             /* Execute ongoing tasks. */
             while ongoing_tasks.len() > 0 {
                 if let Some(t) = ongoing_tasks.pop() {
+                    /* Decide how to progress the command. */
                     self.proceed(t);
                 }
             }
@@ -501,55 +501,53 @@ mod liv {
                          baby.0, baby.1,
                          if baby.2 { "Girl" } else {" Boy" });
             }
+
+            for i in 0..self.wusels.len() {
+                self.show_wusel_tasklist_for(i);
+            }
         }
 
-        /** Proceed the task in this world.
-         * @return true, if they are still ongoing. */
-        fn proceed(self: &mut World, mut task: Task) -> bool {
+        /** Proceed the task in this world. */
+        fn proceed(self: &mut World, task: Task) {
             /* World proceeds task. */
 
             let wusel_size = self.wusels.len();
             let actor_index = self.wusel_identifier_to_index(task.active_actor_id);
 
             if actor_index >= wusel_size {
-                return false; // abort, because actor unavailable
+                return; // abort, because actor unavailable
             }
 
-            // let mut actor: &mut Wusel;
-            let still_running: bool;
-
-            match task.passive_part {
+            /* Decide what to do, and if the task case done a step. */
+            let succeeded = match task.passive_part {
                 TaskTag::WaitLike => {
                     println!("Wait?");
+                    true
                 },
                 TaskTag::MoveToPos(x,y) => {
                     /* Let the wusel walk; check if they stopped. */
                     let stopped: bool
                         = self.let_wusel_walk_to_position(actor_index, (x, y));
 
-                    if stopped {
-                        return false; // task stopped.
-                    }
-
-                    task.duration += 1; // XXX stop from ending early.
-
-                    // XXX calculate the path for a certain reach/depth, go first step.
-                    // XXX where to save the pre-calculated path?
+                    !stopped // succession, because it's on goal, no success, still walking.
                 },
                 TaskTag::GetFromPos(x,y) => {
                     println!("Pick from Goal: ({}, {}).", x, y);
                     // == MoveToPos(x,y) && pick up on field?
+                    true
                 },
                 TaskTag::PutAtPos(x,y) => {
                     println!("Drop at Goal: ({}, {}).", x, y);
                     // == MoveToPos(x,y) && drop up on field?
+                    true
                 },
                 TaskTag::MeetWith(other_id, nice, romantically) => {
                     let other_index = self.wusel_identifier_to_index(other_id);
 
-                    /* Other wusel needs to exist. */
+                    /* Other wusel needs also to exist. */
                     if other_index >= self.wusels.len() {
-                        return false; // task can not be done, without target.
+                        self.wusels[actor_index].pop_ongoing_task();
+                        return; // task can not be done, without target.
                     }
 
                     /* Check all preconditions, maybe solve one and maybe do the actually meeting. */
@@ -557,25 +555,16 @@ mod liv {
                         actor_index, other_index,
                         nice, romantically);
 
-                    /* If they are not actually meeting, let the task wait longer. */
-                    if !actually_talking {
-                        // keep going the meeting.
-                        self.wusels[actor_index].tasklist.push(task);
-                        return true;
-                    }
+                    /* If they are not actually meeting, let the task wait longer.
+                     * No succession. */
+                    actually_talking
                 },
+            };
+
+            /* Notify the task succeeded to do a step. */
+            if succeeded {
+                self.wusels[actor_index].notify_ongoing_succeeded();
             }
-
-            /* If not done yet, put back to tasklist (the ongoing task.) */
-            task.done_steps += 1;
-            still_running = task.done_steps < task.duration;
-
-            if still_running {
-                /* Insert back, where current task are (reversed queue) */
-                self.wusels[actor_index].tasklist.push(task);
-            }
-
-            return still_running;
         }
 
         /** Arrange the meeting of two wusels.
@@ -1151,7 +1140,7 @@ mod liv {
 
         /** Tick one unit.
          * @return if the wusel is still alive in the end. */
-        fn tick(self: &mut Self) -> bool {
+        fn tick(self: &mut Self, add_day: bool) -> bool {
 
             /* If in action, need changes may also apply, eg. eating. */
             // self.act(); // proceed on task, if tasklist is providing one.
@@ -1165,6 +1154,11 @@ mod liv {
                 // XXX when IN COLD: decay warmth
 
                 self.needs[i] = (n, if v < decay { 0 } else { v - decay });
+            }
+
+            /* Add a new day. */
+            if add_day {
+                self.add_new_day()
             }
 
             return self.is_alive()
@@ -1258,10 +1252,11 @@ mod liv {
             let mut i = n - 1;
             loop {
                 /* Write task: [Activity Name], */
-                s.push('[');
-                if i == n -1 { s.push('#'); }
-                s.push_str(&self.tasklist[i].name);
-                s.push(']');
+                s += &format!("[{active}{name} {progress}/{duration}]",
+                             active = if i == n -1 { "#" } else { "" },
+                             name = self.tasklist[i].name,
+                             progress = self.tasklist[i].done_steps,
+                             duration = self.tasklist[i].duration);
 
                 /* Break or next task, if available. */
                 if i == 0 {
@@ -1410,6 +1405,14 @@ mod liv {
         /** Peek the ongoing task. */
         fn peek_ongoing_task(self: &Self) -> Option<&Task> {
             self.tasklist.last()
+        }
+
+        /** Notify the ongoing task, that its done steps are increased
+         * This increases the optional ongoing tasks [done_steps](Task.done_steps). */
+        fn notify_ongoing_succeeded(self: &mut Self) {
+            if let Some(ongoing) = self.tasklist.last_mut() {
+                ongoing.done_steps += 1;
+            }
         }
 
         /** Pop the ongoing task (queue reversed). */
