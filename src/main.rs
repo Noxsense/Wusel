@@ -4,16 +4,17 @@ use std::io;
 // use std::io::{Read, Write, stdout, stdin};
 // use termion::raw::IntoRawMode;
 
-// TODO (2020-11-22) TUI/CUI: Look at termion: https://github.com/redox-os/termion/tree/master/examples
-// TODO (2020-11-22) TUI/CUI: Look at termion: https://lib.rs/crates/termion
-// TODO (2020-11-22) TUI/CUI: Look at termion: https://github.com/redox-os/games/blob/master/src/minesweeper/main.rs https://raw.githubusercontent.com/redox-os/games/master/src/minesweeper/main.rs
-// TODO (2020-11-22) TUI/CUI: Look at tui (backend termion): https://docs.rs/tui/0.13.0/tui/index.html
-
-// TODO (2020-11-22) Meeting with someone: Need to be close to the one.
+// TODO (2020-11-24) implement eating (from nothing?) / or need improvement.
+// ==> Grab some food
+// ==> Interacting/Consuming the Need Changing thing changes Needs.
+// ==> aka not over tasks but the interacted objects.
+// ==> other need improvements the same way,
+// TODO (2020-11-24) implement grabbing food
 
 /** The main method of the wusel world. */
 fn main() -> Result<(), io::Error> {
     liv::test_wusel_eats();
+    test_mutal_meeting();
 
     let mut world: liv::World = liv::World::new(80, 30);
     println!("Created a new world: w:{w}, h:{h}",
@@ -34,23 +35,17 @@ fn main() -> Result<(), io::Error> {
     let reading: liv::TaskBuilder = liv::TaskBuilder::new(
         String::from("Reading"))
         // .set_passive_part(String::from("Any Book"))
-        .set_passive_part(liv::TaskTag::WaitLike)
         .set_duration(5 /*ticks*/);
 
     /* Create walking task. (runs until on goal or aborted)
      * => condition: is able to walk, not on the goal.
      * => position is now the goal. */
-    let walking: liv::TaskBuilder = liv::TaskBuilder::new(
-        String::from("Walking"))
-        .set_passive_part(liv::TaskTag::MoveToPos(10, 10))
-        .set_duration(1 /*ticks*/);
+    let walking: liv::TaskBuilder = liv::TaskBuilder::move_to((10,10));
 
     /* Create talking task
      * => the other wusel needs to exist, needs to be close, then until the time ran out.
      * => outcome: changed relation and maybe improved ability. */
-    let talking: liv::TaskBuilder = liv::TaskBuilder::new(
-        String::from("Talking (friendly)"))
-        .set_passive_part(liv::TaskTag::MeetWith(1, true, false))
+    let talking: liv::TaskBuilder = liv::TaskBuilder::meet_with(1, true, false)
         .set_duration(10 /*ticks*/);
 
     world.tick();
@@ -73,34 +68,25 @@ fn main() -> Result<(), io::Error> {
     for i in 0usize..4 { world.show_wusel_tasklist_for(i); }
     println!("\n\n");
 
-    world.assign_task_to_wusel(0, reading.clone());
-    world.tick();
-    println!("\n\n");
+    world.assign_task_to_wusel(0, reading.clone()); // do reading.
 
-    world.assign_task_to_wusel(1, reading.clone()); // 1: read
-    world.assign_task_to_wusel(1, walking.clone()); // 1: then run away
-    world.assign_task_to_wusel(2, talking.clone()); // 2: talk with 1 | 1: be then contacted by 2
+    world.tick(); println!("\n\n"); // spent some time doing the task.
 
-    world.assign_task_to_wusel(3, liv::TaskBuilder::meet_with(0, true, false).set_name("Hi 0".to_string())); // mutual meeting.
-    world.assign_task_to_wusel(0, liv::TaskBuilder::meet_with(3, true, false).set_name("Hi 3".to_string())); // mutual meeting.
-
-    for _ in 0..20 { world.tick(); println!("\n\n"); } // XXX DEBUG
+    world.abort_task_from_wusel(0, 0); // abort task
+    world.assign_task_to_wusel(0, reading.clone()); // re-add reading.
 
     world.tick();
     println!("\n\n");
 
-    world.abort_task_from_wusel(0, 0);
-    world.tick();
-    println!("\n\n");
-
-    world.assign_task_to_wusel(0, reading.clone());
+    // show state before rendering the world ever and ever again. \_(o_0)_/
 
     println!("World Clock: {}", world.get_time());
-    world.show_wusel_overview();
-    for i in 0usize..4 { world.show_wusel_tasklist_for(i); }
 
-    world.show_relations_for(world.get_selected_wusel());
+    world.show_wusel_overview(); // needs
+    world.show_relations_for(world.get_selected_wusel()); // relations
+    for i in 0usize..4 { world.show_wusel_tasklist_for(i); } // everyones tasklist
 
+    /* Every 500 ms, make a tick. */
     let duration = std::time::Duration::from_millis(500);
 
     /* Draw the field and make some real automation. */
@@ -137,6 +123,12 @@ fn main() -> Result<(), io::Error> {
                 _ => {} // do nothing randomly.
             }
         }
+
+        /* Draw selected wusel's needs (right position below field). */
+        // print!("{pos}", pos = termion::cursor::Goto(
+        //         world.get_width() as u16 - 22,
+        //         world.get_height() as u16 + 3));
+        // world.show_wusel_overview();
 
         std::thread::sleep(duration); // wait.
     }
@@ -180,6 +172,81 @@ fn draw_field(w: usize, h: usize, positions: Vec<Vec<(char, usize)>>) {
            pos_clear = termion::cursor::Goto(1, h as u16 + 3),
            pos_then = termion::cursor::Goto(1, h as u16 + 4),
            clear = termion::clear::AfterCursor);
+}
+
+/** Test mutually meeting, which may cause deadlocks.
+ * -----
+ * 1at: [Read, Meet 2nd].
+ * 2nd: [Meet 3rd]
+ * 3rd: [Meet 4th]
+ * 4th: [Meet 1st]
+ * -----
+ * 1at: [Read, Meet 2nd] + [Met by 4th]
+ * 2nd: [Meet 3rd]
+ * 3rd: [Meet 4th] + [Met by 2nd]
+ * 4th: [Meet 1st] + [Met by 3rd]
+ * -----
+ * 1st done with reading and wants to meet 2nd.
+ * -----
+ * 1at: [Meet 2nd, Met by 4th]
+ * 2nd: [Meet 3rd] + [Met by 1st]
+ * 3rd: [Meet 4th, Met by 2nd]
+ * 4th: [Meet 1st, Met by 3rd]
+ * -----
+ * Nothing happens, since everyone waits for the other to be done.
+ * 2nd, 3rd and 4th stop meeting. (they waited too long)
+ * -----
+ * 1at: [Meet 2nd, Met by 4th]
+ * 2nd: [Met by 1st]
+ * 3rd: [Met by 2nd]
+ * 4th: [Met by 3rd]
+ * -----
+ * The active meeter, they were about to be met by is gone, stop being met.
+ * 1at: [Meet 2nd, Met by 4th]
+ * 2nd: [Met by 1st]
+ * 3rd: []
+ * 4th: []
+ * -----
+ * 1st meets 2nd; 4th is not meeting 1st anymore. No tasks left.
+ */
+fn test_mutal_meeting() {
+    println!("[test] Mutual Meeting, causes for circular deadlocks.");
+    let mut test_world: liv::World = liv::World::new(80, 30);
+
+    /* Empty test_world tick. */
+    test_world.tick();
+
+    test_world.new_wusel("1st".to_string(), true); // female
+    test_world.new_wusel("2nd".to_string(), true); // female
+    test_world.new_wusel("3rd".to_string(), false); // male
+    test_world.new_wusel("4th".to_string(), false); // male
+
+    /* Create an easy talk, without any preconditions.
+     * => no preconditions.
+     * => does 'nothing' for ticks steps. */
+    let reading: liv::TaskBuilder = liv::TaskBuilder::new(
+        String::from("Reading"))
+        .set_duration(5 /*ticks*/);
+
+    test_world.tick();
+
+    // first wusel is also doing something else
+    test_world.assign_task_to_wusel(0, reading.clone()); // do reading.
+
+    // scenario: everyone wants too meet the next one.
+    test_world.assign_task_to_wusel(0, liv::TaskBuilder::meet_with(1, true, false).set_duration(7)); // mutual meeting.
+    test_world.assign_task_to_wusel(1, liv::TaskBuilder::meet_with(2, true, false).set_duration(7)); // mutual meeting.
+    test_world.assign_task_to_wusel(2, liv::TaskBuilder::meet_with(3, true, false).set_duration(7)); // mutual meeting.
+    test_world.assign_task_to_wusel(3, liv::TaskBuilder::meet_with(0, true, false).set_duration(7)); // mutual meeting.
+
+    /* 90 ticks later. */
+    for _ in 0..90 {
+        test_world.tick();
+        println!("\nTasks at time {}:", test_world.get_time());
+        for w in 0..4 {
+            test_world.show_wusel_tasklist_for(w);
+        }
+    };
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -280,7 +347,7 @@ mod liv {
         pub fn assign_task_to_wusel(self: &mut Self, wusel_index: usize, taskb: TaskBuilder) {
             if wusel_index < self.wusels.len() {
                 /* Task apply wusel[index] as actor. */
-                self.wusels[wusel_index].add_task(taskb);
+                self.wusels[wusel_index].add_task(self.clock, taskb);
             }
         }
 
@@ -467,13 +534,13 @@ mod liv {
 
             let mut some_busy_wusel: Vec<usize> = vec![];
             let mut new_babies: Vec<(usize, usize, bool)> = vec![];
+            let mut dying_wusels: Vec<usize>= vec![];
 
             /* Decay on every object and living. */
             let mut i: usize = 0;
             for w in self.wusels.iter_mut() {
 
-                /* Peek ongoing tasks of (all wusels) and try to proceed.
-                 * While peeking, this may remove done tasks and maybe return Nothing. */
+                /* Watch all tasks, remove tasks, which may be aborted or ran out. */
                 w.auto_clean_tasks();
 
                 /* Peek into the ongoing task, and maybe proceed them.
@@ -497,7 +564,13 @@ mod liv {
                     }
                 }
 
-                w.tick(new_day);
+                let alive = w.wusel_tick(new_day);
+
+                /* The wusel just died. Remove if from active wusels later. */
+                if !alive {
+                    dying_wusels.push(i);
+                }
+
                 i += 1;
             }
 
@@ -520,11 +593,6 @@ mod liv {
                          baby.0, baby.1,
                          if baby.2 { "Girl" } else {" Boy" });
             }
-
-            // [DEBUG] and directly to std::out
-            for i in 0..self.wusels.len() {
-                self.show_wusel_tasklist_for(i);
-            }
         }
 
         /** Proceed the task in this world. */
@@ -532,11 +600,22 @@ mod liv {
             /* World proceeds task. */
 
             let wusel_size = self.wusels.len();
-            let actor_index = self.wusel_identifier_to_index(task.active_actor_id);
+            let actor_id = task.active_actor_id;
+            let actor_index = self.wusel_identifier_to_index(actor_id);
 
             if actor_index >= wusel_size {
                 return; // abort, because actor unavailable
             }
+
+            let start_time = match task.started {
+                true => task.start_time,
+                false => {
+                    /* Notify the start of the task (for the wusel). */
+                    self.wusels[actor_id].start_ongoing_task(self.clock);
+
+                    self.clock // starting now
+                },
+            };
 
             /* Decide what to do, and if the task case done a step. */
             let succeeded = match task.passive_part {
@@ -544,9 +623,32 @@ mod liv {
                     println!("{}", task.name);
                     true
                 },
-                TaskTag::BeMetFrom(_other_id) => {
-                    println!("Wait for others.");
-                    false // don't succeed; actual progression with other's meeting (or abortion).
+                TaskTag::BeMetFrom(other_id) => {
+                    let other_index = self.wusel_identifier_to_index(other_id);
+
+                    /* Other wusel needs also to exist or still wants to meet.
+                     * Otherwise pop. */
+
+                    match other_index {
+
+                        /* => procceed, since the other party was invalid. */
+                        invalid_index if invalid_index >= self.wusels.len() => true,
+
+                        /* Meeting party is valid, check their ongoing task. */
+                        _ => match self.wusels[other_index].peek_ongoing_task() {
+                            /* => Proceed, since the other party is doing nothing, so no meeting. */
+                            None => true,
+
+                            /* Other party is busy. */
+                            Some(t) => match t.passive_part {
+                                /* => Do not end (proceed), since the other party is still meeting with this actor. */
+                                TaskTag::MeetWith(id, _nice, _love) if id == actor_id => false,
+
+                                /* => proceed task, other party is busy with sth else. */
+                                _ => true,
+                            },
+                        },
+                    }
                 },
                 TaskTag::MeetWith(other_id, nice, romantically) => {
                     let other_index = self.wusel_identifier_to_index(other_id);
@@ -557,20 +659,32 @@ mod liv {
                         return; // task can not be done, without target.
                     }
 
-                    /* Check all preconditions, maybe solve one and maybe do the actually meeting. */
-                    let actually_talking = self.let_two_wusels_meet(
+                    /* Check all preconditions, maybe solve one and maybe do the actually meeting.
+                     * 0, when they met, like the C-ish "OK".
+                     * 1, when the actor walked.
+                     * 2, when the actual knocking was just applied.
+                     * 3, when the knocking was done, but the passive is still busy.
+                     */
+                    let meeting_result = self.let_two_wusels_meet(
                         actor_index, other_index,
                         nice, romantically);
 
                     /* On Final Success with own step,
                      * also let the BeMetFrom() succeed. */
-                    if actually_talking && task.done_steps + 1 == task.duration {
-                        self.wusels[other_index].notify_ongoing_succeeded();
-                    }
 
-                    /* If they are not actually meeting, let the task wait longer.
-                     * No succession. */
-                    actually_talking
+                    match meeting_result {
+                        // waiting, but don't wait too long.
+                        Self::MEET_RESULT_WAITED => {
+                            if self.clock - start_time >= Task::PATIENCE_TO_MEET {
+                                self.wusels[actor_index].pop_ongoing_task();
+                            }
+                            false // => do not notify succession
+                        },
+
+                        /* They met and the task is over. */
+                        Self::MEET_RESULT_OK => true, // => notify process
+                        _ => false, // => no process (FOLLOWED, KNOCKED or an unexpected)
+                    }
                 },
                 TaskTag::MoveToPos(x,y) => {
                     /* Let the wusel walk; check if they stopped. */
@@ -599,6 +713,11 @@ mod liv {
             }
         }
 
+        const MEET_RESULT_OK: i8 =  0; //  When they met, like the C-ish "OK".
+        const MEET_RESULT_FOLLOWED: i8 =  1; //  When the actor walked, they might not have met yet.
+        const MEET_RESULT_KNOCKED: i8 =  2; //  When the actual knocking was just applied, they know both of the meeting, but that may come next.
+        const MEET_RESULT_WAITED: i8 =  3; //  When the knocking was done, but the passive is still busy, they actually have not met like intended.
+
         /** Arrange the meeting of two wusels.
          * They must both exist.
          * They must be close to each other (neighbour fields or shared desk/bench...).
@@ -607,8 +726,14 @@ mod liv {
          * If not, let the active wait for longer and add the request to the passive wusel.
          * The outcome may be influenced by random and the communication abilities the active member.
          *
+         * The output is a number, presenting what the active wusel has done.
+         * 0: When they met, like the C-ish "OK".
+         * 1: When the actor walked, they might not have met yet.
+         * 2: When the actual knocking was just applied, they know both of the meeting, but that may come next.
+         * 3: When the knocking was done, but the passive is still busy, they actually have not met like intended.
+         *
          * #Return, if they actually met (true), or only preconditions needed to be satisfied (false). */
-        fn let_two_wusels_meet(self: &mut Self, active_index: usize, passive_index: usize, intention_good: bool, romantically: bool) -> bool {
+        fn let_two_wusels_meet(self: &mut Self, active_index: usize, passive_index: usize, intention_good: bool, romantically: bool) -> i8 {
             println!("Meet with {}, nice: {}.", self.wusels[passive_index].show(), intention_good);
 
             /* If not close to the other wusel, use this step to get closer,
@@ -625,7 +750,7 @@ mod liv {
                 // XXX if real path finding is implemented this will always calculate the path there, even if the target moves.
                 println!("Follow to {:?}.", pos_o);
                 self.let_wusel_walk_to_position(active_index, pos_o);
-                return false;
+                return Self::MEET_RESULT_FOLLOWED;
             }
 
             let active_id = self.wusels[active_index].id;
@@ -643,12 +768,12 @@ mod liv {
 
             let active_is_met = TaskTag::BeMetFrom(active_id);
 
-            let meet = match &passives_ongoing_tasktag {
+            let handshake_okay = match &passives_ongoing_tasktag {
                 Some(tag) if *tag == active_is_met => true,
                 _ => false,
             };
 
-            if meet {
+            if handshake_okay {
                 let performance: bool; // how well is the communication
 
                 performance = true;
@@ -656,12 +781,13 @@ mod liv {
                 // current value and intention
                 // communication ability
 
+                /* Update the relation beteen active and passive. */
                 self.update_wusel_relations(
                     active_id, passive_id,
                     intention_good && performance,
                     romantically && performance);
 
-                return true; // they actually met.
+                return Self::MEET_RESULT_OK; // they actually met.
             }
 
             /* Check, if the passive is already waiting (in tasklist). */
@@ -669,7 +795,7 @@ mod liv {
                 = self.wusels[passive_index].has_task_with(active_is_met);
 
             /* Check if they both want an (actively) Meeting each other. */
-            let mutal_meeting = match &passives_ongoing_tasktag {
+            let mutuall_meeting_as_actives = match &passives_ongoing_tasktag {
                 Some(TaskTag::MeetWith(id, _, _)) if *id == active_id => true,
                 _ => false,
             };
@@ -677,12 +803,12 @@ mod liv {
             /* They are blocking each other by waiting.
              * A: "I want to talk with you, but wait until you're done with your task."
              * B: "I also want to talk with you, but I wait for you!" */
-            if mutal_meeting {
+            if mutuall_meeting_as_actives {
 
                 /* If one of them are already waiting for the other, it's settled.
                  * Just get the waiting (to be met) to active task. */
 
-                /* This active meeter was earler.
+                /* This active meeter was earlier.
                  * This passive meeter was earlier.
                  * Otherwise some invalid index. */
 
@@ -694,6 +820,15 @@ mod liv {
 
                 /* Move already waiting task to active tasks. */
                 if already_waiting_index < self.wusels.len() {
+
+                    /* What happeens:
+                     * A: [Talk B, Task A2, Task A3]
+                     * B: [Talk A, Task B3, Listen A] // B already knows.
+                     * ----
+                     * A: [Talk B, Task A2, Task A3]
+                     * B: [Listen A, Talk A, Task B2, Task B3] // let B listen first.
+                     */
+
                     let mut i = self.wusels[already_waiting_index].tasklist.len();
                     while i > 0 {
                         i -= 1;
@@ -703,7 +838,7 @@ mod liv {
                             break;
                         }
                     }
-                    return false; // not yet meeting, but prepared.
+                    return Self::MEET_RESULT_KNOCKED; // even if it might be knocked before.
                 }
 
                 /* Non of them requested anything before.
@@ -722,9 +857,11 @@ mod liv {
                     _ => (passive_index, active_index),
                 };
 
-                self.assign_task_to_wusel(more_passive, TaskBuilder::be_met_from(more_active).set_name(format!("Be met by {}", more_active)));
+                self.assign_task_to_wusel(
+                    more_passive,
+                    TaskBuilder::be_met_from(more_active).set_name(format!("Be met by {}", more_active)));
 
-                return false; // not yet met, but prepared to wait.
+                return Self::MEET_RESULT_KNOCKED;
             }
 
             /* Else, just notify them, if not yet done,
@@ -732,10 +869,11 @@ mod liv {
             if !passive_is_waiting {
                 /* Tell passive to be ready for active. */
                 self.assign_task_to_wusel(passive_index, TaskBuilder::be_met_from(active_id));
+                return Self::MEET_RESULT_KNOCKED;
             }
 
-            /* If the passive target is not yet ready to talk, wait. */
-            return false;
+            /* If the passive target is not yet ready to talk, wait.  */
+            return Self::MEET_RESULT_WAITED;
         }
 
         /** Let the wusel walk to a position.
@@ -1174,9 +1312,11 @@ mod liv {
         }
 
         /** Create a new Task from the builder for the requesting [actor](Wusel). */
-        fn assign(self, actor: &Wusel) -> Task {
+        fn assign(self, start_time: usize, actor: &Wusel) -> Task {
             Task {
                 name: self.name,
+                started: false,
+                start_time: start_time,
                 duration: self.duration,
                 done_steps: 0,
 
@@ -1190,6 +1330,8 @@ mod liv {
     #[derive(Clone)]
     pub struct Task {
         name: String,
+        started: bool,
+        start_time: usize,
         duration: usize,
         done_steps: usize,
 
@@ -1208,6 +1350,7 @@ mod liv {
     }
 
     impl Task {
+        const PATIENCE_TO_MEET: usize = 20; // TODO
         /** Get the approximately rest time (in ticks), this task needs. */
         fn get_rest_time(self: &Self) -> usize {
             self.duration - self.done_steps
@@ -1286,8 +1429,10 @@ mod liv {
         }
 
         /** Tick one unit.
+         * Reduce the satisfaction of each needs by default values.
+         * Maybe let it age one day.
          * @return if the wusel is still alive in the end. */
-        fn tick(self: &mut Self, add_day: bool) -> bool {
+        fn wusel_tick(self: &mut Self, add_day: bool) -> bool {
 
             /* If in action, need changes may also apply, eg. eating. */
             // self.act(); // proceed on task, if tasklist is providing one.
@@ -1530,9 +1675,9 @@ mod liv {
         }
 
         /** Append a new task to the task list. */
-        fn add_task(self: &mut Self, task_builder: TaskBuilder) {
+        fn add_task(self: &mut Self, init_time:usize, task_builder: TaskBuilder) {
             /* Task apply self as actor. */
-            let task = task_builder.assign(self);
+            let task = task_builder.assign(init_time, self);
             self.tasklist.insert(0, task); // revert queue
         }
 
@@ -1570,6 +1715,18 @@ mod liv {
         /** Peek the ongoing task. */
         fn peek_ongoing_task(self: &Self) -> Option<&Task> {
             self.tasklist.last()
+        }
+
+        /** Start the ongoing task.
+         * This may set the started flag to true, if not yet set and maybe
+         * updates the starting time. */
+        fn start_ongoing_task(self: &mut Self, start_time: usize) {
+            if let Some(t) = self.tasklist.last_mut() {
+                if !t.started {
+                    t.started = true;
+                    t.start_time = start_time;
+                }
+            }
         }
 
         /** Notify the ongoing task, that its done steps are increased
