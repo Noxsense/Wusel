@@ -173,6 +173,59 @@ fn draw_field(w: usize, h: usize, positions: Vec<Vec<(char, usize)>>) {
     );
 }
 
+/** Test doing tasks. */
+#[test]
+fn test_creating_in_game() {
+    println!("[test] Creating new stuff, let the wusels create stuff in their world.");
+    let mut test_world: liv::World = liv::World::new(80, 30);
+
+    /* Empty test_world tick. */
+    test_world.tick();
+
+    test_world.new_wusel("1st".to_string(), true); // female
+    test_world.new_wusel("2nd".to_string(), true); // female
+    test_world.new_wusel("3rd".to_string(), false); // male
+    test_world.new_wusel("4th".to_string(), false); // male
+
+    // let food: liv::Consumable = liv::Consumable {};
+
+    /* Get the food from food's position. */
+    let get_the_food: liv::TaskBuilder = liv::TaskBuilder::new(String::from("Get the food"));
+
+    /* Eat the held food. */
+    let eat_the_food: liv::TaskBuilder = liv::TaskBuilder::new(String::from("Eating"));
+
+    // TODO: Something can be a tool (to create, dependency) and a consumable (used up by usage)
+    //
+    // Example: Wusel wants to cook.
+    // 1. Go to (free) cooking station: (move)
+    // 2. Wait for the Station to be free
+    // 3. Work on station.
+    // 4. Fetch tomatoes to be cut and prepared (needs Tomatoes)
+    // 5. Cut (consume) tomatoes, create sauce
+    // 6. Heat up sauce. (> use up cold <? Consumable with extra states?)
+    // 7. Creates hot tomato sauce. (can get cold or be eaten.)
+    //
+    // or should tools also be "Consumed" after 1M uses?
+    // knife dull and then .. gone
+    // couch is sit broken after several times?
+
+    /* Cook a meal, that needs a working station, tomatoes, a knife and pot.
+     * Or knife and Pot as part of the station.
+     * Cut a meal, boil the meal => consumes tomatoes, creates tomato soup. */
+
+    // abort if difficulty is too high
+    // walk to station.position, wait until free, block
+    // get required ingredients
+    // do required steps, eg. station changing, prbly a list of subtasks?
+
+    // using objects may influence the needs and skills.
+    // eg.
+    // * eating uses energy, but fills water and hunger
+    // * sleeping fills energy
+    // * doing sports uses energy and water and fills sportivité abilities.
+}
+
 /** Test mutually meeting, which may cause deadlocks.
  * -----
  * 1at: [Read, Meet 2nd].
