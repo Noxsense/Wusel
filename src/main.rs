@@ -16,10 +16,10 @@ fn main() -> Result<(), io::Error> {
     /* Empty world tick. */
     world.tick();
 
-    world.new_wusel("1st".to_string(), true); // female
-    world.new_wusel("2nd".to_string(), true); // female
-    world.new_wusel("3rd".to_string(), false); // male
-    world.new_wusel("4th".to_string(), false); // male
+    world.new_wusel("1st".to_string(), true, (0, 0)); // female
+    world.new_wusel("2nd".to_string(), true, (20, 0)); // female
+    world.new_wusel("3rd".to_string(), false, (30, 0)); // male
+    world.new_wusel("4th".to_string(), false, (40, 0)); // male
 
     /* Create an easy talk, without any preconditions.
      * => no preconditions.
@@ -68,7 +68,7 @@ fn main() -> Result<(), io::Error> {
     println!("World Clock: {}", world.get_time());
 
     world.show_wusel_overview(); // needs
-    world.show_relations_for(world.get_selected_wusel()); // relations
+    world.show_wusel_relations_for(world.get_selected_wusel()); // relations
     for i in 0usize..4 {
         world.show_wusel_tasklist_for(i);
     } // everyone's task list
@@ -182,10 +182,11 @@ fn test_creating_in_game() {
     /* Empty test_world tick. */
     test_world.tick();
 
-    test_world.new_wusel("1st".to_string(), true); // female
-    test_world.new_wusel("2nd".to_string(), true); // female
-    test_world.new_wusel("3rd".to_string(), false); // male
-    test_world.new_wusel("4th".to_string(), false); // male
+    test_world.new_wusel("1st".to_string(), true, (1, 0)); // female
+    test_world.new_wusel("2nd".to_string(), true, (2, 0)); // female
+    test_world.new_wusel("3rd".to_string(), false, (3, 0)); // male
+    test_world.new_wusel("4th".to_string(), false, (4, 0)); // male
+    println!("World's wusel created.");
 
     // let food: liv::Consumable = liv::Consumable {};
 
@@ -269,10 +270,13 @@ fn test_mutal_meeting() {
     /* Empty test_world tick. */
     test_world.tick();
 
-    test_world.new_wusel("1st".to_string(), true); // female
-    test_world.new_wusel("2nd".to_string(), true); // female
-    test_world.new_wusel("3rd".to_string(), false); // male
-    test_world.new_wusel("4th".to_string(), false); // male
+    test_world.new_wusel("1st".to_string(), true, (1, 0)); // female
+    test_world.new_wusel("2nd".to_string(), true, (3, 0)); // female
+    test_world.new_wusel("3rd".to_string(), false, (5, 0)); // male
+    test_world.new_wusel("4th".to_string(), false, (9, 0)); // male
+
+    // 4 wusels created.
+    assert_eq!(4, test_world.wusel_count());
 
     /* Create an easy talk, without any preconditions.
      * => no preconditions.
@@ -316,6 +320,10 @@ fn test_mutal_meeting() {
 ///////////////////////////////////////////////////////////////////////////////
 
 mod liv {
+
+    /** (Private) Wrapping Wusels and positions together. */
+    struct WuselOnPosIdx { wusel: Wusel, position_idx: usize, }
+
     /** The place of existence, time and relations. */
     pub struct World {
         height: u32,
@@ -324,8 +332,9 @@ mod liv {
 
         clock: usize, // time of the world.
 
-        wusels: Vec<Wusel>,    // vector of wusels
-        wusels_created: usize, // all wusels ever created. => for each wusel identifier.
+        // wusels the main live force in here
+        wusels_created: usize, // all wusels ever created. => for each wusel identifier, maybe a few are available, but already the Xth generation
+        wusels: Vec<WuselOnPosIdx>, // vector of { wusels, their positions }
         wusel_selected: usize, // currently selected wusel
 
         relations: std::collections::BTreeMap<(usize, usize), Relation>, // vector of wusel relations
@@ -339,8 +348,8 @@ mod liv {
                 width: width,
                 positions: vec![vec![]; width as usize * height as usize],
                 clock: 0,
-                wusels: vec![],
                 wusels_created: 0,
+                wusels: vec![],
                 wusel_selected: 0,
                 relations: std::collections::BTreeMap::new(),
             };
@@ -367,17 +376,18 @@ mod liv {
         /** Add a wusel to the world.
          * ID is the current wusel count.
          * TODO (2020-11-20) what is about dead wusels and decreasing length? */
-        pub fn new_wusel(self: &mut Self, name: String, female: bool) {
+        pub fn new_wusel(self: &mut Self, name: String, female: bool, pos: (u32, u32)) {
             let id = self.wusels_created; // almost identifier (for a long time unique)
-            let w = Wusel::new(id, name, female); // new wusel at (0,0)
+            let w = Wusel::new(id, name, female); // new wusel at (pos)
 
-            /* Add wusel to positions, start at 0. */
-            let pos_idx = self.pos_to_idx(w.get_position());
+            /* Add wusel to positions, start at (pos). */
+            let pos_idx = self.pos_to_idx(pos);
             if pos_idx < self.positions.len() {
                 self.positions[pos_idx].push((Self::CHAR_WUSEL, w.id));
             }
 
-            self.wusels.push(w);
+            self.wusels.push(WuselOnPosIdx{ wusel: w, position_idx: pos_idx }); // wusel on position (by index)
+            // self.wusels_positions.push(pos_idx); // index.
             self.wusels_created += 1;
         }
 
@@ -401,7 +411,7 @@ mod liv {
         pub fn get_unbusy_wusels(self: &Self) -> Vec<usize> {
             let mut unbusy: Vec<usize> = vec![];
             for i in 0..self.wusels.len() {
-                if self.wusels[i].tasklist.len() < 1 {
+                if self.wusels[i].wusel.tasklist.len() < 1 {
                     unbusy.push(i);
                 }
             }
@@ -412,7 +422,7 @@ mod liv {
         pub fn assign_task_to_wusel(self: &mut Self, wusel_index: usize, taskb: TaskBuilder) {
             if wusel_index < self.wusels.len() {
                 /* Task apply wusel[index] as actor. */
-                self.wusels[wusel_index].add_task(self.clock, taskb);
+                self.wusels[wusel_index].wusel.add_task(self.clock, taskb);
             }
         }
 
@@ -420,7 +430,7 @@ mod liv {
         pub fn abort_task_from_wusel(self: &mut Self, wusel_index: usize, task_index: usize) {
             if wusel_index < self.wusels.len() {
                 /* Remove task. */
-                self.wusels[wusel_index].abort_task(task_index);
+                self.wusels[wusel_index].wusel.abort_task(task_index);
             }
         }
 
@@ -436,7 +446,7 @@ mod liv {
                 println!("There is no wusel to show.");
                 return;
             }
-            println!("{}", self.wusels[wusel_index].show_overview());
+            println!("{}", self.wusels[wusel_index].wusel.show_overview());
         }
 
         /** Print tasklist of (selected) wusel to std::out.*/
@@ -452,22 +462,22 @@ mod liv {
             }
             println!(
                 "Tasks of {}: {}",
-                self.wusels[wusel_index].get_name(),
-                self.wusels[wusel_index].show_takslist()
+                self.wusels[wusel_index].wusel.get_name(),
+                self.wusels[wusel_index].wusel.show_takslist()
             );
         }
 
         /** Show all relations for a wusel, given by index.
          * Prints directly to std::out. */
-        pub fn show_relations_for(self: &Self, wusel_index: usize) {
+        pub fn show_wusel_relations_for(self: &Self, wusel_index: usize) {
             if wusel_index >= self.wusels.len() {
                 println!("There is no wusel to show.");
                 return;
             }
 
-            let wusel_id = self.wusels[wusel_index].id;
+            let wusel_id = self.wusels[wusel_index].wusel.id;
 
-            print!("Relations with {}: ", self.wusels[wusel_index].get_name());
+            print!("Relations with {}: ", self.wusels[wusel_index].wusel.get_name());
 
             let mut has_relations: bool = false;
 
@@ -484,7 +494,7 @@ mod liv {
                     continue;
                 } // not in relation
 
-                let other_name = self.wusels[other_id].get_name();
+                let other_name = self.wusels[other_id].wusel.get_name();
 
                 /* Print Relation. */
                 print!("[{:?}: {}]", other_name, relation.show());
@@ -502,7 +512,7 @@ mod liv {
          * Return LEN, if none is found. */
         fn wusel_identifier_to_index(self: &Self, id: usize) -> usize {
             for i in 0..self.wusels.len() {
-                if self.wusels[i].id == id {
+                if self.wusels[i].wusel.id == id {
                     return i; // return matching id.
                 }
             }
@@ -518,7 +528,7 @@ mod liv {
         /** Get the position of the indexed wusel. */
         pub fn get_wusel_position(self: &Self, wusel_index: usize) -> (u32, u32) {
             if wusel_index < self.wusels.len() {
-                self.wusels[wusel_index].position
+                self.idx_to_pos(self.wusels[wusel_index].position_idx)
             } else {
                 (self.width, self.height) // outside the map.
             }
@@ -528,17 +538,16 @@ mod liv {
          * If the position may land out of the grid, put it to the nearest border. */
         pub fn set_wusel_position(self: &mut Self, wusel_index: usize, pos: (u32, u32)) {
             if wusel_index < self.wusels.len() {
-                let id = self.wusels[wusel_index].id;
-
-                let old_pos = self.wusels[wusel_index].position;
-                let new_pos = (u32::min(pos.0, self.width), u32::min(pos.1, self.height));
-
-                /* Set the new position. */
-                self.wusels[wusel_index].position = new_pos;
+                let id = self.wusels[wusel_index].wusel.id;
 
                 /* Update the self.positions. */
-                let old_pos_idx = self.pos_to_idx(old_pos);
+                let old_pos_idx = self.wusels[wusel_index].position_idx;
+
+                let new_pos = (u32::min(pos.0, self.width), u32::min(pos.1, self.height));
                 let new_pos_idx = self.pos_to_idx(new_pos);
+
+                /* Set the new position. */
+                self.wusels[wusel_index].position_idx = new_pos_idx;
 
                 /* Representation in positions. */
                 let wusel_indicator = (Self::CHAR_WUSEL, id);
@@ -561,7 +570,7 @@ mod liv {
         pub fn get_all_wusels_positions(self: &Self) -> Vec<(u32, u32)> {
             let mut positions = vec![];
             for w in self.wusels.iter() {
-                positions.push((w.position.0, w.position.1));
+                positions.push(self.idx_to_pos((*w).position_idx)); // usize -> (u32, u32)
             }
             return positions;
         }
@@ -574,13 +583,14 @@ mod liv {
 
             let valid_idx = self.positions.len();
 
+            let mut wusel_idx = 0usize;
             for w in self.wusels.iter() {
-                let pos = w.position;
-                let idx = (pos.0 + self.width * pos.1) as usize;
+                let idx = self.wusels[wusel_idx].position_idx;
+                wusel_idx += 1;
 
                 /* Add id to position. */
                 if idx < valid_idx {
-                    self.positions[idx].push((Self::CHAR_WUSEL, w.id));
+                    self.positions[idx].push((Self::CHAR_WUSEL, w.wusel.id));
                 }
             }
         }
@@ -589,6 +599,11 @@ mod liv {
          * If the position is not in world, this index is not in [0,positions.len()).*/
         fn pos_to_idx(self: &Self, pos: (u32, u32)) -> usize {
             (pos.0 + self.width * pos.1) as usize
+        }
+
+        /** Get the position tuple from the given index in this world. */
+        fn idx_to_pos(self: &Self, idx: usize) -> (u32, u32) {
+            (idx as u32 % self.width, idx as u32 / self.width)
         }
 
         /** Get all the positions as they are. */
@@ -611,18 +626,18 @@ mod liv {
             let mut i: usize = 0;
             for w in self.wusels.iter_mut() {
                 /* Watch all tasks, remove tasks, which may be aborted or ran out. */
-                w.auto_clean_tasks();
+                w.wusel.auto_clean_tasks();
 
                 /* Peek into the ongoing task, and maybe proceed them.
                  * This may lead to remove the done task. */
-                if w.tasklist.len() > 0 {
+                if w.wusel.tasklist.len() > 0 {
                     some_busy_wusel.push(i);
                 } else {
                     /* Wusel is currently not busy. => maybe apply an idle/auto task. */
                 }
 
                 /* If pregnant: Maybe push out the child => Failure, Early or too late. */
-                if let Some((father, pregnancy_days)) = w.pregnancy {
+                if let Some((father, pregnancy_days)) = w.wusel.pregnancy {
                     let maybe_now: u8 = rand::random::<u8>() % 100;
                     let possibility: u8 = match pregnancy_days {
                         0 => 90,
@@ -632,11 +647,11 @@ mod liv {
                     if (0u8..possibility).contains(&maybe_now) {
                         println!("Pop the baby!");
                         let female = rand::random::<bool>();
-                        new_babies.push((w.id, father, female));
+                        new_babies.push((w.wusel.id, father, female));
                     }
                 }
 
-                let alive = w.wusel_tick(new_day);
+                let alive = w.wusel.wusel_tick(new_day);
 
                 /* The wusel just died. Remove if from active wusels later. */
                 if !alive {
@@ -648,7 +663,7 @@ mod liv {
 
             /* Execute ongoing tasks, unmutable wusel context.. */
             for w in some_busy_wusel.iter() {
-                if let Some(t) = self.wusels[*w].peek_ongoing_task() {
+                if let Some(t) = self.wusels[*w].wusel.peek_ongoing_task() {
                     /* Decide how to progress the command. */
                     let u = (*t).clone();
                     self.proceed(u);
@@ -684,7 +699,7 @@ mod liv {
                 true => task.start_time,
                 false => {
                     /* Notify the start of the task (for the wusel). */
-                    self.wusels[actor_id].start_ongoing_task(self.clock);
+                    self.wusels[actor_id].wusel.start_ongoing_task(self.clock);
 
                     self.clock // starting now
                 }
@@ -707,7 +722,7 @@ mod liv {
                         invalid_index if invalid_index >= self.wusels.len() => true,
 
                         /* Meeting party is valid, check their ongoing task. */
-                        _ => match self.wusels[other_index].peek_ongoing_task() {
+                        _ => match self.wusels[other_index].wusel.peek_ongoing_task() {
                             /* => Proceed, since the other party is doing nothing, so no meeting. */
                             None => true,
 
@@ -727,7 +742,7 @@ mod liv {
 
                     /* Other wusel needs also to exist. */
                     if other_index >= self.wusels.len() {
-                        self.wusels[actor_index].pop_ongoing_task();
+                        self.wusels[actor_index].wusel.pop_ongoing_task();
                         return; // task can not be done, without target.
                     }
 
@@ -747,7 +762,7 @@ mod liv {
                         // waiting, but don't wait too long.
                         Self::MEET_RESULT_WAITED => {
                             if self.clock - start_time >= Task::PATIENCE_TO_MEET {
-                                self.wusels[actor_index].pop_ongoing_task();
+                                self.wusels[actor_index].wusel.pop_ongoing_task();
                             }
                             false // => do not notify succession
                         }
@@ -779,7 +794,7 @@ mod liv {
 
             /* Notify the task succeeded to do a step. */
             if succeeded {
-                self.wusels[actor_index].notify_ongoing_succeeded();
+                self.wusels[actor_index].wusel.notify_ongoing_succeeded();
             }
         }
 
@@ -812,7 +827,7 @@ mod liv {
         ) -> i8 {
             println!(
                 "Meet with {}, nice: {}.",
-                self.wusels[passive_index].show(),
+                self.wusels[passive_index].wusel.show(),
                 intention_good
             );
 
@@ -833,14 +848,14 @@ mod liv {
                 return Self::MEET_RESULT_FOLLOWED;
             }
 
-            let active_id = self.wusels[active_index].id;
-            let passive_id = self.wusels[passive_index].id;
+            let active_id = self.wusels[active_index].wusel.id;
+            let passive_id = self.wusels[passive_index].wusel.id;
 
             /* Get the passive wusel's current task.
              * If it is being met by the active, succeed a step with the meeting,
              * otherwise see below. */
             let passives_ongoing_tasktag: Option<TaskTag> =
-                if let Some(t) = self.wusels[passive_index].peek_ongoing_task() {
+                if let Some(t) = self.wusels[passive_index].wusel.peek_ongoing_task() {
                     Some(t.passive_part)
                 } else {
                     None
@@ -873,7 +888,7 @@ mod liv {
             }
 
             /* Check, if the passive is already waiting (in tasklist). */
-            let passive_is_waiting = self.wusels[passive_index].has_task_with(active_is_met);
+            let passive_is_waiting = self.wusels[passive_index].wusel.has_task_with(active_is_met);
 
             /* Check if they both want an (actively) Meeting each other. */
             let mutuall_meeting_as_actives = match &passives_ongoing_tasktag {
@@ -894,7 +909,7 @@ mod liv {
 
                 let already_waiting_index = match 0 {
                     _p if passive_is_waiting => passive_index,
-                    _a if self.wusels[active_index]
+                    _a if self.wusels[active_index].wusel
                         .has_task_with(TaskTag::BeMetFrom(passive_id)) =>
                     {
                         active_index
@@ -912,14 +927,14 @@ mod liv {
                      * B: [Listen A, Talk A, Task B2, Task B3] // let B listen first.
                      */
 
-                    let mut i = self.wusels[already_waiting_index].tasklist.len();
+                    let mut i = self.wusels[already_waiting_index].wusel.tasklist.len();
                     while i > 0 {
                         i -= 1;
-                        if self.wusels[already_waiting_index].tasklist[i].passive_part
+                        if self.wusels[already_waiting_index].wusel.tasklist[i].passive_part
                             == active_is_met
                         {
-                            let met_task = self.wusels[already_waiting_index].tasklist.remove(i);
-                            self.wusels[already_waiting_index].tasklist.push(met_task); // append to back (ongoing)
+                            let met_task = self.wusels[already_waiting_index].wusel.tasklist.remove(i);
+                            self.wusels[already_waiting_index].wusel.tasklist.push(met_task); // append to back (ongoing)
                             break;
                         }
                     }
@@ -932,8 +947,8 @@ mod liv {
                  * (No waiting-to-be-met needs to be deleted.) */
 
                 let skill = Ability::COMMUNICATION;
-                let c0 = self.wusels[active_index].get_ability(&skill);
-                let c1 = self.wusels[passive_index].get_ability(&skill);
+                let c0 = self.wusels[active_index].wusel.get_ability(&skill);
+                let c1 = self.wusels[passive_index].wusel.get_ability(&skill);
 
                 let (more_active, more_passive) = match c0 {
                     better if better > c1 => (active_index, passive_index),
@@ -1218,9 +1233,6 @@ mod liv {
     pub struct Consumable {
         name: String,
 
-        /* The position of the consumable. */
-        position: (u32, u32),
-
         /* Size representation: whole = 100% = size/size. */
         size: u32, // a size representation: consuming this [size]  times, the thing is gone. (fixed)
         available: f32, // 1.0f whole, 0.0f gone. (temporary)
@@ -1244,8 +1256,6 @@ mod liv {
         ) -> Self {
             Self {
                 name: name,
-
-                position: (0, 0), // start at root
 
                 size: size,        // => 0.5 per minute
                 available: 1.0f32, // start fully.
@@ -1548,8 +1558,6 @@ mod liv {
         /* Name */
         name: String,
 
-        position: (u32, u32),
-
         female: bool, // female => able to bear children, male => able to inject children
         pregnancy: Option<(usize, u8)>, // optional pregnancy with father's id and remaining days.
 
@@ -1583,8 +1591,6 @@ mod liv {
                 id: id,
                 name: name,
 
-                position: (0, 0), // start at root
-
                 female: female,
                 pregnancy: None,
 
@@ -1602,11 +1608,6 @@ mod liv {
             }
 
             return new;
-        }
-
-        /** Show position of its body. */
-        pub fn get_position(self: &Self) -> (u32, u32) {
-            (self.position.0, self.position.1)
         }
 
         /** Tick one unit.
@@ -1967,7 +1968,7 @@ mod liv {
         let mut sushi = Consumable::new(String::from("Sushi"), 2, 1, 5, 2, 2);
         println!("Consumable: {}", sushi.show());
 
-        sushi.position = (0, 1);
+        assert!(available1 >= 1.0);
 
         w0.eat(&mut sushi);
         w0.show_overview();
