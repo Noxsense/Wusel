@@ -36,18 +36,15 @@ fn main() -> Result<(), io::Error> {
     // wusel.improve(liv::Ability::FINESSE);
 
     println!("World Clock: {}", world.get_time());
-    world.show_wusel_overview();
     for i in 0usize..4 {
+        world.show_wusel_overview_for(i); // needs
         world.show_wusel_tasklist_for(i);
     }
     println!("\n\n");
 
-    world.select_wusel(1);
-    world.show_wusel_tasklist();
-
     println!("World Clock: {}", world.get_time());
-    world.show_wusel_overview();
     for i in 0usize..4 {
+        world.show_wusel_overview_for(i); // needs
         world.show_wusel_tasklist_for(i);
     }
     println!("\n\n");
@@ -67,10 +64,10 @@ fn main() -> Result<(), io::Error> {
 
     println!("World Clock: {}", world.get_time());
 
-    world.show_wusel_overview(); // needs
-    world.show_wusel_relations_for(world.get_selected_wusel()); // relations
     for i in 0usize..4 {
+        world.show_wusel_overview_for(i); // needs
         world.show_wusel_tasklist_for(i);
+        world.show_wusel_relations_for(i); // relations
     } // everyone's task list
 
     /* Every 500 ms, make a tick. */
@@ -116,7 +113,6 @@ fn main() -> Result<(), io::Error> {
         // print!("{pos}", pos = termion::cursor::Goto(
         //         world.get_width() as u16 - 22,
         //         world.get_height() as u16 + 3));
-        // world.show_wusel_overview();
 
         std::thread::sleep(duration); // wait.
     }
@@ -322,7 +318,10 @@ fn test_mutal_meeting() {
 mod liv {
 
     /** (Private) Wrapping Wusels and positions together. */
-    struct WuselOnPosIdx { wusel: Wusel, position_idx: usize, }
+    struct WuselOnPosIdx {
+        wusel: Wusel,
+        position_idx: usize,
+    }
 
     /** The place of existence, time and relations. */
     pub struct World {
@@ -334,8 +333,7 @@ mod liv {
 
         // wusels the main live force in here
         wusels_created: usize, // all wusels ever created. => for each wusel identifier, maybe a few are available, but already the Xth generation
-        wusels: Vec<WuselOnPosIdx>, // vector of { wusels, their positions }
-        wusel_selected: usize, // currently selected wusel
+        wusels: Vec<WuselOnPosIdx>, // vector of [ wusels, their positions ]
 
         relations: std::collections::BTreeMap<(usize, usize), Relation>, // vector of wusel relations
     }
@@ -350,7 +348,6 @@ mod liv {
                 clock: 0,
                 wusels_created: 0,
                 wusels: vec![],
-                wusel_selected: 0,
                 relations: std::collections::BTreeMap::new(),
             };
         }
@@ -396,17 +393,6 @@ mod liv {
             self.wusels.len()
         }
 
-        /** Select a wusel by index/living count. */
-        pub fn select_wusel(self: &mut Self, selection: usize) {
-            self.wusel_selected = usize::min(selection, self.wusels.len());
-        }
-
-        /** Get the index of the wusel, which is currently selected. */
-        #[allow(dead_code)]
-        pub fn get_selected_wusel(self: &Self) -> usize {
-            self.wusel_selected
-        }
-
         /** Get the indices of all wusels, which are currently having no tasks to do. */
         pub fn get_unbusy_wusels(self: &Self) -> Vec<usize> {
             let mut unbusy: Vec<usize> = vec![];
@@ -435,11 +421,6 @@ mod liv {
         }
 
         /** Print overview of (selected) wusel to std::out.*/
-        pub fn show_wusel_overview(self: &Self) {
-            self.show_wusel_overview_for(self.wusel_selected);
-        }
-
-        /** Print overview of (selected) wusel to std::out.*/
         pub fn show_wusel_overview_for(self: &Self, wusel_index: usize) {
             /* No wusel is there to show. */
             if self.wusels.len() <= wusel_index {
@@ -447,11 +428,6 @@ mod liv {
                 return;
             }
             println!("{}", self.wusels[wusel_index].wusel.show_overview());
-        }
-
-        /** Print tasklist of (selected) wusel to std::out.*/
-        pub fn show_wusel_tasklist(self: &Self) {
-            self.show_wusel_tasklist_for(self.wusel_selected);
         }
 
         /** Print tasklist of (selected) wusel to std::out.*/
