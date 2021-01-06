@@ -323,6 +323,13 @@ mod liv {
         position_idx: usize,
     }
 
+    /** (Private) Wrapping fixed objects with world IDs and positions. */
+    struct ObjectOnPosIdx {
+        object: Box<dyn WorldObject>,
+        object_id: usize,
+        position_idx: usize,
+    }
+
     /** The place of existence, time and relations. */
     pub struct World {
         height: u32,
@@ -332,8 +339,13 @@ mod liv {
         clock: usize, // time of the world.
 
         // wusels the main live force in here
-        wusels_created: usize, // all wusels ever created. => for each wusel identifier, maybe a few are available, but already the Xth generation
-        wusels: Vec<WuselOnPosIdx>, // vector of [ wusels, their positions ]
+        wusels_alltime_count: usize, // coount of all ever created wusels
+        wusels: Vec<WuselOnPosIdx>,  // vector of [ wusels, their positions ]
+
+        // [ objects, position_idx ]: things a wusel cannot pickup/transport
+        // wall or workbench or chest.
+        fixed_objects: Vec<ObjectOnPosIdx>,
+        fixed_objects_alltime_count: usize, // count of all ever created fixed objects.
 
         relations: std::collections::BTreeMap<(usize, usize), Relation>, // vector of wusel relations
     }
@@ -346,8 +358,10 @@ mod liv {
                 width: width,
                 positions: vec![vec![]; width as usize * height as usize],
                 clock: 0,
-                wusels_created: 0,
+                wusels_alltime_count: 0,
                 wusels: vec![],
+                fixed_objects: vec![],
+                fixed_objects_alltime_count: 0,
                 relations: std::collections::BTreeMap::new(),
             };
         }
@@ -369,12 +383,85 @@ mod liv {
         }
 
         const CHAR_WUSEL: char = 'w';
+        const CHAR_OBJECT: char = '\u{3a0}';
+
+        /** Check if the position is inside the world bounds. */
+        pub fn check_position_in_bounds(self: &Self, pos: (u32, u32)) -> bool {
+            pos.0 < self.width && pos.1 < self.height
+        }
+
+        /** Place a new World Object into the world. */
+        pub fn new_object<T: 'static + WorldObject + std::fmt::Debug>(
+            self: &mut Self,
+            object: T,
+            pos: (u32, u32),
+        ) {
+            /* Assert if the position is valid. */
+            if !self.check_position_in_bounds(pos) {
+                println!("Position is out of the box.");
+                return; // abort this.
+            }
+
+            let pos_idx = self.pos_to_idx(pos);
+
+            /* Add object to world on position. */
+            self.fixed_objects.push(ObjectOnPosIdx {
+                object: Box::new(object),
+                object_id: self.fixed_objects_alltime_count,
+                position_idx: pos_idx,
+            });
+
+            /* Show on positions. */
+            self.positions[pos_idx].push((Self::CHAR_OBJECT, self.fixed_objects_alltime_count));
+
+            self.fixed_objects_alltime_count += 1;
+        }
+
+        /** Set the position of the given, already existing object
+         * and return the old position. */
+        pub fn set_object_position(
+            self: &mut Self,
+            object_id: usize,
+            pos: (u32, u32),
+        ) -> (u32, u32) {
+            /* No objects ever inserted, return the root. */
+            if object_id >= self.fixed_objects_alltime_count {
+                return (self.width, self.height); // out of bound | invalid.
+            }
+
+            /* Find the object of the same object id. */
+            for o in self.fixed_objects.iter() {
+                println!("{:?}", o.object_id);
+                if o.object_id == object_id {
+                    let old_idx = o.position_idx;
+                    let old_pos = self.idx_to_pos(old_idx);
+
+                    /* On Change, set the new position. */
+                    if old_pos != pos {
+                        let pos_idx = self.pos_to_idx(pos);
+
+                        /* Remove from current position list. */
+                        let idx = self.positions[old_idx].iter().position(|(ch, id)| id == &object_id ).unwrap();
+                        self.positions[old_idx].remove(idx);
+
+                        /* Set to new position index. */
+                        self.positions[pos_idx].push((Self::CHAR_OBJECT, object_id));
+                    }
+
+                    /* Return old, maybe freed position. */
+                    return old_pos;
+                }
+            }
+
+            /* None of the objects has the given object_id. */
+            (self.width, self.height) // out of bound | invalid.
+        }
 
         /** Add a wusel to the world.
          * ID is the current wusel count.
          * TODO (2020-11-20) what is about dead wusels and decreasing length? */
         pub fn new_wusel(self: &mut Self, name: String, female: bool, pos: (u32, u32)) {
-            let id = self.wusels_created; // almost identifier (for a long time unique)
+            let id = self.wusels_alltime_count; // almost identifier (for a long time unique)
             let w = Wusel::new(id, name, female); // new wusel at (pos)
 
             /* Add wusel to positions, start at (pos). */
@@ -383,9 +470,12 @@ mod liv {
                 self.positions[pos_idx].push((Self::CHAR_WUSEL, w.id));
             }
 
-            self.wusels.push(WuselOnPosIdx{ wusel: w, position_idx: pos_idx }); // wusel on position (by index)
-            // self.wusels_positions.push(pos_idx); // index.
-            self.wusels_created += 1;
+            self.wusels.push(WuselOnPosIdx {
+                wusel: w,
+                position_idx: pos_idx,
+            }); // wusel on position (by index)
+                // self.wusels_positions.push(pos_idx); // index.
+            self.wusels_alltime_count += 1;
         }
 
         /** Count how many wusels are currently active. */
@@ -571,8 +661,8 @@ mod liv {
             }
         }
 
-        /** Get the `positions` index for the requesting position.
-         * If the position is not in world, this index is not in [0,positions.len()).*/
+        /** Get the `positions` index for the requesting position (width, height).
+         * If the position is not in world, this index is not in [0, positions.len()).*/
         fn pos_to_idx(self: &Self, pos: (u32, u32)) -> usize {
             (pos.0 + self.width * pos.1) as usize
         }
@@ -1103,6 +1193,15 @@ mod liv {
             }
         }
     }
+
+    /** Trait to be in thw world. */
+    pub trait WorldObject {}
+
+    /** A wusel with a position. */
+    impl WorldObject for Wusel {}
+
+    /** A consumable object with a position. */
+    impl WorldObject for Consumable {}
 
     /** Way in the world. */
     #[derive(Debug, Copy, Clone, PartialEq)]
