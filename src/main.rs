@@ -6,6 +6,9 @@ use std::io;
 
 /** The main method of the wusel world. */
 fn main() -> Result<(), io::Error> {
+    // initiate the logger.
+    env_logger::init();
+
     let mut world: liv::World = liv::World::new(80, 30);
     println!(
         "Created a new world: w:{w}, h:{h}",
@@ -499,6 +502,7 @@ mod liv {
             if wusel_index < self.wusels.len() {
                 /* Task apply wusel[index] as actor. */
                 self.wusels[wusel_index].wusel.add_task(self.clock, taskb);
+                log::debug!("task successfully assigned")
             }
         }
 
@@ -711,7 +715,7 @@ mod liv {
                         _ => 10,
                     };
                     if (0u8..possibility).contains(&maybe_now) {
-                        println!("Pop the baby!");
+                        log::debug!("Pop the baby!");
                         let female = rand::random::<bool>();
                         new_babies.push((w.wusel.id, father, female));
                     }
@@ -740,7 +744,7 @@ mod liv {
 
             /* Command further name giving and attention from the player. */
             for baby in new_babies.iter() {
-                println!(
+                log::debug!(
                     "New parents {}  and {}: It is a {} ",
                     baby.0,
                     baby.1,
@@ -774,7 +778,7 @@ mod liv {
             /* Decide what to do, and if the task case done a step. */
             let succeeded = match task.passive_part {
                 TaskTag::WaitLike => {
-                    println!("{}", task.name);
+                    log::debug!("{}", task.name);
                     true
                 }
                 TaskTag::BeMetFrom(other_id) => {
@@ -891,7 +895,7 @@ mod liv {
             intention_good: bool,
             romantically: bool,
         ) -> i8 {
-            println!(
+            log::debug!(
                 "Meet with {}, nice: {}.",
                 self.wusels[passive_index].wusel.show(),
                 intention_good
@@ -902,7 +906,7 @@ mod liv {
             let pos_a = self.get_wusel_position(active_index);
             let pos_o = self.get_wusel_position(passive_index);
 
-            println!("Meet at {:?} and {:?}", pos_a, pos_o);
+            log::debug!("Meet at {:?}", pos_o);
 
             /* If they are not close, try to get closer to the passive target. */
             if Self::get_distance_between(pos_a, pos_o) > 2.0 {
@@ -1060,11 +1064,11 @@ mod liv {
 
             /* Check if the goal is already reached. */
             if pos.0 == goal.0 && pos.1 == goal.1 {
-                println!("Reached Goal ({},{}).", goal.0, goal.1);
+                log::info!("Reached Goal ({},{}).", goal.0, goal.1);
                 return true; // stopped walking.
             }
 
-            println!("Move to Goal {:?}.", goal);
+            log::info!("Move to Goal {:?}.", goal);
 
             /* Check, if the pre-calculated path is blocked. */
             if false { /* Abort the pre-calculated, but blocked path. */ }
@@ -1078,7 +1082,7 @@ mod liv {
                 let neighbours = Self::get_neighbour_positions(self.width, self.height, pos);
 
                 if neighbours.len() < 1 {
-                    println!("Wusel cannot move, it's enclosed, wait forever");
+                    log::info!("Wusel cannot move, it's enclosed, wait forever");
                     return true;
                 }
 
@@ -1101,7 +1105,7 @@ mod liv {
                 return false; // still walking.
             } else {
                 /* Calculate the path and go it next time. */
-                println!("Calculate the path to {:?}", goal);
+                log::info!("Calculate the path to {:?}", goal);
                 return false; // still walking.
             }
         }
@@ -1602,7 +1606,7 @@ mod liv {
         duration: usize,
         done_steps: usize,
 
-        active_actor_id: usize, // wusel id.
+        active_actor_id: usize, // wusel ID.
         passive_part: TaskTag,  // position | object-to-be | object | wusel | nothing.
     }
 

@@ -8,5 +8,7 @@ edition = "2018"
 
 [dependencies]
 rand = "0.7.3"
+env_logger = "0.8.1"
+log = "0.4.11"
 
 termion = "1.5"
