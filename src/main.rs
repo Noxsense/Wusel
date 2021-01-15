@@ -104,9 +104,7 @@ fn main() -> Result<(), io::Error> {
                 }
                 i if i >= wusel_len && i < 2 * wusel_len => {
                     /* Walk randomly somewhere. */
-                    let x = rand::random::<u32>() % world.get_width();
-                    let y = rand::random::<u32>() % world.get_height();
-                    world.assign_task_to_wusel(widx, liv::TaskBuilder::move_to((x, y)));
+                    world.assign_task_to_wusel(widx, liv::TaskBuilder::move_to(world.random_position()));
                 }
                 _ => {} // do nothing randomly.
             }
@@ -140,9 +138,9 @@ fn draw_field(w: usize, h: usize, positions: Vec<Vec<(char, usize)>>) {
 
     /* Draw border. */
     let mut i: u16 = 0;
-    let w2: u16 = w as u16 + 2;
-    let h2: u16 = h as u16 + 2;
+    let (w2, h2): (u16, u16) = (w as u16 + 2, h as u16 + 2);
     let around: u16 = (w2 * h2) as u16;
+
     while i < around {
         /* Draw symbol. */
         print!(
@@ -613,6 +611,19 @@ mod liv {
         /** Get the position tuple from the given index in this world. */
         fn idx_to_pos(self: &Self, idx: usize) -> (u32, u32) {
             (idx as u32 % self.width, idx as u32 / self.width)
+        }
+
+        /** Get a random position in this world. */
+        pub fn random_position(self: &Self) -> (u32, u32) {
+            self.random_area_position((0, 0), (self.width, self.height))
+        }
+
+        /** Get a random position within a range. */
+        pub fn random_area_position(self: &Self, start: (u32, u32), end: (u32, u32)) -> (u32, u32) {
+            (
+                start.0 + (rand::random::<u32>() % u32::min(self.width, end.0)),
+                start.1 + (rand::random::<u32>() % u32::min(self.height, end.1)),
+            )
         }
 
         /** Get all the positions as they are. */
