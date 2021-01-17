@@ -81,16 +81,16 @@ fn main() -> Result<(), io::Error> {
     } // everyone's task list
 
     /* Every 500 ms, make a tick. */
-    let duration = std::time::Duration::from_millis(500);
+    let duration = std::time::Duration::from_millis(125);
+
+    println!("{clear}", clear = termion::clear::All);
 
     /* Draw the field and make some real automation. */
-    for _ in 0..100 {
+    let (w, h) = (world.get_width() as usize, world.get_height() as usize);
+
+    for _ in 0..150 {
         // world.recalculate_all_positions();
-        draw_field(
-            world.get_width() as usize,
-            world.get_height() as usize,
-            world.get_positions(),
-        );
+        draw_field(w, h, world.get_positions());
 
         /* Tick the world, maybe print the ongoing tasks. */
         print!("Time: {}\n", world.get_time());
@@ -111,16 +111,17 @@ fn main() -> Result<(), io::Error> {
                 }
                 i if i >= wusel_len && i < 2 * wusel_len => {
                     /* Walk randomly somewhere. */
-                    world.assign_task_to_wusel(widx, liv::TaskBuilder::move_to(world.random_position()));
+                    world.assign_task_to_wusel(
+                        widx,
+                        liv::TaskBuilder::move_to(world.random_position()),
+                    );
                 }
                 _ => {} // do nothing randomly.
             }
         }
 
         /* Draw selected wusel's needs (right position below field). */
-        // print!("{pos}", pos = termion::cursor::Goto(
-        //         world.get_width() as u16 - 22,
-        //         world.get_height() as u16 + 3));
+        // TODO
 
         std::thread::sleep(duration); // wait.
     }
@@ -160,7 +161,7 @@ fn draw_field(w: usize, h: usize, positions: Vec<Vec<(char, usize)>>) {
                 _ => "=",
             }
         );
-        /* Go around field. */
+        /* Go around field, next index. */
         i += if i < w2 || i >= around - w2 - 1 || i % w2 == w2 - 1 {
             1
         } else {
@@ -544,7 +545,7 @@ mod liv {
         /** Print overview of (selected) wusel to std::out.*/
         pub fn show_wusel_overview_for(self: &Self, wusel_index: usize) {
             /* No wusel is there to show. */
-            if self.wusels.len() <= wusel_index {
+            if wusel_index >= self.wusels.len() {
                 println!("There is no wusel to show.");
                 return;
             }
@@ -574,7 +575,10 @@ mod liv {
 
             let wusel_id = self.wusels[wusel_index].wusel.id;
 
-            print!("Relations with {}: ", self.wusels[wusel_index].wusel.get_name());
+            print!(
+                "Relations with {}: ",
+                self.wusels[wusel_index].wusel.get_name()
+            );
 
             let mut has_relations: bool = false;
 
@@ -796,7 +800,6 @@ mod liv {
         fn proceed(self: &mut World, task: Task) {
             /* World proceeds task. */
 
-            let wusel_size = self.wusels.len();
             let actor_id = task.active_actor_id;
             let actor_index = self.wusel_identifier_to_index(actor_id);
 
@@ -1042,7 +1045,8 @@ mod liv {
 
                 let already_waiting_index = match 0 {
                     _p if passive_is_waiting => passive_index,
-                    _a if self.wusels[active_index].wusel
+                    _a if self.wusels[active_index]
+                        .wusel
                         .has_task_with(TaskTag::BeMetFrom(passive_id)) =>
                     {
                         active_index
@@ -1066,8 +1070,12 @@ mod liv {
                         if self.wusels[already_waiting_index].wusel.tasklist[i].passive_part
                             == active_is_met
                         {
-                            let met_task = self.wusels[already_waiting_index].wusel.tasklist.remove(i);
-                            self.wusels[already_waiting_index].wusel.tasklist.push(met_task); // append to back (ongoing)
+                            let met_task =
+                                self.wusels[already_waiting_index].wusel.tasklist.remove(i);
+                            self.wusels[already_waiting_index]
+                                .wusel
+                                .tasklist
+                                .push(met_task); // append to back (ongoing)
                             break;
                         }
                     }
@@ -2011,7 +2019,7 @@ mod liv {
         name: String,
 
         female: bool, // female => able to bear children, male => able to inject children
-        pregnancy: Option<(usize, u8)>, // optional pregnancy with father's id and remaining days.
+        pregnancy: Option<(usize, u8)>, // optional pregnancy with father's ID and remaining days.
 
         life: Life,      // alive | dead | ghost
         lived_days: u32, // last lived day.
