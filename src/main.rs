@@ -24,6 +24,13 @@ fn main() -> Result<(), io::Error> {
     world.new_wusel("3rd".to_string(), false, (30, 0)); // male
     world.new_wusel("4th".to_string(), false, (40, 0)); // male
 
+    /* Transportable bibimbap (korean food) */
+    let bibimbap = world.new_food(String::from("Bibimbap"), 10);
+    let (bibimbap_id, _bibimbap_index) = bibimbap;
+
+    /* Position. */
+    world.place_object_at(bibimbap_id, world.random_position());
+
     /* Create an easy talk, without any preconditions.
      * => no preconditions.
      * => does 'nothing' for ticks steps. */
@@ -171,30 +178,97 @@ fn draw_field(w: usize, h: usize, positions: Vec<Vec<(char, usize)>>) {
 }
 
 /** Test doing tasks. */
-#[test]
-fn test_creating_in_game() {
-    println!("[test] Creating new stuff, let the wusels create stuff in their world.");
-    let mut test_world: liv::World = liv::World::new(80, 30);
+// #[test]
+fn test_consume_bread() {
+    log::debug!("[TEST] Creating new stuff, let the wusels eat the bread.");
+    let mut test_world: liv::World = liv::World::new(20, 5); // small world.
+    log::debug!("Test World created");
 
     /* Empty test_world tick. */
     test_world.tick();
+    log::debug!("Test World ticked");
 
-    test_world.new_wusel("1st".to_string(), true, (1, 0)); // female
-    test_world.new_wusel("2nd".to_string(), true, (2, 0)); // female
-    test_world.new_wusel("3rd".to_string(), false, (3, 0)); // male
-    test_world.new_wusel("4th".to_string(), false, (4, 0)); // male
-    println!("World's wusel created.");
+    test_world.new_wusel("Eater".to_string(), true, (1, 0)); // female
+    test_world.new_wusel("Starver".to_string(), false, (2, 0)); // male
+    log::debug!("Test World's wusel created.");
 
-    // let food: liv::Consumable = liv::Consumable {};
+    /* Create food: transportable, no storage. */
+    let food1 = test_world.new_food(String::from("Bread"), 10);
 
-    /* Get the food from food's position. */
-    let get_the_food: liv::TaskBuilder = liv::TaskBuilder::new(String::from("Get the food"));
+    let (food1_id, food1_index) = food1;
 
-    /* Eat the held food. */
-    let eat_the_food: liv::TaskBuilder = liv::TaskBuilder::new(String::from("Eating"));
+    log::debug!("Test World's food created, index: {}.", food1_index);
 
-    // TODO: Something can be a tool (to create, dependency) and a consumable (used up by usage)
+    let food2 = test_world.duplicate_object(0);
+    let (food2_id, food2_index) = food2;
+
+    log::debug!("Test World's food duplicated, index: {}.", food2_index);
+
+    /* Put a copy into the world. */
+    test_world.place_object_at(food1_id, test_world.random_position());
+    test_world.place_object_at(food2_id, test_world.random_position());
+
+    log::debug!("Test World's food put onto a position.");
+
+    // XXX (2021-01-11) design question: bound task changes to object or action or somehwere else?
+
     //
+
+    /* Get the food and transport it somewhere else. */
+    test_world.assign_task_to_wusel(1, liv::TaskBuilder::use_object(food1_id, 1)); // take
+    test_world.assign_task_to_wusel(1, liv::TaskBuilder::move_to(test_world.random_position()));
+    test_world.assign_task_to_wusel(1, liv::TaskBuilder::use_object(food1_id, 2)); // drop
+    test_world.assign_task_to_wusel(1, liv::TaskBuilder::move_to(test_world.random_position()));
+    test_world.assign_task_to_wusel(1, liv::TaskBuilder::use_object(food1_id, 1)); // take not exisiting?
+
+    /* Let the other wusel wait, than it's tries to get the food as well, and consume it. */
+    test_world.assign_task_to_wusel(
+        0,
+        liv::TaskBuilder::move_to((test_world.get_width() - 1, test_world.get_height() - 1)),
+    );
+    test_world.assign_task_to_wusel(0, liv::TaskBuilder::use_object(food1_id, 1)); // take as well.
+    test_world.assign_task_to_wusel(0, liv::TaskBuilder::move_to(test_world.random_position()));
+    test_world.assign_task_to_wusel(0, liv::TaskBuilder::use_object(food1_id, 3)); // consume.
+    test_world.assign_task_to_wusel(0, liv::TaskBuilder::move_to(test_world.random_position()));
+
+    // show everyone's stats.
+    for i in 0usize..2 {
+        // test_world.show_wusel_overview_for(i); // needs
+        test_world.show_wusel_tasklist_for(i); // tasks
+    }
+
+    log::debug!("Test World's task to work at the workbench assigned.");
+
+    /* Show the grid.. */
+    let (w, h): (usize, usize) = (
+        test_world.get_width() as usize,
+        test_world.get_height() as usize,
+    );
+
+    println!("{clear}", clear = termion::clear::All); // clear the screen
+
+    for _ in 0..100 {
+        println!();
+        log::debug!(
+            "Test World's current grid, time: {}.",
+            test_world.get_time()
+        );
+
+        test_world.tick(); // progress time.
+
+        // show everyone's stats.
+        for i in 0usize..2 {
+            // test_world.show_wusel_overview_for(i); // needs
+            test_world.show_wusel_tasklist_for(i); // tasks
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(100)); // wait.
+    }
+}
+
+/** Test doing tasks. */
+#[test]
+fn test_create_bread() {
     // Example: Wusel wants to cook.
     // 1. Go to (free) cooking station: (move)
     // 2. Wait for the Station to be free
@@ -324,6 +398,13 @@ mod liv {
         position_index: usize,
     }
 
+    /** (Private) Wrapping Objects and where abouts together. */
+    #[derive(Debug)]
+    struct ExistingObject {
+        object: Box<Object>,
+        position: Where,
+    }
+
     /** The place of existence, time and relations. */
     pub struct World {
         height: u32,
@@ -339,13 +420,13 @@ mod liv {
         relations: std::collections::BTreeMap<(usize, usize), Relation>, // vector of wusel relations
 
         // wall or furniture or miscellaneous.
-        objects: Vec<(Box<WorldObject>, Where)>,
+        objects: Vec<ExistingObject>,
         obj_count_furniture: usize, // all ever created furniture objects
         obj_count_misc: usize,      // all ever created miscellaneous objects
         obj_count_food: usize,      // all ever created food objects
 
         actions: Vec<String>,                 // actions to do.
-        actions_effects: Vec<(usize, usize)>, // how various actions on various objects may influence
+        actions_effects: Vec<(usize, usize, String)>, // how various actions on various objects may influence
     }
 
     impl World {
@@ -371,6 +452,7 @@ mod liv {
                     String::from("View"),
                     String::from("Take"),
                     String::from("Drop"),
+                    String::from("Consume"),
                 ],
                 actions_effects: vec![],
             };
@@ -393,6 +475,15 @@ mod liv {
         }
 
         const CHAR_WUSEL: char = '\u{263A}'; // smiley, alternatively or w
+
+        /** Get the character representing an object type. */
+        fn objecttype_as_char(t: ObjectType) -> char {
+            match t {
+                ObjectType::Furniture => 'm',     // '\u{1f4ba}', // chair
+                ObjectType::Miscellaneous => '?', // '\u{26ac}', // small circle
+                ObjectType::Food => '%',          // '\u{2615}', // hot beverage
+            }
+        }
 
         // self.positions[pos_index].push((Self::CHAR_OBJECT, object_id));
 
@@ -528,16 +619,14 @@ mod liv {
 
         /** Get the position of the indexed wusel. */
         pub fn get_wusel_position(self: &Self, wusel_index: Option<usize>) -> Option<(u32, u32)> {
-            if wusel_index == None {
-                return None
-            } else {
-                let wusel_index = wusel_index.unwrap();
-
+            if let Some(wusel_index) = wusel_index {
                 if wusel_index < self.wusels.len() {
                     Some(self.idx_to_pos(self.wusels[wusel_index].position_index))
                 } else {
                     None // outside the map.
                 }
+            } else {
+                return None;
             }
         }
 
@@ -806,7 +895,7 @@ mod liv {
                     let object_index = self
                         .objects
                         .iter()
-                        .position(|(o, _)| o.object_id == object_id);
+                        .position(|wo| wo.object.object_id == object_id);
 
                     // TODO: get index for the given action ID.
                     let action_index = if action_id >= self.actions.len() {
@@ -821,7 +910,7 @@ mod liv {
                             object_id,
                             action_id
                         );
-                        false
+                        true // proceed to next action.
                     } else {
                         let object_index = object_index.unwrap(); // TODO
                         let action_index = action_index.unwrap(); // TODO
@@ -1030,6 +1119,8 @@ mod liv {
             obj_type: ObjectType,
             name: String,
             transportable: bool,
+            passable: bool,
+            consumable_parts: Option<usize>,
             storage_capacity: usize,
         ) -> ((ObjectType, usize), usize) {
             // XXX DELETE FOLLING
@@ -1052,21 +1143,23 @@ mod liv {
             };
 
             /* Add the new object into the world active objects. */
-            self.objects.push((
-                Box::new(WorldObject {
+            self.objects.push(ExistingObject {
+                object: Box::new(Object {
                     name: name,
                     object_id: (obj_type, new_obj_count),
                     transportable: transportable,
+                    passable: passable,
+                    consumable: consumable_parts,
                     storage_capacity: storage_capacity,
                 }),
-                world_inventory,
-            ));
+                position: world_inventory,
+            });
 
             log::info!("New object created: {:?}", self.objects.last_mut());
 
             /* Return appended index. */
             (
-                self.objects.last_mut().unwrap().0.object_id,
+                self.objects.last_mut().unwrap().object.object_id,
                 self.objects.len() - 1,
             )
         }
@@ -1079,34 +1172,30 @@ mod liv {
          * Returns the new object's index for the world's objects. */
         pub fn new_food(
             self: &mut Self,
-            obj_type: ObjectType,
             name: String,
+            bites: usize,
         ) -> ((ObjectType, usize), usize) {
-            self.new_object(ObjectType::Food, name, true, 0)
+            self.new_object(ObjectType::Food, name, true, true, Some(bites), 0)
         }
 
         /** Duplicate a world object: Use all attributes, but change the ID
          * This will create a new object, currently in world's storage. */
-        fn duplicate_object(self: &mut Self, base_index: usize) -> ((ObjectType, usize), usize) {
+        pub fn duplicate_object(
+            self: &mut Self,
+            base_index: usize,
+        ) -> ((ObjectType, usize), usize) {
             if base_index >= self.objects.len() {
                 return ((ObjectType::Miscellaneous, 0), 0);
             }
 
             self.new_object(
-                (&*self.objects[base_index].0).object_id.0,
-                (&*self.objects[base_index].0).name.clone(),
-                (&*self.objects[base_index].0).transportable,
-                (&*self.objects[base_index].0).storage_capacity,
+                (&*self.objects[base_index].object).object_id.0,
+                (&*self.objects[base_index].object).name.clone(),
+                (&*self.objects[base_index].object).transportable,
+                (&*self.objects[base_index].object).passable,
+                (&*self.objects[base_index].object).consumable,
+                (&*self.objects[base_index].object).storage_capacity,
             )
-        }
-
-        /** Get the character representing an object type. */
-        fn objecttype_as_char(t: ObjectType) -> char {
-            match t {
-                ObjectType::Furniture => 'm',     // '\u{1f4ba}', // chair
-                ObjectType::Miscellaneous => '?', // '\u{26ac}', // small circle
-                ObjectType::Food => 'u',          // '\u{2615}', // hot beverage
-            }
         }
 
         /** From an object's ID to a grid (representation) ID. */
@@ -1118,7 +1207,7 @@ mod liv {
         fn get_index_from_object_id(self: &Self, object_id: (ObjectType, usize)) -> Option<usize> {
             self.objects
                 .iter()
-                .position(|(obj, _)| obj.object_id == object_id)
+                .position(|o| o.object.object_id == object_id)
         }
 
         /** Get the optional position of an object, given by an ID.
@@ -1137,10 +1226,12 @@ mod liv {
         /** Get the optional position of an object, given by an index.
          * If the position is held by a storage, get the pos of the storage. */
         fn get_object_position_by_index(self: &Self, object_index: usize) -> Option<(u32, u32)> {
-            match self.objects[object_index].1 {
+            match self.objects[object_index].position {
                 Where::AtPosition(pos_index) => Some(self.idx_to_pos(pos_index)),
                 // get nested position.
-                Where::HeldBy(wusel_id) => self.get_wusel_position(self.wusel_identifier_to_index(wusel_id)),
+                Where::HeldBy(wusel_id) => {
+                    self.get_wusel_position(self.wusel_identifier_to_index(wusel_id))
+                }
                 Where::StoredIn(storage_obj_id) => self.get_object_position(storage_obj_id),
             }
         }
@@ -1168,13 +1259,13 @@ mod liv {
             }
 
             let object = &self.objects[object_index]; // immutable.
-            let object_id = object.0.object_id;
+            let object_id = object.object.object_id;
 
             // positions: CHAR and ID.
             let obj_c = Self::objecttype_as_char(object_id.0);
             let obj_i = object_id.1;
 
-            if let Where::AtPosition(old_pos_index) = &object.1 {
+            if let Where::AtPosition(old_pos_index) = &object.position {
                 /* Remove from old position. */
                 if let Some(i) = self.find_grid_index(*old_pos_index, &(obj_c, obj_i)) {
                     self.positions[*old_pos_index].remove(i);
@@ -1183,9 +1274,9 @@ mod liv {
 
             /* Update new where. */
             let object = &mut self.objects[object_index]; // now mutable.
-            object.1 = whereto;
+            object.position = whereto;
 
-            if let Where::AtPosition(new_pos_index) = self.objects[object_index].1 {
+            if let Where::AtPosition(new_pos_index) = self.objects[object_index].position {
                 /* Change and update self.positions. */
                 self.positions[new_pos_index].push((obj_c, obj_i));
             }
@@ -1208,7 +1299,10 @@ mod liv {
                 return;
             }
 
-            let (obj, wherefrom): &(Box<WorldObject>, Where) = &self.objects[object_index];
+            let ExistingObject {
+                object: obj,
+                position: wherefrom,
+            } = &self.objects[object_index];
 
             /* Remove from grid / positions, if available. */
             if let Where::AtPosition(pos_index) = wherefrom {
@@ -1222,6 +1316,9 @@ mod liv {
             /* Finally remove. */
             self.objects.remove(object_index);
         }
+
+        const TASK_HOLD: bool = false;
+        const TASK_PROCEED: bool = true;
 
         /** Let a wusel use an object.
          *
@@ -1251,6 +1348,9 @@ mod liv {
             if wusel_index >= self.wusels.len() {
                 return false;
             }
+
+            let wusel_id = self.wusels[wusel_index].wusel.id;
+
             /* Invalid object index. */
             if object_index >= self.objects.len() {
                 log::warn!("No such object.");
@@ -1274,9 +1374,15 @@ mod liv {
             } else {
                 false
             };
+
+            let obj_pos = obj_pos.unwrap();
+            let obj_pos_index = self.pos_to_idx(obj_pos);
+
             if !close_enough {
                 return false;
             }
+
+            let obj_where = self.objects[object_index].position;
 
             /* Invalid action index. */
             if action_index >= self.actions.len() {
@@ -1290,7 +1396,59 @@ mod liv {
                 self.objects[object_index]
             );
 
-            false
+            /* Do the actual action. */
+            return match self.actions[action_index].as_ref() {
+                "View" => {
+                    log::info!("Just view.");
+                    // TODO can u view sth, if it's held by another wusel?
+                    Self::TASK_PROCEED
+                }
+                "Take" => {
+                    if let Where::AtPosition(_) | Where::StoredIn(_) = obj_where {
+                        log::info!("Get it, if possible.");
+                        self.put_object(object_index, Where::HeldBy(wusel_id));
+                        return Self::TASK_PROCEED;
+                    }
+                    log::warn!("Item is already hold, just look and stop.");
+                    Self::TASK_PROCEED // if already held, cannot be held, but just stop to do so.
+                }
+                "Drop" => {
+                    if let Where::HeldBy(holder_id) = obj_where {
+                        if holder_id == wusel_id {
+                            log::info!("Drop it, if held by wusel themself.");
+                            self.put_object(object_index, Where::AtPosition(obj_pos_index)); // == wusel_pos, as pos of all containers
+                            log::debug!("Object placed, somewhere.");
+                            return Self::TASK_PROCEED;
+                        }
+                    }
+                    Self::TASK_PROCEED // if not held, it cannot be dropped, but the wusel will be done, to drop the object.
+                }
+                "Consume" => {
+                    let consumable = self.objects[object_index].object.consumable;
+                    if consumable != None {
+                        log::info!("Try to consume the consumable object, eat a bit..");
+                        // TODO if consumable, consume some bits, until it's gone.
+
+                        let left_over = consumable.unwrap();
+
+                        // XXX store, what is left over.
+                        if left_over == 0usize {
+                            self.destroy_object(object_index); // delete from world.
+                            return Self::TASK_PROCEED;
+                        }
+                        self.objects[object_index].object.consumable = Some(left_over - 1);
+
+                        // return Self::TASK_PROCEED;
+                        return Self::TASK_HOLD; // ddbug.
+                    }
+                    log::warn!("Tried to consume something  unconsumable");
+                    Self::TASK_HOLD // if not held, it cannot be dropped, but the wusel will be done, to drop the object.
+                }
+                _ => {
+                    log::info!("Undefined action?");
+                    Self::TASK_HOLD
+                }
+            };
         }
 
         /** Let the wusel walk to a position, if they are not close.
@@ -1539,11 +1697,13 @@ mod liv {
 
     /** A world object indicates an object in the world which is not a wusel. */
     #[derive(Debug, Clone)]
-    struct WorldObject {
+    struct Object {
         name: String,
         object_id: (ObjectType, usize),
         transportable: bool, // can be transported by a wusel, will also apply stotable
-        storage_capacity: usize, // items that can be stored 0
+        passable: bool,      // if true, wusel can walk over it's occupied place (if at position)
+        consumable: Option<usize>, // if None: cannot be consumed; if Some(bites): number of parts, that can be consumed
+        storage_capacity: usize,   // items that can be stored 0
     }
 
     /** Where the object is stored / placed. */
@@ -1562,12 +1722,6 @@ mod liv {
         product: usize,
         components: Vec<usize>, // needed components: such as tools (desk) or ingredients (pen, paper).
         steps: usize,           // needed steps.
-    }
-
-    /** An ActiveRecipe links to the index of a task in the overall list of all possible tasks. */
-    struct ActiveRecipe {
-        recipe_id: usize,
-        progress: usize,
     }
 
     /** Something a Wusel can consume (= destroying by usage).
@@ -1849,8 +2003,7 @@ mod liv {
     }
 
     /** Wusel.
-     * Bundle of information on a certain position and abilities.
-     */
+     * Bundle of information on a certain position and abilities. */
     pub struct Wusel {
         id: usize,
 
