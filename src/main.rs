@@ -100,20 +100,27 @@ fn main() -> Result<(), io::Error> {
         let unbusy = world.wusel_get_all_unbusy();
         let wusel_len = world.wusel_count();
         for widx in unbusy {
-            let r = rand::random::<usize>() % (3 * wusel_len);
+            let r = rand::random::<usize>() % (4 * wusel_len);
             match r {
                 i if i < wusel_len && i != widx => {
-                    /* Meet randomly with someone. */
+                    /* Meet randomly with someone: Let [widx] meet [i], if i in [0..|w|). */
                     world.wusel_assign_task(
                         widx,
                         liv::TaskBuilder::meet_with(i, true, true).set_duration(10),
                     );
                 }
                 i if i >= wusel_len && i < 2 * wusel_len => {
-                    /* Walk randomly somewhere. */
+                    /* Walk randomly somewhere, if i not an wusel index. */
                     world.wusel_assign_task(
                         widx,
                         liv::TaskBuilder::move_to(world.position_random()),
+                    );
+                }
+                i if i >= 2 * wusel_len && i < 3 * wusel_len => {
+                    /* Interact with the object. */
+                    world.wusel_assign_task(
+                        widx,
+                        liv::TaskBuilder::use_object(bibimbap_id, 0), // view
                     );
                 }
                 _ => {} // do nothing randomly.
@@ -194,7 +201,7 @@ fn test_consume_bread() {
     log::debug!("Test World's wusels created.");
 
     /* Create food: transportable, no storage. */
-    let food1 = test_world.food_new("Bread", 10);
+    let food1 = test_world.food_new("Bread", 100);
 
     let (food1_id, food1_index) = food1;
 
@@ -231,13 +238,18 @@ fn test_consume_bread() {
     test_world.wusel_assign_task(0, liv::TaskBuilder::move_to(test_world.position_random()));
     test_world.wusel_assign_task(0, liv::TaskBuilder::use_object(food1_id, 3)); // consume.
     test_world.wusel_assign_task(0, liv::TaskBuilder::move_to(test_world.position_random()));
+    test_world.wusel_assign_task(0, liv::TaskBuilder::move_to(test_world.position_random()));
     log::debug!("Test World's task to work at the workbench assigned.");
 
     // show everyone's stats.
     for i in 0usize..2 {
-        // test_world.wusel_show_overview(i); // needs
         test_world.wusel_show_tasklist(i); // tasks
+        for n in liv::Need::VALUES.iter() {
+            test_world.wusel_set_need(i, n, 100);
+        }
+        test_world.wusel_show_overview(i); // needs
     }
+    log::debug!("Test World's wusels' needs artificially reduced.");
 
     /* Show the grid.. */
     let (_w, _h): (usize, usize) = (
@@ -247,7 +259,7 @@ fn test_consume_bread() {
 
     println!("{clear}", clear = termion::clear::All); // clear the screen
 
-    for _ in 0..200 {
+    for _ in 0..300 {
         // draw_field(_w, _h, test_world.positions_for_grid());
         println!();
         log::debug!(
@@ -261,6 +273,11 @@ fn test_consume_bread() {
         for i in 0usize..2 {
             test_world.wusel_show_overview(i); // needs
             test_world.wusel_show_tasklist(i); // tasks
+        }
+
+        if test_world.wusel_get_all_unbusy().len() > 1 {
+            log::debug!("Test world is done, to be busy.");
+            break;
         }
 
         std::thread::sleep(std::time::Duration::from_millis(100)); // wait.
@@ -569,8 +586,8 @@ mod liv {
         obj_count_misc: usize,      // all ever created miscellaneous objects
         obj_count_food: usize,      // all ever created food objects
 
-        actions: Vec<String>,                         // actions to do.
-        actions_effects: Vec<(usize, usize, String)>, // how various actions on various objects may influence
+        actions: Vec<String>, // actions to do.
+        actions_effects: Vec<(ObjectIdentifer, usize, &'static str, Vec<(Need, i16)>)>, // how various actions on various objects may influence
     }
 
     impl World {
@@ -598,7 +615,27 @@ mod liv {
                     String::from("Drop"),
                     String::from("Consume"),
                 ],
-                actions_effects: vec![],
+                actions_effects: vec![
+                    (
+                        (ObjectType::Food, "Bibimbap", 0),
+                        0,
+                        "View => Inspired.",
+                        vec![],
+                    ),
+                    (
+                        (ObjectType::Food, "Bibimbap", 3),
+                        0,
+                        "Consume => Fed.",
+                        vec![],
+                    ),
+                    ((ObjectType::Food, "Bread", 0), 0, "View => Teased.", vec![]),
+                    (
+                        (ObjectType::Food, "Bread", 0), // object type, subtype, any ID
+                        3,                              // action id
+                        "Consume => Fed.",              // effect description // placeholder
+                        vec![(Need::WATER, -50), (Need::FOOD, 200)], // effect
+                    ),
+                ],
             };
         }
 
@@ -672,6 +709,7 @@ mod liv {
         /** Get the character representing an object type. */
         fn objecttype_as_char(t: ObjectType) -> char {
             match t {
+                ObjectType::Construction => '#',  // '\u{1f4ba}', // wall
                 ObjectType::Furniture => 'm',     // '\u{1f4ba}', // chair
                 ObjectType::Miscellaneous => '*', // '\u{26ac}', // small circle
                 ObjectType::Food => 'ó',         // '\u{2615}', // hot beverage
@@ -743,6 +781,12 @@ mod liv {
         ) -> (ObjectIdentifer, usize) {
             /* Which object's counter to increase. */
             let new_obj_count: usize = match obj_type {
+                ObjectType::Construction => {
+                    // TODO (2021-01-21) ... construction such as walls.
+                    // self.obj_count_furniture += 1;
+                    // self.obj_count_furniture // increase and return.
+                    1
+                }
                 ObjectType::Furniture => {
                     self.obj_count_furniture += 1;
                     self.obj_count_furniture // increase and return.
@@ -1089,6 +1133,22 @@ mod liv {
             }
 
             println!("");
+        }
+
+        /** Get the wusel's need. */
+        pub fn wusel_get_need(self: &mut Self, wusel_id: usize, need: Need) -> u32 {
+            if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
+                self.wusels[index].wusel.get_need(need)
+            } else {
+                0
+            }
+        }
+
+        /** Set the wusel's need to a new value. */
+        pub fn wusel_set_need(self: &mut Self, wusel_id: usize, need: &Need, new_value: u32) {
+            if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
+                self.wusels[index].wusel.set_need(*need, new_value);
+            }
         }
 
         /** Get the world's current time. */
@@ -1571,6 +1631,22 @@ mod liv {
                 self.objects[object_index]
             );
 
+            /* Get the effect of interacting with the object. */
+            let effect = self.actions_effects.iter().find(
+                |((obj_type, obj_subtype, _), act_id, _effect_str, _effect_vec)| {
+                    *obj_type == obj_id.0 && *obj_subtype == obj_id.1 && *act_id == action_index
+                },
+            );
+
+            if let Some(effect) = effect {
+                log::debug!("Using the object has the following effect: {:?}", effect);
+                let (_, _, _, effect_vec) = effect;
+                for e in effect_vec {
+                    log::debug!("- Apply effect: {:?}", e);
+                    self.wusels[wusel_index].wusel.mod_need(e.0, e.1);
+                }
+            }
+
             /* Do the actual action. */
             return match self.actions[action_index].as_ref() {
                 "View" => {
@@ -1792,6 +1868,7 @@ mod liv {
     /** Types of an object. */
     #[derive(Debug, Clone, Copy, PartialEq)]
     pub enum ObjectType {
+        Construction,
         Furniture,
         Miscellaneous,
         Food,
