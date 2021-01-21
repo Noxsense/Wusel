@@ -13,16 +13,16 @@ fn main() -> Result<(), io::Error> {
     println!(
         "Created a new world: w:{w}, h:{h}",
         w = world.get_width(),
-        h = world.get_height()
+        h = world.get_depth()
     );
 
     /* Empty world tick. */
     world.tick();
 
-    world.wusel_new("1st".to_string(), true, (0, 0)); // female
-    world.wusel_new("2nd".to_string(), true, (20, 0)); // female
-    world.wusel_new("3rd".to_string(), false, (30, 0)); // male
-    world.wusel_new("4th".to_string(), false, (40, 0)); // male
+    world.wusel_new("1st".to_string(), true, liv::Position::new(0, 0)); // female
+    world.wusel_new("2nd".to_string(), true, liv::Position::new(20, 0)); // female
+    world.wusel_new("3rd".to_string(), false, liv::Position::new(30, 0)); // male
+    world.wusel_new("4th".to_string(), false, liv::Position::new(40, 0)); // male
 
     /* Transportable bibimbap (korean food) */
     let bibimbap = world.food_new("Bibimbap", 10);
@@ -86,7 +86,7 @@ fn main() -> Result<(), io::Error> {
     println!("{clear}", clear = termion::clear::All);
 
     /* Draw the field and make some real automation. */
-    let (w, h) = (world.get_width() as usize, world.get_height() as usize);
+    let (w, h) = (world.get_width() as usize, world.get_depth() as usize);
 
     for _ in 0..150 {
         // world.positions_recalculate_grid();
@@ -189,8 +189,8 @@ fn test_consume_bread() {
     test_world.tick();
     log::debug!("Test World ticked");
 
-    test_world.wusel_new("Eater".to_string(), true, (1, 0)); // female
-    test_world.wusel_new("Starver".to_string(), false, (2, 0)); // male
+    test_world.wusel_new("Eater".to_string(), true, liv::Position::new(1, 0)); // female
+    test_world.wusel_new("Starver".to_string(), false, liv::Position::new(2, 0)); // male
     log::debug!("Test World's wusels created.");
 
     /* Create food: transportable, no storage. */
@@ -222,7 +222,10 @@ fn test_consume_bread() {
     /* Let the other wusel wait, than it's tries to get the food as well, and consume it. */
     test_world.wusel_assign_task(
         0,
-        liv::TaskBuilder::move_to((test_world.get_width() - 1, test_world.get_height() - 1)),
+        liv::TaskBuilder::move_to(liv::Position::new(
+            test_world.get_width() - 1,
+            test_world.get_depth() - 1,
+        )),
     );
     test_world.wusel_assign_task(0, liv::TaskBuilder::use_object(food1_id, 1)); // take as well.
     test_world.wusel_assign_task(0, liv::TaskBuilder::move_to(test_world.position_random()));
@@ -239,7 +242,7 @@ fn test_consume_bread() {
     /* Show the grid.. */
     let (_w, _h): (usize, usize) = (
         test_world.get_width() as usize,
-        test_world.get_height() as usize,
+        test_world.get_depth() as usize,
     );
 
     println!("{clear}", clear = termion::clear::All); // clear the screen
@@ -404,10 +407,152 @@ mod liv {
         position: Where,
     }
 
+    /** Simple position in world. */
+    #[derive(Debug, PartialEq, Clone, Copy)]
+    pub struct Position {
+        x: u32,
+        y: u32,
+    }
+
+    impl Position {
+        /** Simple constructor. */
+        pub fn new(x: u32, y: u32) -> Self {
+            Self { x, y }
+        }
+
+        /** Get the distance between two positions. */
+        pub fn distance_to(self: &Self, other: &Self) -> f32 {
+            (((self.x as i64 - other.x as i64).pow(2) + (self.y as i64 - other.y as i64).pow(2))
+                as f32)
+                .sqrt()
+        }
+    }
+
+    /** Simple position in world. */
+    #[derive(Debug, PartialEq, Clone, Copy)]
+    pub struct Area {
+        anchor: Position,
+        width: u32,
+        depth: u32,
+        iterator_index: u32,
+    }
+
+    impl Area {
+        pub fn new(anchor: Position, width: u32, depth: u32) -> Self {
+            Self {
+                anchor,
+                width,
+                depth,
+                iterator_index: 0,
+            }
+        }
+
+        /** Create an area, that is spanned by the given positions. */
+        pub fn span(a: &Position, b: &Position) -> Self {
+            let (min_x, max_x) = (<u32>::min(a.x, b.x), <u32>::max(a.x, b.x));
+            let (min_y, max_y) = (<u32>::min(a.y, b.y), <u32>::max(a.y, b.y));
+
+            return Area {
+                anchor: Position::new(min_x, min_y),
+                /* If only one position is spanned: width/depth: 1. */
+                width: <u32>::max(1, max_x - min_x),
+                depth: <u32>::max(1, max_y - min_y),
+                iterator_index: 0,
+            };
+        }
+
+        /** Check, if the position is in the area. */
+        pub fn contains_position(self: &Self, pos: &Position) -> bool {
+            (self.anchor.x <= pos.x && pos.x < (self.anchor.x + self.width))
+                && (self.anchor.y <= pos.y && pos.y < (self.anchor.y + self.depth))
+        }
+
+        /** Get a random position within this area. */
+        pub fn position_random(self: &Self) -> Position {
+            Position::new(
+                self.anchor.x + (rand::random::<u32>() % (self.anchor.x + self.width)),
+                self.anchor.y + (rand::random::<u32>() % (self.anchor.y + self.depth)),
+            )
+        }
+
+        /** Get all valid neighbours of a position within the area. */
+        pub fn get_all_neighbours(self: &Self, pos: Position) -> Vec<Position> {
+            // TODO (maka a storage, to not calculate it every time. )
+            let mut neighbours: Vec<Position> = vec![];
+
+            /* Get all the valid neighbours. */
+            for d in Way::NEIGHBOURING.iter() {
+                if let Some(n) = self.get_directed_neighbour(pos, *d) {
+                    neighbours.push(n);
+                }
+            }
+            return neighbours;
+        }
+
+        /** Get a requested neighbour of a given position within this area. */
+        pub fn get_directed_neighbour(
+            self: &Self,
+            pos: Position,
+            direction: Way,
+        ) -> Option<Position> {
+            let change = direction.as_direction_tuple();
+
+            let box_width = self.anchor.x + self.width;
+            let box_depth = self.anchor.y + self.depth;
+
+            /* On west border => No west neighbours. (None) */
+            if pos.x < 1 && change.0 < 0 {
+                return None;
+            }
+
+            /* On east border => No east neighbours. (None) */
+            if pos.x >= box_width && change.0 > 0 {
+                return None;
+            }
+
+            /* On south border => No south neighbours. (None) */
+            if pos.y < 1 && change.1 < 0 {
+                return None;
+            }
+
+            /* On north border => No north neighbours. (None) */
+            if pos.y >= box_depth && change.1 > 0 {
+                return None;
+            }
+
+            return Some(Position::new(
+                (pos.x as i64 + change.0 as i64) as u32,
+                (pos.y as i64 + change.1 as i64) as u32,
+            ));
+        }
+
+        /** Get the optional position, which is on the given index. */
+        pub fn position_from_index(self: &Self, index: u32) -> Option<Position> {
+            if index < self.width * self.depth {
+                Some(Position::new(
+                    index % self.width + self.anchor.x,
+                    index / self.width + self.anchor.y,
+                ))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl Iterator for Area {
+        type Item = Position;
+
+        /** Iterator over the positions of the field. */
+        fn next(self: &mut Self) -> Option<Self::Item> {
+            let index = self.iterator_index;
+            self.iterator_index += 1;
+            self.position_from_index(index)
+        }
+    }
     /** The place of existence, time and relations. */
     pub struct World {
-        height: u32,
         width: u32,
+        depth: u32,
         positions: Vec<Vec<(char, usize)>>, // all positions [height x width] contain a vector of ids and type/set indicators.
 
         clock: usize, // time of the world.
@@ -430,11 +575,11 @@ mod liv {
 
     impl World {
         /** Create a new world. */
-        pub fn new(width: u32, height: u32) -> Self {
+        pub fn new(width: u32, depth: u32) -> Self {
             return Self {
-                height: height,
                 width: width,
-                positions: vec![vec![]; width as usize * height as usize],
+                depth: depth,
+                positions: vec![vec![]; width as usize * depth as usize],
 
                 clock: 0,
 
@@ -469,106 +614,56 @@ mod liv {
         }
 
         /** Get height of the world. */
-        pub fn get_height(self: &Self) -> u32 {
-            self.height
+        pub fn get_depth(self: &Self) -> u32 {
+            self.depth
         }
+
+        pub fn get_area(self: &Self) -> Area {
+            Area::new(Position::new(0, 0), self.width, self.depth)
+        }
+
+        // self.positions[pos_index].push((Self::CHAR_OBJECT, object_id));
 
         /** Get the `positions` index for the requesting position (width, height).
          * If the position is not in world, this index is not in [0, positions.len()).*/
-        fn position_to_index(self: &Self, pos: (u32, u32)) -> usize {
-            (pos.0 + self.width * pos.1) as usize
+        fn position_to_index(self: &Self, pos: Position) -> usize {
+            (pos.x + self.width * pos.y) as usize
         }
 
         /** Get the position tuple from the given index in this world. */
-        fn position_from_index(self: &Self, idx: usize) -> (u32, u32) {
-            (idx as u32 % self.width, idx as u32 / self.width)
+        fn position_from_index(self: &Self, idx: usize) -> Position {
+            Position::new(idx as u32 % self.width, idx as u32 / self.width)
         }
 
         /** Get a random position in this world. */
-        pub fn position_random(self: &Self) -> (u32, u32) {
-            self.position_random_in_area((0, 0), (self.width, self.height))
-        }
-
-        /** Get a random position within a range. */
-        pub fn position_random_in_area(
-            self: &Self,
-            start: (u32, u32),
-            end: (u32, u32),
-        ) -> (u32, u32) {
-            (
-                start.0 + (rand::random::<u32>() % u32::min(self.width, end.0)),
-                start.1 + (rand::random::<u32>() % u32::min(self.height, end.1)),
-            )
+        pub fn position_random(self: &Self) -> Position {
+            self.get_area().position_random()
         }
 
         /** Get the (valid) neighbours for a position. */
-        pub fn position_get_all_neighbours(
-            box_width: u32,
-            box_height: u32,
-            pos: (u32, u32),
-        ) -> Vec<(u32, u32)> {
-            let mut neighbours: Vec<(u32, u32)> = vec![];
-
-            /* Get all the valid neighbours. */
-            for d in Way::NEIGHBOURING.iter() {
-                if let Some(n) = Self::position_get_neighbour_on(box_width, box_height, pos, *d) {
-                    neighbours.push(n);
-                }
-            }
-
-            return neighbours;
+        pub fn position_get_all_neighbours(self: &Self, pos: Position) -> Vec<Position> {
+            self.get_area().get_all_neighbours(pos)
         }
 
         /** Get the next optional neighbour to the given position within the given box. */
         pub fn position_get_neighbour_on(
-            box_width: u32,
-            box_height: u32,
-            pos: (u32, u32),
+            self: &Self,
+            pos: Position,
             direction: Way,
-        ) -> Option<(u32, u32)> {
-            let change = direction.as_direction_tuple();
-
-            /* On west border => No west neighbours. (None) */
-            if pos.0 < 1 && change.0 < 0 {
-                return None;
-            }
-
-            /* On east border => No east neighbours. (None) */
-            if pos.0 >= box_width && change.0 > 0 {
-                return None;
-            }
-
-            /* On south border => No south neighbours. (None) */
-            if pos.1 < 1 && change.1 < 0 {
-                return None;
-            }
-
-            /* On north border => No north neighbours. (None) */
-            if pos.1 >= box_height && change.1 > 0 {
-                return None;
-            }
-
-            return Some((
-                (pos.0 as i64 + change.0 as i64) as u32,
-                (pos.1 as i64 + change.1 as i64) as u32,
-            ));
+        ) -> Option<Position> {
+            self.get_area().get_directed_neighbour(pos, direction)
         }
 
         /** Check if the position is inside the world bounds. */
-        pub fn position_is_world(self: &Self, pos: (u32, u32)) -> bool {
-            pos.0 < self.width && pos.1 < self.height
-        }
-
-        /** Get the distance between two positions. */
-        pub fn distance_between(a: (u32, u32), b: (u32, u32)) -> f32 {
-            (((a.0 as i64 - b.0 as i64).pow(2) + (a.1 as i64 - b.1 as i64).pow(2)) as f32).sqrt()
+        pub fn position_containing(self: &Self, pos: Position) -> bool {
+            self.get_area().contains_position(&pos)
         }
 
         /** Get the distance between two positions represented by indices in this world. */
-        fn distance_between_indeces(self: &Self, a_index: usize, b_index: usize) -> f32 {
+        fn positions_indices_distance(self: &Self, a_index: usize, b_index: usize) -> f32 {
             let a = self.position_from_index(a_index);
             let b = self.position_from_index(b_index);
-            return Self::distance_between(a, b);
+            return a.distance_to(&b);
         }
 
         /** Wusel char. */
@@ -586,7 +681,7 @@ mod liv {
          * Recalculate all positions, if they really consist what they promised. */
         #[allow(dead_code)]
         pub fn positions_recalculate_grid(self: &mut Self) {
-            self.positions = vec![vec![]; self.width as usize * self.height as usize];
+            self.positions = vec![vec![]; self.width as usize * self.depth as usize];
 
             let valid_index = self.positions.len();
 
@@ -604,10 +699,10 @@ mod liv {
 
         /** Get the positions of all active wusels. */
         #[allow(dead_code)]
-        pub fn positions_for_wusels(self: &Self) -> Vec<(u32, u32)> {
+        pub fn positions_for_wusels(self: &Self) -> Vec<Position> {
             let mut positions = vec![];
             for w in self.wusels.iter() {
-                positions.push(self.position_from_index((*w).position_index)); // usize -> (u32, u32)
+                positions.push(self.position_from_index((*w).position_index)); // usize -> Position
             }
             return positions;
         }
@@ -737,7 +832,7 @@ mod liv {
 
         /** Get the optional position of an object, given by an index.
          * If the position is held by a storage, get the pos of the storage. */
-        fn object_index_get_position(self: &Self, object_index: usize) -> Option<(u32, u32)> {
+        fn object_index_get_position(self: &Self, object_index: usize) -> Option<Position> {
             match self.objects[object_index].position {
                 Where::AtPosition(pos_index) => Some(self.position_from_index(pos_index)),
                 // get nested position.
@@ -750,7 +845,7 @@ mod liv {
 
         /** Get the optional position of an object, given by an ID.
          * If the position is held by a storage, get the pos of the storage. */
-        pub fn object_get_position(self: &Self, object_id: ObjectIdentifer) -> Option<(u32, u32)> {
+        pub fn object_get_position(self: &Self, object_id: ObjectIdentifer) -> Option<Position> {
             if let Some(object_index) = self.object_identifier_to_index(object_id) {
                 self.object_index_get_position(object_index)
             } else {
@@ -759,13 +854,9 @@ mod liv {
         }
 
         /** Place an object on a new position. */
-        pub fn object_set_position(
-            self: &mut Self,
-            object_id: ObjectIdentifer,
-            position: (u32, u32),
-        ) {
+        pub fn object_set_position(self: &mut Self, object_id: ObjectIdentifer, pos: Position) {
             if let Some(object_index) = self.object_identifier_to_index(object_id) {
-                let position_index = self.position_to_index(position);
+                let position_index = self.position_to_index(pos);
                 self.object_set_whereabouts(object_index, Where::AtPosition(position_index));
             }
         }
@@ -837,7 +928,7 @@ mod liv {
         /** Add a wusel to the world.
          * ID is the current wusel count.
          * TODO (2020-11-20) what is about dead wusels and decreasing length? */
-        pub fn wusel_new(self: &mut Self, name: String, female: bool, pos: (u32, u32)) {
+        pub fn wusel_new(self: &mut Self, name: String, female: bool, pos: Position) {
             let id = self.wusels_alltime_count; // almost identifier (for a long time unique)
             let w = Wusel::new(id, name, female); // new wusel at (pos)
 
@@ -861,7 +952,7 @@ mod liv {
         }
 
         /** Get the position of the indexed wusel. */
-        pub fn wusel_get_position(self: &Self, wusel_index: Option<usize>) -> Option<(u32, u32)> {
+        pub fn wusel_get_position(self: &Self, wusel_index: Option<usize>) -> Option<Position> {
             if let Some(wusel_index) = wusel_index {
                 if wusel_index < self.wusels.len() {
                     Some(self.position_from_index(self.wusels[wusel_index].position_index))
@@ -875,14 +966,15 @@ mod liv {
 
         /** Set the position of the indexed wusel to the nearest valid position
          * If the position may land out of the grid, put it to the nearest border. */
-        pub fn wusel_set_position(self: &mut Self, wusel_index: usize, pos: (u32, u32)) {
+        pub fn wusel_set_position(self: &mut Self, wusel_index: usize, pos: Position) {
             if wusel_index < self.wusels.len() {
                 let id = self.wusels[wusel_index].wusel.id;
 
                 /* Update the self.positions. */
                 let old_pos_index = self.wusels[wusel_index].position_index;
 
-                let new_pos = (u32::min(pos.0, self.width), u32::min(pos.1, self.height));
+                let new_pos =
+                    Position::new(u32::min(pos.x, self.width), u32::min(pos.y, self.depth));
                 let new_pos_index = self.position_to_index(new_pos);
 
                 /* Set the new position. */
@@ -1167,9 +1259,9 @@ mod liv {
                         _ => false, // => no process (FOLLOWED, KNOCKED or an unexpected)
                     }
                 }
-                TaskTag::MoveToPos(x, y) => {
+                TaskTag::MoveToPos(pos) => {
                     /* Let the wusel walk; check if they stopped. */
-                    let stopped: bool = self.let_wusel_walk_to_position(actor_index, (x, y));
+                    let stopped: bool = self.let_wusel_walk_to_position(actor_index, pos);
 
                     stopped // true == stop == success.
                 }
@@ -1540,7 +1632,7 @@ mod liv {
         fn let_wusel_walk_to_position_if_not_close(
             self: &mut Self,
             wusel_index: usize,
-            goal: (u32, u32),
+            goal: Position,
             max_distance: f32,
         ) -> bool {
             let wpos = self.wusel_get_position(Some(wusel_index));
@@ -1551,7 +1643,7 @@ mod liv {
 
             let wpos = wpos.unwrap();
 
-            if Self::distance_between(wpos, goal) > max_distance {
+            if wpos.distance_to(&goal) > max_distance {
                 self.let_wusel_walk_to_position(wusel_index, goal);
                 false // just walked
             } else {
@@ -1566,11 +1658,7 @@ mod liv {
          * If the goal, is reached, the walk is done.
          *
          * #Return, if wusel has stopped walking / is on goal (true), otherwise true, if they are still walking. */
-        fn let_wusel_walk_to_position(
-            self: &mut Self,
-            wusel_index: usize,
-            goal: (u32, u32),
-        ) -> bool {
+        fn let_wusel_walk_to_position(self: &mut Self, wusel_index: usize, goal: Position) -> bool {
             let pos = self.wusel_get_position(Some(wusel_index));
 
             if pos == None {
@@ -1580,8 +1668,8 @@ mod liv {
             let pos = pos.unwrap();
 
             /* Check if the goal is already reached. */
-            if pos.0 == goal.0 && pos.1 == goal.1 {
-                log::info!("Reached Goal ({},{}).", goal.0, goal.1);
+            if pos.x == goal.x && pos.y == goal.y {
+                log::info!("Reached Goal ({},{}).", goal.x, goal.y);
                 return true; // stopped walking.
             }
 
@@ -1596,20 +1684,20 @@ mod liv {
                 // XXX easy placeholder walking, ignoring all obstacles.
 
                 /* Get the current positions neighbours. */
-                let neighbours = Self::position_get_all_neighbours(self.width, self.height, pos);
+                let neighbours = self.position_get_all_neighbours(pos);
 
                 if neighbours.len() < 1 {
                     log::info!("Wusel cannot move, it's enclosed, wait forever");
                     return true;
                 }
 
-                let goal: (u32, u32) = (goal.0, goal.1);
-                let mut closest: (u32, u32) = neighbours[0];
+                let goal: Position = Position::new(goal.x, goal.y);
+                let mut closest: Position = neighbours[0];
                 let mut closest_distance: f32 = f32::MAX;
 
                 /* Find closest neighbour to goal. */
                 for p in neighbours.iter() {
-                    let distance = Self::distance_between(goal, *p);
+                    let distance = goal.distance_to(&p);
 
                     if distance < closest_distance {
                         closest = *p;
@@ -1907,11 +1995,11 @@ mod liv {
         }
 
         /** Create a new Task Builder, preset for moving. */
-        pub fn move_to(pos: (u32, u32)) -> Self {
+        pub fn move_to(pos: Position) -> Self {
             Self {
                 name: "Moving".to_string(),
                 duration: 1,
-                passive_part: TaskTag::MoveToPos(pos.0, pos.1),
+                passive_part: TaskTag::MoveToPos(pos),
             }
         }
 
@@ -2004,7 +2092,7 @@ mod liv {
     #[derive(Debug, Clone, PartialEq)]
     pub enum TaskTag {
         WaitLike,
-        MoveToPos(u32, u32),
+        MoveToPos(Position),
 
         UseObject(ObjectIdentifer, usize), // object_id, and action_id
 
@@ -2014,6 +2102,7 @@ mod liv {
 
     impl Task {
         const PATIENCE_TO_MEET: usize = 20; // TODO
+
         /** Get the approximately rest time (in ticks), this task needs. */
         fn get_rest_time(self: &Self) -> usize {
             self.duration - self.done_steps
