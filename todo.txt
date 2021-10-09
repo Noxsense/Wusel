@@ -1,0 +1,12 @@
+- [ ]  TODO (2020-11-22) TUI/CUI: Look at termion: https://github.com/redox-os/termion/tree/master/examples
+- [ ]  TODO (2020-11-22) TUI/CUI: Look at termion: https://lib.rs/crates/termion
+- [ ]  TODO (2020-11-22) TUI/CUI: Look at termion: https://github.com/redox-os/games/blob/master/src/minesweeper/main.rs https://raw.githubusercontent.com/redox-os/games/master/src/minesweeper/main.rs
+- [ ]  TODO (2020-11-22) TUI/CUI: Look at tui (backend termion): https://docs.rs/tui/0.13.0/tui/index.html
+
+- [ ]  TODO (2020-11-24) implement eating (from nothing?) / or need improvement.
+       ==> Grab some food
+       ==> Interacting/Consuming the Need Changing thing changes Needs.
+       ==> aka not over tasks but the interacted objects.
+       ==> other need improvements the same way,
+- [ ]  TODO (2020-11-24) implement grabbing food
+

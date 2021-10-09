@@ -11,4 +11,5 @@ rand = "0.7.3"
 env_logger = "0.8.1"
 log = "0.4.11"
 
+# https://docs.rs/tui/0.8.0/tui/: TUI is a library used to build rich terminal users interfaces and dashboards, uses termion as backend.
 termion = "1.5"
