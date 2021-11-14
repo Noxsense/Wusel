@@ -85,14 +85,15 @@ fn main() -> Result<(), io::Error> {
     /* Every 500 ms, make a tick. */
     let duration = std::time::Duration::from_millis(125);
 
-    println!("{clear}", clear = termion::clear::All);
+    // hide cursor?
+    println!("{clear}{hide}", clear = termion::clear::All, hide = termion::cursor::Hide);
 
     /* Draw the field and make some real automation. */
     let (w, h) = (world.get_width() as usize, world.get_depth() as usize);
 
     for _ in 0..150 {
         // world.positions_recalculate_grid();
-        draw_field(w, h, world.positions_for_grid());
+        render_field(w, h, world.positions_for_grid());
 
         /* Tick the world, maybe print the ongoing tasks. */
         print!("Time: {}\n", world.get_time());
@@ -139,17 +140,18 @@ fn main() -> Result<(), io::Error> {
 }
 
 /** Clean he view and draw the field, put the cursor, two lines below the field, to write there. */
-fn draw_field(w: usize, h: usize, positions: Vec<Vec<(char, usize)>>) {
+fn render_field(w: usize, h: usize, positions: Vec<Vec<(char, usize)>>) {
     /* Draw field. */
     for p in 0..positions.len() {
         let on_pos = &positions[p];
         print!(
-            "{pos}{sym}",
+            "{pos}{sym}{hide}",
             pos = termion::cursor::Goto(
                 (p % w) as u16 + 2, // x
-                (p / w) as u16 + 2
-            ), // y
-            sym = if on_pos.len() < 1 { '`' } else { on_pos[0].0 }
+                (p / w) as u16 + 2 // y
+            ),
+            sym = if on_pos.len() < 1 { '`' } else { on_pos[0].0 },
+            hide = termion::cursor::Hide
         );
     }
 
@@ -266,10 +268,10 @@ mod test {
             test_world.get_depth() as usize,
             );
 
-        println!("{clear}", clear = termion::clear::All); // clear the screen
+        println!("{clear}{hide}", clear = termion::clear::All, hide = termion::cursor::Hide); // clear the screen
 
         for _ in 0..300 {
-            // draw_field(_w, _h, test_world.positions_for_grid());
+            // render_field(_w, _h, test_world.positions_for_grid());
             println!();
             log::debug!(
                 "Test World's current grid, time: {}.",
@@ -413,10 +415,8 @@ mod test {
         /* 90 ticks later. */
         for _ in 0..90 {
             test_world.tick();
-            println!("\nTasks at time {}:", test_world.get_time());
-            for w in 0..4 {
-                test_world.wusel_show_tasklist(w);
-            }
+            // println!("\nTasks at time {}:", test_world.get_time());
+            // for w in 0..4 { test_world.wusel_show_tasklist(w); }
         }
     }
 }
