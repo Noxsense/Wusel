@@ -28,8 +28,7 @@ impl Position {
 
     /** Get the distance between two positions. */
     pub fn distance_to(self: &Self, other: &Self) -> f32 {
-        (((self.x as i64 - other.x as i64).pow(2) + (self.y as i64 - other.y as i64).pow(2))
-         as f32)
+        (((self.x as i64 - other.x as i64).pow(2) + (self.y as i64 - other.y as i64).pow(2)) as f32)
             .sqrt()
     }
 }
@@ -78,7 +77,7 @@ impl Area {
         Position::new(
             self.anchor.x + (rand::random::<u32>() % (self.anchor.x + self.width)),
             self.anchor.y + (rand::random::<u32>() % (self.anchor.y + self.depth)),
-            )
+        )
     }
 
     /** Get all valid neighbours of a position within the area. */
@@ -96,11 +95,7 @@ impl Area {
     }
 
     /** Get a requested neighbour of a given position within this area. */
-    pub fn get_directed_neighbour(
-        self: &Self,
-        pos: Position,
-        direction: Way,
-        ) -> Option<Position> {
+    pub fn get_directed_neighbour(self: &Self, pos: Position, direction: Way) -> Option<Position> {
         let change = direction.as_direction_tuple();
 
         let box_width = self.anchor.x + self.width;
@@ -127,18 +122,18 @@ impl Area {
         }
 
         return Some(Position::new(
-                (pos.x as i64 + change.0 as i64) as u32,
-                (pos.y as i64 + change.1 as i64) as u32,
-                ));
+            (pos.x as i64 + change.0 as i64) as u32,
+            (pos.y as i64 + change.1 as i64) as u32,
+        ));
     }
 
     /** Get the optional position, which is on the given index. */
     pub fn position_from_index(self: &Self, index: u32) -> Option<Position> {
         if index < self.width * self.depth {
             Some(Position::new(
-                    index % self.width + self.anchor.x,
-                    index / self.width + self.anchor.y,
-                    ))
+                index % self.width + self.anchor.x,
+                index / self.width + self.anchor.y,
+            ))
         } else {
             None
         }
@@ -210,27 +205,26 @@ impl World {
                     0,
                     "View => Inspired.",
                     vec![],
-                    ),
-                    (
-                        (ObjectType::Food, "Bibimbap", 3),
-                        0,
-                        "Consume => Fed.",
-                        vec![],
-                        ),
-                        ((ObjectType::Food, "Bread", 0), 0, "View => Teased.", vec![]),
-                        (
-                            (ObjectType::Food, "Bread", 0), // object type, subtype, any ID
-                            3,                              // action id
-                            "Consume => Fed.",              // effect description // placeholder
-                            vec![(Need::WATER, -50), (Need::FOOD, 200)], // effect
-                        ),
+                ),
+                (
+                    (ObjectType::Food, "Bibimbap", 3),
+                    0,
+                    "Consume => Fed.",
+                    vec![],
+                ),
+                ((ObjectType::Food, "Bread", 0), 0, "View => Teased.", vec![]),
+                (
+                    (ObjectType::Food, "Bread", 0), // object type, subtype, any ID
+                    3,                              // action id
+                    "Consume => Fed.",              // effect description // placeholder
+                    vec![(Need::WATER, -50), (Need::FOOD, 200)], // effect
+                ),
             ],
         };
     }
 
     /* World Inventory. */
-    const WORLD_INVENTORY: Where =
-        Where::StoredIn((ObjectType::Miscellaneous, "World-Storage", 0));
+    const WORLD_INVENTORY: Where = Where::StoredIn((ObjectType::Miscellaneous, "World-Storage", 0));
 
     pub const TICKS_PER_DAY: usize = 2880; // 24h by 0.5 minutes
 
@@ -276,7 +270,7 @@ impl World {
         self: &Self,
         pos: Position,
         direction: Way,
-        ) -> Option<Position> {
+    ) -> Option<Position> {
         self.get_area().get_directed_neighbour(pos, direction)
     }
 
@@ -349,7 +343,7 @@ impl World {
         self: &Self,
         position_index: usize,
         id: &(char, usize),
-        ) -> Option<usize> {
+    ) -> Option<usize> {
         self.positions[position_index]
             .iter()
             .position(|obj_id| obj_id == id)
@@ -367,7 +361,7 @@ impl World {
         passable: bool,
         consumable_parts: Option<usize>,
         storage_capacity: usize,
-        ) -> (ObjectIdentifer, usize) {
+    ) -> (ObjectIdentifer, usize) {
         /* Which object's counter to increase. */
         let new_obj_count: usize = match obj_type {
             ObjectType::Construction => {
@@ -409,7 +403,7 @@ impl World {
         (
             self.objects.last_mut().unwrap().object.object_id,
             self.objects.len() - 1,
-            )
+        )
     }
 
     /** Create a new food (an object) to exist in this world.
@@ -422,7 +416,7 @@ impl World {
         self: &mut Self,
         name: ObjectSubtype,
         bites: usize,
-        ) -> (ObjectIdentifer, usize) {
+    ) -> (ObjectIdentifer, usize) {
         self.object_new(
             ObjectType::Food,
             name,
@@ -431,7 +425,7 @@ impl World {
             true,
             Some(bites),
             0,
-            )
+        )
     }
 
     /** Duplicate a world object: Use all attributes, but change the ID
@@ -439,21 +433,21 @@ impl World {
     pub fn object_duplicate(
         self: &mut Self,
         base_index: usize,
-        ) -> Option<(ObjectIdentifer, usize)> {
+    ) -> Option<(ObjectIdentifer, usize)> {
         /* Duplicate non existing?. */
         if base_index >= self.objects.len() {
             return None;
         }
 
         Some(self.object_new(
-                (&*self.objects[base_index].object).object_id.0,
-                (&*self.objects[base_index].object).object_id.1,
-                (&*self.objects[base_index].object).name.clone(),
-                (&*self.objects[base_index].object).transportable,
-                (&*self.objects[base_index].object).passable,
-                (&*self.objects[base_index].object).consumable,
-                (&*self.objects[base_index].object).storage_capacity,
-                ))
+            (&*self.objects[base_index].object).object_id.0,
+            (&*self.objects[base_index].object).object_id.1,
+            (&*self.objects[base_index].object).name.clone(),
+            (&*self.objects[base_index].object).transportable,
+            (&*self.objects[base_index].object).passable,
+            (&*self.objects[base_index].object).consumable,
+            (&*self.objects[base_index].object).storage_capacity,
+        ))
     }
 
     /** Find the optional index of an object, given by an ID. */
@@ -541,11 +535,11 @@ impl World {
 
         /* Remove from grid / positions, if available. */
         if let Where::AtPosition(pos_index) = wherefrom {
-            if let Some(i) = self
-                .positions_find_index(*pos_index, &Self::objectid_as_gridid(&(obj.object_id)))
-                {
-                    self.positions[*pos_index].remove(i);
-                }
+            if let Some(i) =
+                self.positions_find_index(*pos_index, &Self::objectid_as_gridid(&(obj.object_id)))
+            {
+                self.positions[*pos_index].remove(i);
+            }
         }
 
         /* Finally remove. */
@@ -575,7 +569,7 @@ impl World {
             wusel: w,
             position_index: pos_index,
         }); // wusel on position (by index)
-        // self.wusels_positions.push(pos_index); // index.
+            // self.wusels_positions.push(pos_index); // index.
         self.wusels_alltime_count += 1;
     }
 
@@ -606,8 +600,7 @@ impl World {
             /* Update the self.positions. */
             let old_pos_index = self.wusels[wusel_index].position_index;
 
-            let new_pos =
-                Position::new(u32::min(pos.x, self.width), u32::min(pos.y, self.depth));
+            let new_pos = Position::new(u32::min(pos.x, self.width), u32::min(pos.y, self.depth));
             let new_pos_index = self.position_to_index(new_pos);
 
             /* Set the new position. */
@@ -667,7 +660,7 @@ impl World {
             "Tasks of {}: {}",
             self.wusels[wusel_index].wusel.get_name(),
             self.wusels[wusel_index].wusel.show_takslist()
-            );
+        );
     }
 
     /** Print overview of (selected) wusel to std::out.*/
@@ -693,7 +686,7 @@ impl World {
         print!(
             "Relations with {}: ",
             self.wusels[wusel_index].wusel.get_name()
-            );
+        );
 
         let mut has_relations: bool = false;
 
@@ -813,7 +806,7 @@ impl World {
                 baby.0,
                 baby.1,
                 if baby.2 { "Girl" } else { " Boy" }
-                );
+            );
         }
     }
 
@@ -933,7 +926,7 @@ impl World {
                         "Object[{:?}] or Action[{}] could not be found.",
                         object_id,
                         action_id
-                        );
+                    );
                     true // proceed to next action.
                 } else {
                     let object_index = object_index.unwrap(); // TODO
@@ -976,12 +969,12 @@ impl World {
         passive_index: usize,
         intention_good: bool,
         romantically: bool,
-        ) -> i8 {
+    ) -> i8 {
         log::debug!(
             "Meet with {}, nice: {}.",
             self.wusels[passive_index].wusel.show(),
             intention_good
-            );
+        );
 
         /* If not close to the other wusel, use this step to get closer,
          * return as not yet ready. */
@@ -1037,7 +1030,7 @@ impl World {
                 passive_id,
                 intention_good && performance,
                 romantically && performance,
-                );
+            );
 
             return Self::MEET_RESULT_OK; // they actually met.
         }
@@ -1069,9 +1062,9 @@ impl World {
                 _a if self.wusels[active_index]
                     .wusel
                     .has_task_with(&TaskTag::BeMetFrom(passive_id)) =>
-                    {
-                        active_index
-                    }
+                {
+                    active_index
+                }
                 _ => self.wusels.len(),
             };
 
@@ -1090,15 +1083,14 @@ impl World {
                     i -= 1;
                     if self.wusels[already_waiting_index].wusel.tasklist[i].passive_part
                         == *active_is_met
-                        {
-                            let met_task =
-                                self.wusels[already_waiting_index].wusel.tasklist.remove(i);
-                            self.wusels[already_waiting_index]
-                                .wusel
-                                .tasklist
-                                .push(met_task); // append to back (ongoing)
-                            break;
-                        }
+                    {
+                        let met_task = self.wusels[already_waiting_index].wusel.tasklist.remove(i);
+                        self.wusels[already_waiting_index]
+                            .wusel
+                            .tasklist
+                            .push(met_task); // append to back (ongoing)
+                        break;
+                    }
                 }
                 return Self::MEET_RESULT_KNOCKED; // even if it might be knocked before.
             }
@@ -1122,8 +1114,8 @@ impl World {
             self.wusel_assign_task(
                 more_passive,
                 TaskBuilder::be_met_from(more_active)
-                .set_name(format!("Be met by {}", more_active)),
-                );
+                    .set_name(format!("Be met by {}", more_active)),
+            );
 
             return Self::MEET_RESULT_KNOCKED;
         }
@@ -1166,7 +1158,7 @@ impl World {
         wusel_index: usize,
         object_index: usize,
         action_index: usize,
-        ) -> bool {
+    ) -> bool {
         /* Invalid wusel index. */
         if wusel_index >= self.wusels.len() {
             return false;
@@ -1193,7 +1185,7 @@ impl World {
                 wusel_index,
                 obj_pos, // current object position.
                 1.2,     // max distance.
-                )
+            )
         } else {
             false
         };
@@ -1218,14 +1210,14 @@ impl World {
             "Used object ({:?} on {:?}).",
             self.actions[action_index],
             self.objects[object_index]
-            );
+        );
 
         /* Get the effect of interacting with the object. */
         let effect = self.actions_effects.iter().find(
             |((obj_type, obj_subtype, _), act_id, _effect_str, _effect_vec)| {
                 *obj_type == obj_id.0 && *obj_subtype == obj_id.1 && *act_id == action_index
             },
-            );
+        );
 
         if let Some(effect) = effect {
             log::debug!("Using the object has the following effect: {:?}", effect);
@@ -1256,10 +1248,7 @@ impl World {
                 if let Where::HeldBy(holder_id) = *obj_where {
                     if holder_id == wusel_id {
                         log::info!("Drop it, if held by wusel themself.");
-                        self.object_set_whereabouts(
-                            object_index,
-                            Where::AtPosition(obj_pos_index),
-                            ); // == wusel_pos, as pos of all containers
+                        self.object_set_whereabouts(object_index, Where::AtPosition(obj_pos_index)); // == wusel_pos, as pos of all containers
                         log::debug!("Object placed, somewhere.");
                         return Self::TASK_PROCEED;
                     }
@@ -1299,7 +1288,7 @@ impl World {
         wusel_index: usize,
         goal: Position,
         max_distance: f32,
-        ) -> bool {
+    ) -> bool {
         let wpos = self.wusel_get_position(Some(wusel_index));
 
         if wpos == None {
@@ -1387,7 +1376,7 @@ impl World {
         wusel1_id: usize,
         nice: bool,
         romantic: bool,
-        ) {
+    ) {
         /* Decide for a relation key: (Greater ID, Smaller ID). */
 
         let key = if wusel0_id <= wusel1_id {
@@ -1555,7 +1544,7 @@ impl Relation {
                 1 => " Siblings|Parents|Kids",
                 _ => "Related",
             }
-            )
+        )
     }
 }
 
@@ -1956,7 +1945,7 @@ impl Wusel {
                 name = self.tasklist[i].name,
                 progress = self.tasklist[i].done_steps,
                 duration = self.tasklist[i].duration
-                );
+            );
 
             /* Break or next task, if available. */
             if i == 0 {
@@ -1984,7 +1973,7 @@ impl Wusel {
                 value = v,
                 bar_len = usize::min(bar_len, max_len as usize),
                 end = ""
-                );
+            );
         }
         return s;
     }
@@ -1998,7 +1987,7 @@ impl Wusel {
                 a = ability.name(),
                 v = *value as usize,
                 bar = ""
-                );
+            );
         }
         return s;
     }

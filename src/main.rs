@@ -20,8 +20,8 @@ fn main() -> Result<(), io::Error> {
 
     let size = terminal_size::terminal_size();
     if let Some((terminal_size::Width(w), terminal_size::Height(h))) = size {
-        width = w as u32 - 2;
-        height = (h as u32) - 10; // minus gap for time.
+        width = w as u32 - (2 * 3);
+        height = (h as u32) - (2 * 3) - 4; // minus gap for time.
     } else {
         width = 80;
         height = 30;
@@ -69,7 +69,11 @@ fn main() -> Result<(), io::Error> {
     let duration = std::time::Duration::from_millis(125);
 
     // hide cursor?
-    println!("{clear}{hide}", clear = termion::clear::All, hide = termion::cursor::Hide);
+    println!(
+        "{clear}{hide}",
+        clear = termion::clear::All,
+        hide = termion::cursor::Hide
+    );
 
     /* Draw the field and make some real automation. */
     let (w, h) = (world.get_width() as usize, world.get_depth() as usize);
@@ -82,7 +86,7 @@ fn main() -> Result<(), io::Error> {
         print!("Time: {}\n", world.get_time());
         world.tick();
 
-        /* Give some unbusy wusels the task to move around. */
+        /* Give some unbusy wusels the task to move circumference. */
         let unbusy = world.wusel_get_all_unbusy();
         let wusel_len = world.wusel_count();
         for widx in unbusy {
@@ -126,47 +130,94 @@ fn main() -> Result<(), io::Error> {
 fn render_field(w: usize, h: usize, positions: Vec<Vec<(char, usize)>>) {
     /* Draw field. */
     for p in 0..positions.len() {
+        /* All things on this position. */
         let on_pos = &positions[p];
+
+        let (x, y): (u16, u16);
+        x = (p % w) as u16 + 2;
+        y = (p / w) as u16 + 2;
+
+        let color_bg: termion::color::Rgb;
+        let color_fg: termion::color::Rgb;
+        let render_symbol: char;
+
+        // TODO (2021-11-15) from position, get form and colour.
+        let position_is_free = on_pos.len() < 1;
+
+        if position_is_free {
+            color_fg = termion::color::Rgb(0, 255, 0);
+            render_symbol = '`';
+        } else {
+            color_fg = termion::color::Rgb(255, 0, 0);
+            render_symbol = on_pos[0].0;
+        }
+
+        color_bg = termion::color::Rgb(92, 194, 97);
+
+        /* Draw position symbol. */
         print!(
-            "{pos}{sym}{hide}",
-            pos = termion::cursor::Goto(
-                (p % w) as u16 + 2, // x
-                (p / w) as u16 + 2 // y
-            ),
-            sym = if on_pos.len() < 1 { '`' } else { on_pos[0].0 },
-            hide = termion::cursor::Hide
+            "{hide}{pos}{color_fg}{color_bg}{render_symbol}",
+            pos = termion::cursor::Goto(x, y),
+            color_bg = termion::color::Bg(color_bg),
+            color_fg = termion::color::Fg(color_fg),
+            render_symbol = render_symbol,
+            hide = termion::cursor::Hide,
         );
     }
 
     /* Draw border. */
     let mut i: u16 = 0;
     let (w2, h2): (u16, u16) = (w as u16 + 2, h as u16 + 2);
-    let around: u16 = (w2 * h2) as u16;
+    let circumference: u16 = (w2 * h2) as u16;
 
-    while i < around {
+    let border_top: u16 = 0;
+    let border_right: u16 = w2 - 1;
+    let border_left: u16 = 0;
+    let border_bottom: u16 = h2 - 1;
+
+    let border_symbol_vertical = "|";
+    let border_symbol_horizontal = "=";
+    let border_symbol_edge = "+";
+
+    let border_colour = termion::color::Rgb(192, 67, 67);
+
+    print!(
+        "{bg_reset}{bordercolour}",
+        bg_reset = termion::color::Bg(termion::color::Reset),
+        bordercolour = termion::color::Fg(border_colour)
+    );
+
+    while i < circumference {
+        let x: u16 = i % w2;
+        let y: u16 = i / w2;
+
+        let is_on_edge: bool =
+            (x == border_left || x == border_right) && (y == border_top || y == border_bottom);
+        let is_vertical: bool = x == 0 || x == border_right; // most left or most right.
+
         /* Draw symbol. */
         print!(
             "{pos}{border}",
             pos = termion::cursor::Goto(i % w2 + 1, i / w2 + 1),
-            border = match i % w2 {
-                _ if i == 0 || i == w2 - 1 || i == around - w2 || i == around - 1 => "+",
-                0 => "|",
-                x if x == (w2 - 1) => "|",
-                _ => "=",
+            border = match x {
+                _ if is_on_edge => border_symbol_edge,
+                _ if is_vertical => border_symbol_vertical,
+                _ => border_symbol_horizontal,
             }
         );
-        /* Go around field, next index. */
-        i += if i < w2 || i >= around - w2 - 1 || i % w2 == w2 - 1 {
-            1
-        } else {
-            w2 - 1
+        /* Go circumference field, next index. */
+        let is_drawing_horizotal: bool = i < w2 || i >= circumference - w2 - 1 || i % w2 == w2 - 1;
+        i += match is_drawing_horizotal {
+            true => 1,       // add one.
+            false => w2 - 1, // add width + 2
         };
     }
 
     /* Position to below field, clear everything below. */
     print!(
-        "{pos_clear}{clear}{pos_then}",
+        "{pos_clear}{colour_reset}{clear}{pos_then}",
         pos_clear = termion::cursor::Goto(1, h as u16 + 3),
+        colour_reset = termion::color::Fg(termion::color::Reset),
         pos_then = termion::cursor::Goto(1, h as u16 + 4),
         clear = termion::clear::AfterCursor
     );
@@ -224,10 +275,10 @@ mod test {
         test_world.wusel_assign_task(
             0,
             life::TaskBuilder::move_to(life::Position::new(
-                    test_world.get_width() - 1,
-                    test_world.get_depth() - 1,
-                    )),
-                    );
+                test_world.get_width() - 1,
+                test_world.get_depth() - 1,
+            )),
+        );
         test_world.wusel_assign_task(0, life::TaskBuilder::use_object(food1_id, 1)); // take as well.
         test_world.wusel_assign_task(0, life::TaskBuilder::move_to(test_world.position_random()));
         test_world.wusel_assign_task(0, life::TaskBuilder::use_object(food1_id, 3)); // consume.
@@ -249,9 +300,13 @@ mod test {
         let (_w, _h): (usize, usize) = (
             test_world.get_width() as usize,
             test_world.get_depth() as usize,
-            );
+        );
 
-        println!("{clear}{hide}", clear = termion::clear::All, hide = termion::cursor::Hide); // clear the screen
+        println!(
+            "{clear}{hide}",
+            clear = termion::clear::All,
+            hide = termion::cursor::Hide
+        ); // clear the screen
 
         for _ in 0..300 {
             // render_field(_w, _h, test_world.positions_for_grid());
@@ -259,7 +314,7 @@ mod test {
             log::debug!(
                 "Test World's current grid, time: {}.",
                 test_world.get_time()
-                );
+            );
 
             test_world.tick(); // progress time.
 
@@ -358,10 +413,10 @@ mod test {
         /* Empty test_world tick. */
         test_world.tick();
 
-        test_world.wusel_new("1st".to_string(), true, life::Position{ x: 1, y: 0}); // female
-        test_world.wusel_new("2nd".to_string(), true, life::Position{ x: 3, y: 0}); // female
-        test_world.wusel_new("3rd".to_string(), false, life::Position{ x: 5, y: 0}); // male
-        test_world.wusel_new("4th".to_string(), false, life::Position{ x: 9, y: 0}); // male
+        test_world.wusel_new("1st".to_string(), true, life::Position { x: 1, y: 0 }); // female
+        test_world.wusel_new("2nd".to_string(), true, life::Position { x: 3, y: 0 }); // female
+        test_world.wusel_new("3rd".to_string(), false, life::Position { x: 5, y: 0 }); // male
+        test_world.wusel_new("4th".to_string(), false, life::Position { x: 9, y: 0 }); // male
 
         // 4 wusels created.
         assert_eq!(4, test_world.wusel_count());
@@ -381,19 +436,19 @@ mod test {
         test_world.wusel_assign_task(
             0,
             life::TaskBuilder::meet_with(1, true, false).set_duration(7),
-            ); // mutual meeting.
+        ); // mutual meeting.
         test_world.wusel_assign_task(
             1,
             life::TaskBuilder::meet_with(2, true, false).set_duration(7),
-            ); // mutual meeting.
+        ); // mutual meeting.
         test_world.wusel_assign_task(
             2,
             life::TaskBuilder::meet_with(3, true, false).set_duration(7),
-            ); // mutual meeting.
+        ); // mutual meeting.
         test_world.wusel_assign_task(
             3,
             life::TaskBuilder::meet_with(0, true, false).set_duration(7),
-            ); // mutual meeting.
+        ); // mutual meeting.
 
         /* 90 ticks later. */
         for _ in 0..90 {
