@@ -555,9 +555,9 @@ impl World {
     /** Add a wusel to the world.
      * ID is the current wusel count.
      * TODO (2020-11-20) what is about dead wusels and decreasing length? */
-    pub fn wusel_new(self: &mut Self, name: String, female: bool, pos: Position) {
+    pub fn wusel_new(self: &mut Self, name: String, gender: WuselGender, pos: Position) {
         let id = self.wusels_alltime_count; // almost identifier (for a long time unique)
-        let w = Wusel::new(id, name, female); // new wusel at (pos)
+        let w = Wusel::new(id, name, gender); // new wusel at (pos)
 
         /* Add wusel to positions, start at (pos). */
         let pos_index = self.position_to_index(pos);
@@ -773,8 +773,8 @@ impl World {
                 };
                 if (0u8..possibility).contains(&maybe_now) {
                     log::debug!("Pop the baby!");
-                    let female = rand::random::<bool>();
-                    new_babies.push((w.wusel.id, father, female));
+                    let gender = rand::random::<bool>();
+                    new_babies.push((w.wusel.id, father, gender));
                 }
             }
 
@@ -1764,6 +1764,12 @@ impl Task {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum WuselGender {
+    Female,
+    Male,
+}
+
 /** Wusel.
  * Bundle of information on a certain position and abilities. */
 pub struct Wusel {
@@ -1772,7 +1778,7 @@ pub struct Wusel {
     /* Name */
     name: String,
 
-    female: bool, // female => able to bear children, male => able to inject children
+    gender: WuselGender, // WuselGender::Female => able to bear children, male => able to inject children
     pregnancy: Option<(usize, u8)>, // optional pregnancy with father's ID and remaining days.
 
     life: Life,      // alive | dead | ghost
@@ -1800,12 +1806,12 @@ impl Wusel {
     ];
 
     /** Create a new Wusel with name. */
-    fn new(id: usize, name: String, female: bool) -> Self {
+    fn new(id: usize, name: String, gender: WuselGender) -> Self {
         let mut new = Self {
-            id: id,
-            name: name,
+            id,
+            name,
 
-            female: female,
+            gender,
             pregnancy: None,
 
             life: Life::ALIVE,
@@ -1891,7 +1897,11 @@ impl Wusel {
         string.push(' ');
 
         /* Gender */
-        string.push_str(if self.female { "\u{2640}" } else { "\u{2642}" });
+        string.push_str(if self.gender == WuselGender::Female {
+            "\u{2640}"
+        } else {
+            "\u{2642}"
+        });
 
         /* Birth tick. */
         string.push_str(" (");

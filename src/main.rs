@@ -37,10 +37,26 @@ fn main() -> Result<(), io::Error> {
     /* Empty world tick. */
     world.tick();
 
-    world.wusel_new("1st".to_string(), true, life::Position::new(0, 0)); // female
-    world.wusel_new("2nd".to_string(), true, life::Position::new(20, 0)); // female
-    world.wusel_new("3rd".to_string(), false, life::Position::new(30, 0)); // male
-    world.wusel_new("4th".to_string(), false, life::Position::new(40, 0)); // male
+    world.wusel_new(
+        "1st".to_string(),
+        life::WuselGender::Female,
+        life::Position::new(0, 0),
+    ); // female
+    world.wusel_new(
+        "2nd".to_string(),
+        life::WuselGender::Female,
+        life::Position::new(20, 0),
+    ); // female
+    world.wusel_new(
+        "3rd".to_string(),
+        life::WuselGender::Male,
+        life::Position::new(30, 0),
+    ); // male
+    world.wusel_new(
+        "4th".to_string(),
+        life::WuselGender::Male,
+        life::Position::new(40, 0),
+    ); // male
 
     /* Transportable bibimbap (korean food) */
     let bibimbap = world.food_new("Bibimbap", 10);
@@ -241,8 +257,16 @@ mod test {
         test_world.tick();
         log::debug!("Test World ticked");
 
-        test_world.wusel_new("Eater".to_string(), true, life::Position::new(1, 0)); // female
-        test_world.wusel_new("Starver".to_string(), false, life::Position::new(2, 0)); // male
+        test_world.wusel_new(
+            "Eater".to_string(),
+            life::WuselGender::Female,
+            life::Position::new(1, 0),
+        ); // female
+        test_world.wusel_new(
+            "Starver".to_string(),
+            life::WuselGender::Male,
+            life::Position::new(2, 0),
+        ); // male
         log::debug!("Test World's wusels created.");
 
         /* Create food: transportable, no storage. */
@@ -413,10 +437,26 @@ mod test {
         /* Empty test_world tick. */
         test_world.tick();
 
-        test_world.wusel_new("1st".to_string(), true, life::Position { x: 1, y: 0 }); // female
-        test_world.wusel_new("2nd".to_string(), true, life::Position { x: 3, y: 0 }); // female
-        test_world.wusel_new("3rd".to_string(), false, life::Position { x: 5, y: 0 }); // male
-        test_world.wusel_new("4th".to_string(), false, life::Position { x: 9, y: 0 }); // male
+        test_world.wusel_new(
+            "1st".to_string(),
+            life::WuselGender::Female,
+            life::Position { x: 1, y: 0 },
+        ); // female
+        test_world.wusel_new(
+            "2nd".to_string(),
+            life::WuselGender::Female,
+            life::Position { x: 3, y: 0 },
+        ); // female
+        test_world.wusel_new(
+            "3rd".to_string(),
+            life::WuselGender::Male,
+            life::Position { x: 5, y: 0 },
+        ); // male
+        test_world.wusel_new(
+            "4th".to_string(),
+            life::WuselGender::Male,
+            life::Position { x: 9, y: 0 },
+        ); // male
 
         // 4 wusels created.
         assert_eq!(4, test_world.wusel_count());
