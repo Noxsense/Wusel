@@ -1,5 +1,7 @@
 extern crate rand;
 
+use terminal_size;
+
 pub mod life;
 
 use std::io;
@@ -11,7 +13,21 @@ fn main() -> Result<(), io::Error> {
     // initiate the logger.
     env_logger::init();
 
-    let mut world: life::World = life::World::new(80, 30);
+    // use terminal_size::{Width, Height, terminal_size};
+
+    let width: u32;
+    let height: u32;
+
+    let size = terminal_size::terminal_size();
+    if let Some((terminal_size::Width(w), terminal_size::Height(h))) = size {
+        width = w as u32 - 2;
+        height = (h as u32) - 10; // minus gap for time.
+    } else {
+        width = 80;
+        height = 30;
+    }
+
+    let mut world: life::World = life::World::new(width, height);
     println!(
         "Created a new world: w:{w}, h:{h}",
         w = world.get_width(),
