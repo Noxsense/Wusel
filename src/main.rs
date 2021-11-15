@@ -64,39 +64,6 @@ fn main() -> Result<(), io::Error> {
     // wusel.improve(life::Ability::FINESSE);
 
     println!("World Clock: {}", world.get_time());
-    for i in 0usize..4 {
-        world.wusel_show_overview(i); // needs
-        world.wusel_show_tasklist(i);
-    }
-    println!("\n\n");
-
-    println!("World Clock: {}", world.get_time());
-    for i in 0usize..4 {
-        world.wusel_show_overview(i); // needs
-        world.wusel_show_tasklist(i);
-    }
-    println!("\n\n");
-
-    world.wusel_assign_task(0, reading.clone()); // do reading.
-
-    world.tick();
-    println!("\n\n"); // spent some time doing the task.
-
-    world.wusel_abort_task(0, 0); // abort task
-    world.wusel_assign_task(0, reading.clone()); // re-add reading.
-
-    world.tick();
-    println!("\n\n");
-
-    // show state before rendering the world ever and ever again. \_(o_0)_/
-
-    println!("World Clock: {}", world.get_time());
-
-    for i in 0usize..4 {
-        world.wusel_show_overview(i); // needs
-        world.wusel_show_tasklist(i);
-        world.wusel_show_relations(i); // relations
-    } // everyone's task list
 
     /* Every 500 ms, make a tick. */
     let duration = std::time::Duration::from_millis(125);
