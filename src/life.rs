@@ -717,6 +717,10 @@ impl World {
         println!("");
     }
 
+    pub fn wusel_get_need_full(self: &mut Self, need: Need) -> u32 {
+        Wusel::default_need_full(&need)
+    }
+
     /** Get the wusel's need. */
     pub fn wusel_get_need(self: &mut Self, wusel_id: usize, need: Need) -> u32 {
         if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
@@ -1588,7 +1592,7 @@ impl Need {
         0, /*health*/ // by outer sources
     ];
 
-    fn name(self: &Self) -> &str {
+    pub fn name(self: &Self) -> &str {
         return match self {
             Self::WATER => "water",
             Self::FOOD => "food",
@@ -1600,7 +1604,7 @@ impl Need {
         };
     }
 
-    fn get_default_decay(self: &Self) -> u32 {
+    pub fn get_default_decay(self: &Self) -> u32 {
         for i in 0..Self::VALUES.len() {
             if self == &Self::VALUES[i] {
                 return Self::DEFAULT_NEED_DECAY_PER_MINUTE[i];
@@ -1926,7 +1930,6 @@ impl Wusel {
 
         /* Show needs. */
         s += &format!("---{:-<40}\n", " NEEDS: ");
-        s += &self.show_needs();
 
         /* Show abilities. */
         s += &format!("---{:-<40}\n", " ABILITIES: ");
@@ -1964,26 +1967,6 @@ impl Wusel {
                 s.push_str(", ");
                 i -= 1;
             }
-        }
-        return s;
-    }
-
-    /** Show all assigned needs. */
-    fn show_needs(self: &Self) -> String {
-        let mut s = String::new();
-        for (n, v) in self.needs.iter() {
-            let full = Self::default_need_full(n);
-
-            let max_len = 20;
-            let bar_len = (*v * max_len / full) as usize;
-
-            s += &format!(
-                " {name:>14} {value:5} {end:.>bar_len$} \n",
-                name = n.name(),
-                value = v,
-                bar_len = usize::min(bar_len, max_len as usize),
-                end = ""
-            );
         }
         return s;
     }

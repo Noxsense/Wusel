@@ -21,7 +21,7 @@ fn main() -> Result<(), io::Error> {
     let size = terminal_size::terminal_size();
     if let Some((terminal_size::Width(w), terminal_size::Height(h))) = size {
         width = w as u32 - (2 * 3);
-        height = (h as u32) - (2 * 3) - 4; // minus gap for time.
+        height = (h as u32) - (2 * 3) - 6; // minus gap for time.
     } else {
         width = 80;
         height = 30;
@@ -94,12 +94,39 @@ fn main() -> Result<(), io::Error> {
     /* Draw the field and make some real automation. */
     let (w, h) = (world.get_width() as usize, world.get_depth() as usize);
 
-    for _ in 0..150 {
+    let time_position: (u16, u16) = (1u16, h as u16 + 3);
+    let need_panel_position: (u16, u16) = (1u16, h as u16 + 5);
+    let need_panel_width: usize = 10;
+    let need_panel_hide_percentage: bool = false;
+
+    let iterations: u32 = 150;
+
+    for _ in 0..iterations {
         // world.positions_recalculate_grid();
         render_field(w, h, world.positions_for_grid());
+        render_reset((1u16, h as u16 + 4));
 
         /* Tick the world, maybe print the ongoing tasks. */
-        print!("Time: {}\n", world.get_time());
+        render_time(time_position, world.get_time());
+
+        /* Draw selected wusel's needs (right position below field). */
+
+        for wusel_id in 0u16..4u16 {
+            // TODO
+            // render_wusel_tasklist(0);
+
+            render_wusel_need_bar(
+                (
+                    need_panel_position.0 + wusel_id * 30,
+                    need_panel_position.1,
+                ),
+                need_panel_width,
+                need_panel_hide_percentage,
+                &mut world,
+                wusel_id as usize,
+            );
+        }
+
         world.tick();
 
         /* Give some unbusy wusels the task to move circumference. */
@@ -133,13 +160,22 @@ fn main() -> Result<(), io::Error> {
             }
         }
 
-        /* Draw selected wusel's needs (right position below field). */
-        // TODO
-
+        print!("{}", termion::cursor::Goto(1u16, height as u16 - 1));
         std::thread::sleep(duration); // wait.
     }
 
     Ok(())
+}
+
+fn render_reset(end_position: (u16, u16)) {
+    /* Position to below field, clear everything below. */
+    print!(
+        "{pos_clear}{colour_reset}{clear}{pos_then}",
+        pos_clear = termion::cursor::Goto(end_position.0, end_position.1),
+        colour_reset = termion::color::Fg(termion::color::Reset),
+        pos_then = termion::cursor::Goto(end_position.0, end_position.1 + 1), // continue here.
+        clear = termion::clear::AfterCursor
+    );
 }
 
 /** Clean he view and draw the field, put the cursor, two lines below the field, to write there. */
@@ -228,14 +264,84 @@ fn render_field(w: usize, h: usize, positions: Vec<Vec<(char, usize)>>) {
             false => w2 - 1, // add width + 2
         };
     }
+}
 
-    /* Position to below field, clear everything below. */
+fn render_time(position: (u16, u16), time: usize) {
     print!(
-        "{pos_clear}{colour_reset}{clear}{pos_then}",
-        pos_clear = termion::cursor::Goto(1, h as u16 + 3),
-        colour_reset = termion::color::Fg(termion::color::Reset),
-        pos_then = termion::cursor::Goto(1, h as u16 + 4),
-        clear = termion::clear::AfterCursor
+        "{goto}{formatted_time}",
+        goto = termion::cursor::Goto(position.0, position.1),
+        formatted_time = format!("Time: {}", time)
+    );
+}
+
+fn render_wusel_tasklist(wusel_index: usize) {}
+
+fn render_wusel_need_bar(
+    position: (u16, u16),
+    panel_width: usize,
+    hide_percentage: bool,
+    world: &mut life::World,
+    wusel_index: usize,
+) {
+    let mut offset: u16 = 0;
+    let (x, y) = position;
+    for need in life::Need::VALUES {
+        print!(
+            "{goto}{title:9}",
+            goto = termion::cursor::Goto(x, y + offset),
+            title = need.name()
+        );
+
+        render_default_bar(
+            (x + 10, y + offset),
+            panel_width,
+            hide_percentage,
+            world.wusel_get_need_full(need),
+            world.wusel_get_need(wusel_index, need),
+            None,
+        );
+        offset += 1;
+    }
+}
+
+/** Render a bar at a given position. If min value is not null, try to balance the zero value in the center. */
+fn render_default_bar(
+    position: (u16, u16),
+    panel_width: usize,
+    hide_percentage: bool,
+    max_value: u32,
+    current_value: u32,
+    colors: Option<(termion::color::Rgb, termion::color::Rgb)>,
+) {
+    // max width of that actual bar.
+    let bar_width: usize = match hide_percentage {
+        false => panel_width - 5 - 2,
+        _ => panel_width - 2,
+    };
+
+    let partial_bar: f32 = current_value as f32 / max_value as f32;
+    let percentual: usize = (partial_bar * bar_width as f32) as usize;
+
+    let filled_bar: usize = usize::min(percentual, bar_width);
+    let rest_bar: usize = bar_width - filled_bar;
+
+    let optional_percentage: String = match hide_percentage {
+        true => format!(""),
+        false => format!("{:3}% ", (partial_bar * 100f32) as usize),
+    };
+
+    let bar_formatted: &String = &format!(
+        "{}{optional_percentage}[{end:#>filled_bar$}{end:->rest_bar$}]",
+        optional_percentage = optional_percentage,
+        filled_bar = filled_bar, // max witdh.
+        rest_bar = rest_bar,     // max witdh.
+        end = ""
+    );
+
+    print!(
+        "{pos}{bar_formatted}",
+        pos = termion::cursor::Goto(position.0, position.1),
+        bar_formatted = bar_formatted,
     );
 }
 
