@@ -13,18 +13,31 @@ fn main() -> Result<(), io::Error> {
     // initiate the logger.
     env_logger::init();
 
+    println!(
+        "{clear}{hide}",
+        clear = termion::clear::All,
+        hide = termion::cursor::Hide
+    ); //clear on start.
+
     // use terminal_size::{Width, Height, terminal_size};
 
     let width: u32;
     let height: u32;
+    let screen_height: u16;
 
     let size = terminal_size::terminal_size();
     if let Some((terminal_size::Width(w), terminal_size::Height(h))) = size {
         width = w as u32 - (2 * 3);
         height = (h as u32) - (2 * 3) - 6; // minus gap for time.
+        screen_height = h;
     } else {
         width = 80;
         height = 30;
+        screen_height = 0;
+    }
+
+    if (screen_height < 2) {
+        assert!(screen_height > 1);
     }
 
     let mut world: life::World = life::World::new(width, height);
@@ -84,27 +97,28 @@ fn main() -> Result<(), io::Error> {
     /* Every 500 ms, make a tick. */
     let duration = std::time::Duration::from_millis(125);
 
-    // hide cursor?
-    println!(
-        "{clear}{hide}",
-        clear = termion::clear::All,
-        hide = termion::cursor::Hide
-    );
-
     /* Draw the field and make some real automation. */
     let (w, h) = (world.get_width() as usize, world.get_depth() as usize);
 
     let time_position: (u16, u16) = (1u16, h as u16 + 3);
     let need_panel_position: (u16, u16) = (1u16, h as u16 + 5);
-    let need_panel_width: usize = 10;
-    let need_panel_hide_percentage: bool = false;
+    let need_panel_width: u16 = 10;
+    let need_panel_show_percentage: bool = true;
 
-    let iterations: u32 = 150;
+    let iterations: u32 = 100;
+
+    // render field frame.
+    render_rectangle(
+        (1, 1),
+        (w as u16 + 2, h as u16 + 2),
+        &format!("{}-", termion::color::Fg(termion::color::Rgb(0, 0, 255))),
+        &format!("{}|", termion::color::Fg(termion::color::Rgb(0, 255, 0))),
+        &format!("{}+", termion::color::Fg(termion::color::Rgb(255, 0, 0))),
+    );
 
     for _ in 0..iterations {
         // world.positions_recalculate_grid();
         render_field(w, h, world.positions_for_grid());
-        render_reset((1u16, h as u16 + 4));
 
         /* Tick the world, maybe print the ongoing tasks. */
         render_time(time_position, world.get_time());
@@ -124,7 +138,7 @@ fn main() -> Result<(), io::Error> {
             render_wusel_need_bar(
                 (need_panel_position.0 + wusel_id * 30, need_panel_position.1),
                 need_panel_width,
-                need_panel_hide_percentage,
+                need_panel_show_percentage,
                 &mut world,
                 wusel_id as usize,
             );
@@ -163,10 +177,13 @@ fn main() -> Result<(), io::Error> {
             }
         }
 
-        print!("{}", termion::cursor::Goto(1u16, height as u16 - 1));
+        // print!("{}", termion::cursor::Goto(1u16, height as u16 - 1));
         std::thread::sleep(duration); // wait.
+
+        print!("{}", termion::cursor::Goto(1, screen_height))
     }
 
+    render_reset((1u16, 1u16)); // clear whole field.
     Ok(())
 }
 
@@ -179,6 +196,74 @@ fn render_reset(end_position: (u16, u16)) {
         pos_then = termion::cursor::Goto(end_position.0, end_position.1 + 1), // continue here.
         clear = termion::clear::AfterCursor
     );
+}
+
+fn render_reset_colours() {
+    print!(
+        "{}{}",
+        termion::color::Bg(termion::color::Reset),
+        termion::color::Fg(termion::color::Reset)
+    );
+}
+
+/** Draw a rectangle between the spanning postions, do not fill/overwrite the area. */
+fn render_rectangle(
+    a: (u16, u16),
+    b: (u16, u16),
+    horizontal_border_symbol: &String,
+    vertical_border_symbol: &String,
+    corner_symbol: &String,
+) {
+    let (x0, y0): (u16, u16) = (u16::min(a.0, b.0), u16::min(a.1, b.1)); // top left
+    let (x1, y1): (u16, u16) = (u16::max(a.0, b.0), u16::max(a.1, b.1)); // bottom right
+
+    /* Draw horizontal lines. */
+    for x in (x0 + 1)..(x1) {
+        print!(
+            "{}{}",
+            termion::cursor::Goto(x, y0),
+            horizontal_border_symbol
+        );
+        print!(
+            "{}{}",
+            termion::cursor::Goto(x, y1),
+            horizontal_border_symbol
+        );
+    }
+
+    /* Draw vertical lines. */
+    for y in (y0 + 1)..(y1) {
+        print!("{}{}", termion::cursor::Goto(x0, y), vertical_border_symbol);
+        print!("{}{}", termion::cursor::Goto(x1, y), vertical_border_symbol);
+    }
+
+    /* Draw Corners. */
+    for x in [x0, x1] {
+        for y in [y0, y1] {
+            print!("{}{}", termion::cursor::Goto(x, y), corner_symbol);
+        }
+    }
+
+    render_reset_colours();
+}
+
+/** Draw a rectangle between the spanning positions, filling the area. */
+fn render_rectangle_filled(a: (u16, u16), b: (u16, u16), fill: &String) {
+    let (x0, y0): (u16, u16) = (u16::min(a.0, b.0), u16::min(a.1, b.1)); // top left
+    let (x1, y1): (u16, u16) = (u16::max(a.0, b.0), u16::max(a.1, b.1)); // bottom right
+
+    for x in x0..x1 {
+        for y in y0..y1 {
+            print!("{}{}", termion::cursor::Goto(x, y), fill);
+        }
+    }
+
+    render_reset_colours();
+}
+
+/** Draw a line with a certain symbol, this grows either to the right or down. */
+fn render_rectangle_by_offset(pos: (u16, u16), offset: (u16, u16), fill: &String) {
+    render_rectangle_filled(pos, (pos.0 + offset.0, pos.1 + offset.1), fill);
 }
 
 /** Clean he view and draw the field, put the cursor, two lines below the field, to write there. */
@@ -220,53 +305,7 @@ fn render_field(w: usize, h: usize, positions: Vec<Vec<(char, usize)>>) {
         );
     }
 
-    /* Draw border. */
-    let mut i: u16 = 0;
-    let (w2, h2): (u16, u16) = (w as u16 + 2, h as u16 + 2);
-    let circumference: u16 = (w2 * h2) as u16;
-
-    let border_top: u16 = 0;
-    let border_right: u16 = w2 - 1;
-    let border_left: u16 = 0;
-    let border_bottom: u16 = h2 - 1;
-
-    let border_symbol_vertical = "|";
-    let border_symbol_horizontal = "=";
-    let border_symbol_edge = "+";
-
-    let border_colour = termion::color::Rgb(192, 67, 67);
-
-    print!(
-        "{bg_reset}{bordercolour}",
-        bg_reset = termion::color::Bg(termion::color::Reset),
-        bordercolour = termion::color::Fg(border_colour)
-    );
-
-    while i < circumference {
-        let x: u16 = i % w2;
-        let y: u16 = i / w2;
-
-        let is_on_edge: bool =
-            (x == border_left || x == border_right) && (y == border_top || y == border_bottom);
-        let is_vertical: bool = x == 0 || x == border_right; // most left or most right.
-
-        /* Draw symbol. */
-        print!(
-            "{pos}{border}",
-            pos = termion::cursor::Goto(i % w2 + 1, i / w2 + 1),
-            border = match x {
-                _ if is_on_edge => border_symbol_edge,
-                _ if is_vertical => border_symbol_vertical,
-                _ => border_symbol_horizontal,
-            }
-        );
-        /* Go circumference field, next index. */
-        let is_drawing_horizotal: bool = i < w2 || i >= circumference - w2 - 1 || i % w2 == w2 - 1;
-        i += match is_drawing_horizotal {
-            true => 1,       // add one.
-            false => w2 - 1, // add width + 2
-        };
-    }
+    render_reset_colours();
 }
 
 fn render_time(position: (u16, u16), time: usize) {
@@ -289,8 +328,8 @@ fn render_wusel_tasklist(position: (u16, u16), tasklist: Vec<String>) {
 
 fn render_wusel_need_bar(
     position: (u16, u16),
-    panel_width: usize,
-    hide_percentage: bool,
+    panel_width: u16,
+    show_percentage: bool,
     world: &mut life::World,
     wusel_index: usize,
 ) {
@@ -306,10 +345,17 @@ fn render_wusel_need_bar(
         render_default_bar(
             (x + 10, y + offset),
             panel_width,
-            hide_percentage,
+            show_percentage,
             world.wusel_get_need_full(need),
             world.wusel_get_need(wusel_index, need),
-            None,
+            Some(format!(
+                "{}o",
+                termion::color::Bg(termion::color::Rgb(0, 255, 0))
+            )),
+            Some(format!(
+                "{}-",
+                termion::color::Bg(termion::color::Rgb(255, 0, 0))
+            )),
         );
         offset += 1;
     }
@@ -318,42 +364,47 @@ fn render_wusel_need_bar(
 /** Render a bar at a given position. If min value is not null, try to balance the zero value in the center. */
 fn render_default_bar(
     position: (u16, u16),
-    panel_width: usize,
-    hide_percentage: bool,
+    panel_width: u16,
+    show_percentage: bool,
     max_value: u32,
     current_value: u32,
-    colors: Option<(termion::color::Rgb, termion::color::Rgb)>,
+    optional_render_filled: Option<String>,
+    optional_render_rest: Option<String>,
 ) {
     // max width of that actual bar.
-    let bar_width: usize = match hide_percentage {
-        false => panel_width - 5 - 2,
-        _ => panel_width - 2,
-    };
+    let bar_width: u16 = panel_width - 2;
 
-    let partial_bar: f32 = current_value as f32 / max_value as f32;
-    let percentual: usize = (partial_bar * bar_width as f32) as usize;
+    let percentage: f32 = current_value as f32 / max_value as f32;
+    let percentual: u16 = (percentage * bar_width as f32) as u16;
 
-    let filled_bar: usize = usize::min(percentual, bar_width);
-    let rest_bar: usize = bar_width - filled_bar;
+    let filled_bar: u16 = u16::min(percentual, bar_width);
 
-    let optional_percentage: String = match hide_percentage {
-        true => format!(""),
-        false => format!("{:3}% ", (partial_bar * 100f32) as usize),
-    };
+    let render_filled: String = optional_render_filled.unwrap_or(format!("o"));
+    let render_rest: String = optional_render_rest.unwrap_or(format!("."));
 
-    let bar_formatted: &String = &format!(
-        "{}{optional_percentage}[{end:#>filled_bar$}{end:->rest_bar$}]",
-        optional_percentage = optional_percentage,
-        filled_bar = filled_bar, // max witdh.
-        rest_bar = rest_bar,     // max witdh.
-        end = ""
-    );
+    render_rectangle_by_offset(position, (bar_width as u16, 1), &render_rest);
+    render_rectangle_by_offset(position, (filled_bar as u16, 1), &render_filled); // overwrite.
 
     print!(
-        "{pos}{bar_formatted}",
-        pos = termion::cursor::Goto(position.0, position.1),
-        bar_formatted = bar_formatted,
+        "{bar_start}[{bar_end}]",
+        bar_start = termion::cursor::Goto(position.0, position.1),
+        bar_end = termion::cursor::Goto(position.0 + panel_width as u16 - 2, position.1)
     );
+
+    if show_percentage {
+        print!(
+            "{goto}{bar_bit}{percentage:3}% ",
+            goto = termion::cursor::Goto(position.0 + 1, position.1),
+            bar_bit = if filled_bar > 0 {
+                render_filled
+            } else {
+                render_rest
+            },
+            percentage = (percentage * 100.0) as u16
+        );
+    };
+
+    render_reset_colours();
 }
 
 /** Test doing tasks. */
@@ -447,7 +498,7 @@ mod test {
             "{clear}{hide}",
             clear = termion::clear::All,
             hide = termion::cursor::Hide
-        ); // clear the screen
+        ); // clear the test screen
 
         for _ in 0..300 {
             // render_field(_w, _h, test_world.positions_for_grid());
