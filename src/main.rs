@@ -113,13 +113,16 @@ fn main() -> Result<(), io::Error> {
 
         for wusel_id in 0u16..4u16 {
             // TODO
-            // render_wusel_tasklist(0);
-
-            render_wusel_need_bar(
+            render_wusel_tasklist(
                 (
                     need_panel_position.0 + wusel_id * 30,
-                    need_panel_position.1,
+                    need_panel_position.1 - 1,
                 ),
+                world.wusel_get_tasklist(wusel_id as usize),
+            );
+
+            render_wusel_need_bar(
+                (need_panel_position.0 + wusel_id * 30, need_panel_position.1),
                 need_panel_width,
                 need_panel_hide_percentage,
                 &mut world,
@@ -274,7 +277,15 @@ fn render_time(position: (u16, u16), time: usize) {
     );
 }
 
-fn render_wusel_tasklist(wusel_index: usize) {}
+fn render_wusel_tasklist(position: (u16, u16), tasklist: Vec<String>) {
+    print!(
+        "{goto}",
+        goto = termion::cursor::Goto(position.0, position.1)
+    );
+    for task in tasklist {
+        print!("[{task}] ", task = task);
+    }
+}
 
 fn render_wusel_need_bar(
     position: (u16, u16),
@@ -418,7 +429,7 @@ mod test {
 
         // show everyone's stats.
         for i in 0usize..2 {
-            test_world.wusel_show_tasklist(i); // tasks
+            // test_world.wusel_show_tasklist(i); // tasks
             for n in life::Need::VALUES.iter() {
                 test_world.wusel_set_need(i, n, 100);
             }
@@ -451,7 +462,7 @@ mod test {
             // show everyone's stats.
             for i in 0usize..2 {
                 test_world.wusel_show_overview(i); // needs
-                test_world.wusel_show_tasklist(i); // tasks
+                                                   // test_world.wusel_show_tasklist(i); // tasks
             }
 
             if test_world.wusel_get_all_unbusy().len() > 1 {

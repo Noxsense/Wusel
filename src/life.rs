@@ -650,19 +650,6 @@ impl World {
         }
     }
 
-    /** Print tasklist of (selected) wusel to std::out.*/
-    pub fn wusel_show_tasklist(self: &Self, wusel_index: usize) {
-        if wusel_index >= self.wusels.len() {
-            println!("There is no wusel to show.");
-            return;
-        }
-        println!(
-            "Tasks of {}: {}",
-            self.wusels[wusel_index].wusel.get_name(),
-            self.wusels[wusel_index].wusel.show_takslist()
-        );
-    }
-
     /** Print overview of (selected) wusel to std::out.*/
     pub fn wusel_show_overview(self: &Self, wusel_index: usize) {
         /* No wusel is there to show. */
@@ -715,6 +702,14 @@ impl World {
         }
 
         println!("");
+    }
+
+    pub fn wusel_get_tasklist(self: &mut Self, wusel_id: usize) -> Vec<String> {
+        if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
+            self.wusels[index].wusel.get_tasklist()
+        } else {
+            vec![]
+        }
     }
 
     pub fn wusel_get_need_full(self: &mut Self, need: Need) -> u32 {
@@ -1943,32 +1938,12 @@ impl Wusel {
     }
 
     /** Print the tasklist (as queue). */
-    fn show_takslist(self: &Self) -> String {
-        let n = self.tasklist.len();
-        if n < 1 {
-            return String::from("Nothing to do.");
-        }
-        let mut s = String::new();
-        let mut i = n - 1;
-        loop {
-            /* Write task: [Activity Name], */
-            s += &format!(
-                "[{active}{name} {progress}/{duration}]",
-                active = if i == n - 1 { "#" } else { "" },
-                name = self.tasklist[i].name,
-                progress = self.tasklist[i].done_steps,
-                duration = self.tasklist[i].duration
-            );
-
-            /* Break or next task, if available. */
-            if i == 0 {
-                break;
-            } else {
-                s.push_str(", ");
-                i -= 1;
-            }
-        }
-        return s;
+    fn get_tasklist(self: &Self) -> Vec<String> {
+        return self
+            .tasklist
+            .iter()
+            .map(|task| task.name.to_string())
+            .collect();
     }
 
     /** Print the Wusel's abilities. */
