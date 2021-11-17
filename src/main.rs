@@ -1,6 +1,8 @@
 extern crate rand;
 
+use std;
 use terminal_size;
+use termion;
 
 pub mod life;
 
@@ -10,38 +12,53 @@ use std::io;
 
 /** The main method of the wusel world. */
 fn main() -> Result<(), io::Error> {
-    // initiate the logger.
-    env_logger::init();
+    env_logger::init(); // initiate the logger.
 
-    println!(
-        "{clear}{hide}",
-        clear = termion::clear::All,
-        hide = termion::cursor::Hide
-    ); //clear on start.
+    let args: Vec<String> = std::env::args().collect();
+
+    let iterations: u32 = match args.get(1) {
+        Some(arg_str) => arg_str.parse().unwrap_or(10) as u32,
+        None => 10u32,
+    };
+
+    let arg_steps_per_second: u64 = match args.get(2) {
+        Some(arg_str) => arg_str.parse().unwrap_or(4),
+        None => 8,
+    };
+
+    let clear_on_exit: bool = match args.get(3) {
+        Some(arg_str) => arg_str == "clear",
+        None => false,
+    };
+
+    //clear on start.
+    render_clear_all();
 
     // use terminal_size::{Width, Height, terminal_size};
 
     let width: u32;
     let height: u32;
-    let screen_height: u16;
+    let (screen_width, screen_height): (u16, u16);
 
     let size = terminal_size::terminal_size();
     if let Some((terminal_size::Width(w), terminal_size::Height(h))) = size {
         width = w as u32 - (2 * 3);
-        height = (h as u32) - (2 * 3) - 6; // minus gap for time.
+        height = (h as u32) - (2 * 3) - 8; // minus gap for time.
+        screen_width = w;
         screen_height = h;
     } else {
         width = 80;
         height = 30;
+        screen_width = 0;
         screen_height = 0;
     }
 
-    if screen_height < 2 {
+    if screen_height < 2 || screen_width < 2 {
         assert!(screen_height > 1);
     }
 
     let mut world: life::World = life::World::new(width, height);
-    println!(
+    log::debug!(
         "Created a new world: w:{w}, h:{h}",
         w = world.get_width(),
         h = world.get_depth()
@@ -54,22 +71,22 @@ fn main() -> Result<(), io::Error> {
         "1st".to_string(),
         life::WuselGender::Female,
         life::Position::new(0, 0),
-    ); // female
+    );
     world.wusel_new(
         "2nd".to_string(),
         life::WuselGender::Female,
         life::Position::new(20, 0),
-    ); // female
+    );
     world.wusel_new(
         "3rd".to_string(),
         life::WuselGender::Male,
         life::Position::new(30, 0),
-    ); // male
+    );
     world.wusel_new(
         "4th".to_string(),
         life::WuselGender::Male,
         life::Position::new(40, 0),
-    ); // male
+    );
 
     /* Transportable bibimbap (korean food) */
     let bibimbap = world.food_new("Bibimbap", 10);
@@ -78,29 +95,21 @@ fn main() -> Result<(), io::Error> {
     /* Position. */
     world.object_set_position(bibimbap_id, world.position_random());
 
-    world.tick();
-
-    // wusel.improve(life::Ability::COOKING);
-    // wusel.improve(life::Ability::COMMUNICATION);
-    // wusel.improve(life::Ability::FITNESS);
-    // wusel.improve(life::Ability::FINESSE);
-
-    println!("World Clock: {}", world.get_time());
-
-    /* Every 500 ms, make a tick. */
-    let duration = std::time::Duration::from_millis(125);
+    // TODO (2021-11-17) make mutable to change during the game.
+    let steps_per_second = arg_steps_per_second;
+    let step_sleep = std::time::Duration::from_millis(1000 / steps_per_second);
 
     /* Draw the field and make some real automation. */
     let (w, h) = (world.get_width() as usize, world.get_depth() as usize);
 
     let time_position: (u16, u16) = (1u16, h as u16 + 3);
-    let need_panel_position: (u16, u16) = (1u16, h as u16 + 5);
-    let need_panel_width: u16 = 10;
+    let need_panel_position: (u16, u16) = (2u16, h as u16 + 6);
+    let need_bar_width: u16 = 10;
     let need_panel_show_percentage: bool = true;
 
-    let iterations: u32 = 100;
+    render_clear_all();
 
-    // render field frame.
+    // frame game field
     render_rectangle(
         (1, 1),
         (w as u16 + 2, h as u16 + 2),
@@ -109,32 +118,46 @@ fn main() -> Result<(), io::Error> {
         &format!("{}+", termion::color::Fg(termion::color::Rgb(255, 0, 0))),
     );
 
+    // frame need panel
+    render_rectangle(
+        (need_panel_position.0 - 1, need_panel_position.1 - 1),
+        (
+            need_panel_position.0 + 9 + need_bar_width,
+            need_panel_position.1 + 7,
+        ),
+        &format!("{}-", termion::color::Fg(termion::color::Rgb(255, 255, 0))),
+        &format!("{}|", termion::color::Fg(termion::color::Rgb(255, 255, 0))),
+        &format!("{}+", termion::color::Fg(termion::color::Rgb(255, 255, 0))),
+    );
+
     for _ in 0..iterations {
         // world.positions_recalculate_grid();
         render_field(w, h, world.positions_for_grid());
 
-        /* Tick the world, maybe print the ongoing tasks. */
+        /* Tick the world, show time. */
         render_time(time_position, world.get_time());
 
         /* Draw selected wusel's needs (right position below field). */
 
         for wusel_id in 0u16..4u16 {
             // TODO
-            render_wusel_tasklist(
-                (
-                    need_panel_position.0 + wusel_id * 30,
-                    need_panel_position.1 - 1,
-                ),
-                world.wusel_get_tasklist(wusel_id as usize),
-            );
 
-            render_wusel_need_bar(
-                (need_panel_position.0 + wusel_id * 30, need_panel_position.1),
-                need_panel_width,
-                need_panel_show_percentage,
-                &mut world,
-                wusel_id as usize,
-            );
+            let next_x = need_panel_position.0 + wusel_id * 30;
+
+            if next_x + 30 < screen_width {
+                render_wusel_tasklist(
+                    (next_x, need_panel_position.1 - 2),
+                    world.wusel_get_tasklist(wusel_id as usize),
+                );
+
+                render_wusel_need_bar(
+                    (next_x, need_panel_position.1),
+                    need_bar_width,
+                    need_panel_show_percentage,
+                    &mut world,
+                    wusel_id as usize,
+                );
+            }
         }
 
         world.tick();
@@ -170,13 +193,16 @@ fn main() -> Result<(), io::Error> {
             }
         }
 
-        // print!("{}", termion::cursor::Goto(1u16, height as u16 - 1));
-        std::thread::sleep(duration); // wait.
+        std::thread::sleep(step_sleep); // wait.
 
-        print!("{}", termion::cursor::Goto(1, screen_height))
+        // cursor to bottom.
+        print!("{}", termion::cursor::Goto(1, screen_height));
     }
 
-    render_reset((1u16, 1u16)); // clear whole field.
+    if clear_on_exit {
+        render_reset((1u16, 1u16)); // clear whole field.
+    }
+
     Ok(())
 }
 
@@ -189,6 +215,10 @@ fn render_reset(end_position: (u16, u16)) {
         pos_then = termion::cursor::Goto(end_position.0, end_position.1 + 1), // continue here.
         clear = termion::clear::AfterCursor
     );
+}
+
+fn render_clear_all() {
+    println!("{}{}", termion::clear::All, termion::cursor::Hide);
 }
 
 fn render_reset_colours() {
@@ -305,13 +335,13 @@ fn render_time(position: (u16, u16), time: usize) {
     print!(
         "{goto}{formatted_time}",
         goto = termion::cursor::Goto(position.0, position.1),
-        formatted_time = format!("Time: {}", time)
+        formatted_time = format!("Step Counter: {} => Time: {}", time, time)
     );
 }
 
 fn render_wusel_tasklist(position: (u16, u16), tasklist: Vec<String>) {
     print!(
-        "{goto}",
+        "{goto}> ",
         goto = termion::cursor::Goto(position.0, position.1)
     );
     for task in tasklist {
