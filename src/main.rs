@@ -1,7 +1,6 @@
 extern crate rand;
 
 use std;
-use terminal_size;
 use termion;
 
 pub mod life;
@@ -35,28 +34,13 @@ fn main() -> Result<(), io::Error> {
     //clear on start.
     tui::render_clear_all();
 
-    // use terminal_size::{Width, Height, terminal_size};
+    let (screen_width, screen_height) = match termion::terminal_size() {
+        Ok((w, h)) => (w, h),
+        Err(e) => return Err(e),
+    };
 
-    let width: u32;
-    let height: u32;
-    let (screen_width, screen_height): (u16, u16);
-
-    let size = terminal_size::terminal_size();
-    if let Some((terminal_size::Width(w), terminal_size::Height(h))) = size {
-        width = w as u32 - (2 * 3);
-        height = (h as u32) - (2 * 3) - 8; // minus gap for time.
-        screen_width = w;
-        screen_height = h;
-    } else {
-        width = 80;
-        height = 30;
-        screen_width = 0;
-        screen_height = 0;
-    }
-
-    if screen_height < 2 || screen_width < 2 {
-        assert!(screen_height > 1);
-    }
+    let width: u32 = screen_width as u32 - (2 * 3);
+    let height: u32 = (screen_height as u32) - (2 * 3) - 8; // minus gap for time.
 
     let mut world: life::World = life::World::new(width, height);
     log::debug!(
