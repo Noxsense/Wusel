@@ -160,7 +160,7 @@ pub struct World {
 
     // wusels the main live force in here
     wusels_alltime_count: usize, // coount of all ever created wusels
-    wusels: Vec<WuselOnPosIdx>,  // vector of [ wusels, their positions ]
+    wusels_on_pos: Vec<WuselOnPosIdx>,  // vector of [ wusels, their positions ]
 
     relations: std::collections::BTreeMap<(usize, usize), Relation>, // vector of wusel relations
 
@@ -185,7 +185,7 @@ impl World {
             clock: 0,
 
             wusels_alltime_count: 0,
-            wusels: vec![],
+            wusels_on_pos: vec![],
             relations: std::collections::BTreeMap::new(),
 
             objects: vec![],
@@ -307,8 +307,8 @@ impl World {
         let valid_index = self.positions.len();
 
         let mut wusel_index = 0usize;
-        for w in self.wusels.iter() {
-            let idx = self.wusels[wusel_index].position_index;
+        for w in self.wusels_on_pos.iter() {
+            let idx = self.wusels_on_pos[wusel_index].position_index;
             wusel_index += 1;
 
             /* Add ID to position. */
@@ -322,7 +322,7 @@ impl World {
     #[allow(dead_code)]
     pub fn positions_for_wusels(self: &Self) -> Vec<Position> {
         let mut positions = vec![];
-        for w in self.wusels.iter() {
+        for w in self.wusels_on_pos.iter() {
             positions.push(self.position_from_index((*w).position_index)); // usize -> Position
         }
         return positions;
@@ -549,7 +549,7 @@ impl World {
     /** Get an index for the wusel with the requesting index.
      * Return LEN, if none is found. */
     fn wusel_identifier_to_index(self: &Self, id: usize) -> Option<usize> {
-        self.wusels.iter().position(|w| w.wusel.id == id)
+        self.wusels_on_pos.iter().position(|w| w.wusel.id == id)
     }
 
     /** Add a wusel to the world.
@@ -565,7 +565,7 @@ impl World {
             self.positions[pos_index].push((Self::CHAR_WUSEL, w.id));
         }
 
-        self.wusels.push(WuselOnPosIdx {
+        self.wusels_on_pos.push(WuselOnPosIdx {
             wusel: w,
             position_index: pos_index,
         }); // wusel on position (by index)
@@ -575,14 +575,14 @@ impl World {
 
     /** Count how many wusels are currently active. */
     pub fn wusel_count(self: &Self) -> usize {
-        self.wusels.len()
+        self.wusels_on_pos.len()
     }
 
     /** Get the position of the indexed wusel. */
     pub fn wusel_get_position(self: &Self, wusel_index: Option<usize>) -> Option<Position> {
         if let Some(wusel_index) = wusel_index {
-            if wusel_index < self.wusels.len() {
-                Some(self.position_from_index(self.wusels[wusel_index].position_index))
+            if wusel_index < self.wusels_on_pos.len() {
+                Some(self.position_from_index(self.wusels_on_pos[wusel_index].position_index))
             } else {
                 None // outside the map.
             }
@@ -594,17 +594,17 @@ impl World {
     /** Set the position of the indexed wusel to the nearest valid position
      * If the position may land out of the grid, put it to the nearest border. */
     pub fn wusel_set_position(self: &mut Self, wusel_index: usize, pos: Position) {
-        if wusel_index < self.wusels.len() {
-            let id = self.wusels[wusel_index].wusel.id;
+        if wusel_index < self.wusels_on_pos.len() {
+            let id = self.wusels_on_pos[wusel_index].wusel.id;
 
             /* Update the self.positions. */
-            let old_pos_index = self.wusels[wusel_index].position_index;
+            let old_pos_index = self.wusels_on_pos[wusel_index].position_index;
 
             let new_pos = Position::new(u32::min(pos.x, self.width), u32::min(pos.y, self.depth));
             let new_pos_index = self.position_to_index(new_pos);
 
             /* Set the new position. */
-            self.wusels[wusel_index].position_index = new_pos_index;
+            self.wusels_on_pos[wusel_index].position_index = new_pos_index;
 
             /* Representation in positions. */
             let wusel_indicator = (Self::CHAR_WUSEL, id);
@@ -625,9 +625,9 @@ impl World {
     /** Get the identifier of all wusels, which are alive. */
     pub fn wusel_get_all_alive(self: &Self) -> Vec<usize> {
         let mut alive: Vec<usize> = vec![];
-        for i in 0..self.wusels.len() {
-            if self.wusels[i].wusel.is_alive() {
-                alive.push(self.wusels[i].wusel.get_id());
+        for i in 0..self.wusels_on_pos.len() {
+            if self.wusels_on_pos[i].wusel.is_alive() {
+                alive.push(self.wusels_on_pos[i].wusel.get_id());
             }
         }
         return alive;
@@ -636,8 +636,8 @@ impl World {
     /** Get the indices of all wusels, which are currently having no tasks to do. */
     pub fn wusel_get_all_unbusy(self: &Self) -> Vec<usize> {
         let mut unbusy: Vec<usize> = vec![];
-        for i in 0..self.wusels.len() {
-            if self.wusels[i].wusel.tasklist.len() < 1 {
+        for i in 0..self.wusels_on_pos.len() {
+            if self.wusels_on_pos[i].wusel.tasklist.len() < 1 {
                 unbusy.push(i);
             }
         }
@@ -646,44 +646,44 @@ impl World {
 
     /** Give an available wusel (by index) a new task. */
     pub fn wusel_assign_task(self: &mut Self, wusel_index: usize, taskb: TaskBuilder) {
-        if wusel_index < self.wusels.len() {
+        if wusel_index < self.wusels_on_pos.len() {
             /* Task apply wusel[index] as actor. */
-            self.wusels[wusel_index].wusel.add_task(self.clock, taskb);
+            self.wusels_on_pos[wusel_index].wusel.add_task(self.clock, taskb);
             log::debug!("task successfully assigned")
         }
     }
 
     /** Abort an assigned task from an available wusel (by index). */
     pub fn wusel_abort_task(self: &mut Self, wusel_index: usize, task_index: usize) {
-        if wusel_index < self.wusels.len() {
+        if wusel_index < self.wusels_on_pos.len() {
             /* Remove task. */
-            self.wusels[wusel_index].wusel.abort_task(task_index);
+            self.wusels_on_pos[wusel_index].wusel.abort_task(task_index);
         }
     }
 
     /** Print overview of (selected) wusel to std::out.*/
     pub fn wusel_show_overview(self: &Self, wusel_index: usize) {
         /* No wusel is there to show. */
-        if wusel_index >= self.wusels.len() {
+        if wusel_index >= self.wusels_on_pos.len() {
             println!("There is no wusel to show.");
             return;
         }
-        println!("{}", self.wusels[wusel_index].wusel.show_overview());
+        println!("{}", self.wusels_on_pos[wusel_index].wusel.show_overview());
     }
 
     /** Show all relations for a wusel, given by index.
      * Prints directly to std::out. */
     pub fn wusel_show_relations(self: &Self, wusel_index: usize) {
-        if wusel_index >= self.wusels.len() {
+        if wusel_index >= self.wusels_on_pos.len() {
             println!("There is no wusel to show.");
             return;
         }
 
-        let wusel_id = self.wusels[wusel_index].wusel.id;
+        let wusel_id = self.wusels_on_pos[wusel_index].wusel.id;
 
         print!(
             "Relations with {}: ",
-            self.wusels[wusel_index].wusel.get_name()
+            self.wusels_on_pos[wusel_index].wusel.get_name()
         );
 
         let mut has_relations: bool = false;
@@ -701,7 +701,7 @@ impl World {
                 continue;
             } // not in relation
 
-            let other_name = self.wusels[other_id].wusel.get_name();
+            let other_name = self.wusels_on_pos[other_id].wusel.get_name();
 
             /* Print Relation. */
             print!("[{:?}: {}]", other_name, relation.show());
@@ -717,7 +717,7 @@ impl World {
 
     pub fn wusel_get_tasklist(self: &mut Self, wusel_id: usize) -> Vec<String> {
         if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
-            self.wusels[index].wusel.get_tasklist()
+            self.wusels_on_pos[index].wusel.get_tasklist()
         } else {
             vec![]
         }
@@ -730,7 +730,7 @@ impl World {
     /** Get the wusel's need. */
     pub fn wusel_get_need(self: &mut Self, wusel_id: usize, need: Need) -> u32 {
         if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
-            self.wusels[index].wusel.get_need(need)
+            self.wusels_on_pos[index].wusel.get_need(need)
         } else {
             0
         }
@@ -739,7 +739,7 @@ impl World {
     /** Set the wusel's need to a new value. */
     pub fn wusel_set_need(self: &mut Self, wusel_id: usize, need: &Need, new_value: u32) {
         if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
-            self.wusels[index].wusel.set_need(*need, new_value);
+            self.wusels_on_pos[index].wusel.set_need(*need, new_value);
         }
     }
 
@@ -761,7 +761,7 @@ impl World {
 
         /* Decay on every object and living. */
         let mut i: usize = 0;
-        for w in self.wusels.iter_mut() {
+        for w in self.wusels_on_pos.iter_mut() {
             /* Watch all tasks, remove tasks, which may be aborted or ran out. */
             w.wusel.auto_clean_tasks();
 
@@ -800,7 +800,7 @@ impl World {
 
         /* Execute ongoing tasks, unmutable wusel context.. */
         for w in some_busy_wusel.iter() {
-            if let Some(t) = self.wusels[*w].wusel.peek_ongoing_task() {
+            if let Some(t) = self.wusels_on_pos[*w].wusel.peek_ongoing_task() {
                 /* Decide how to progress the command. */
                 let u = (*t).clone();
                 self.proceed(u);
@@ -837,7 +837,7 @@ impl World {
             true => task.start_time,
             false => {
                 /* Notify the start of the task (for the wusel). */
-                self.wusels[actor_id].wusel.start_ongoing_task(self.clock);
+                self.wusels_on_pos[actor_id].wusel.start_ongoing_task(self.clock);
 
                 self.clock // starting now
             }
@@ -857,7 +857,7 @@ impl World {
 
                 /* Meeting party is valid, check their ongoing task. */
                 if let Some(other_index) = other_index {
-                    match self.wusels[other_index].wusel.peek_ongoing_task() {
+                    match self.wusels_on_pos[other_index].wusel.peek_ongoing_task() {
                         /* => Proceed, since the other party is doing nothing, so no meeting. */
                         None => true,
 
@@ -880,7 +880,7 @@ impl World {
 
                 /* Other wusel needs also to exist. */
                 if other_index == None {
-                    self.wusels[actor_index].wusel.pop_ongoing_task();
+                    self.wusels_on_pos[actor_index].wusel.pop_ongoing_task();
                     return; // task can not be done, without target.
                 }
 
@@ -901,7 +901,7 @@ impl World {
                     // waiting, but don't wait too long.
                     Self::MEET_RESULT_WAITED => {
                         if self.clock - start_time >= Task::PATIENCE_TO_MEET {
-                            self.wusels[actor_index].wusel.pop_ongoing_task();
+                            self.wusels_on_pos[actor_index].wusel.pop_ongoing_task();
                         }
                         false // => do not notify succession
                     }
@@ -948,7 +948,7 @@ impl World {
 
         /* Notify the task succeeded to do a step. */
         if succeeded {
-            self.wusels[actor_index].wusel.notify_ongoing_succeeded();
+            self.wusels_on_pos[actor_index].wusel.notify_ongoing_succeeded();
         }
     }
 
@@ -982,7 +982,7 @@ impl World {
     ) -> i8 {
         log::debug!(
             "Meet with {}, nice: {}.",
-            self.wusels[passive_index].wusel.show(),
+            self.wusels_on_pos[passive_index].wusel.show(),
             intention_good
         );
 
@@ -1006,14 +1006,14 @@ impl World {
             return Self::MEET_RESULT_FOLLOWED;
         }
 
-        let active_id = self.wusels[active_index].wusel.id;
-        let passive_id = self.wusels[passive_index].wusel.id;
+        let active_id = self.wusels_on_pos[active_index].wusel.id;
+        let passive_id = self.wusels_on_pos[passive_index].wusel.id;
 
         /* Get the passive wusel's current task.
          * If it is being met by the active, succeed a step with the meeting,
          * otherwise see below. */
         let passives_ongoing_tasktag: Option<TaskTag> =
-            if let Some(t) = self.wusels[passive_index].wusel.peek_ongoing_task() {
+            if let Some(t) = self.wusels_on_pos[passive_index].wusel.peek_ongoing_task() {
                 Some(t.passive_part.clone())
             } else {
                 None
@@ -1046,7 +1046,7 @@ impl World {
         }
 
         /* Check, if the passive is already waiting (in tasklist). */
-        let passive_is_waiting = self.wusels[passive_index]
+        let passive_is_waiting = self.wusels_on_pos[passive_index]
             .wusel
             .has_task_with(active_is_met);
 
@@ -1069,17 +1069,17 @@ impl World {
 
             let already_waiting_index = match 0 {
                 _p if passive_is_waiting => passive_index,
-                _a if self.wusels[active_index]
+                _a if self.wusels_on_pos[active_index]
                     .wusel
                     .has_task_with(&TaskTag::BeMetFrom(passive_id)) =>
                 {
                     active_index
                 }
-                _ => self.wusels.len(),
+                _ => self.wusels_on_pos.len(),
             };
 
             /* Move already waiting task to active tasks. */
-            if already_waiting_index < self.wusels.len() {
+            if already_waiting_index < self.wusels_on_pos.len() {
                 /* What happens:
                  * A: [Talk B, Task A2, Task A3]
                  * B: [Talk A, Task B3, Listen A] // B already knows.
@@ -1088,14 +1088,14 @@ impl World {
                  * B: [Listen A, Talk A, Task B2, Task B3] // let B listen first.
                  */
 
-                let mut i = self.wusels[already_waiting_index].wusel.tasklist.len();
+                let mut i = self.wusels_on_pos[already_waiting_index].wusel.tasklist.len();
                 while i > 0 {
                     i -= 1;
-                    if self.wusels[already_waiting_index].wusel.tasklist[i].passive_part
+                    if self.wusels_on_pos[already_waiting_index].wusel.tasklist[i].passive_part
                         == *active_is_met
                     {
-                        let met_task = self.wusels[already_waiting_index].wusel.tasklist.remove(i);
-                        self.wusels[already_waiting_index]
+                        let met_task = self.wusels_on_pos[already_waiting_index].wusel.tasklist.remove(i);
+                        self.wusels_on_pos[already_waiting_index]
                             .wusel
                             .tasklist
                             .push(met_task); // append to back (ongoing)
@@ -1111,8 +1111,8 @@ impl World {
              * (No waiting-to-be-met needs to be deleted.) */
 
             let skill = Ability::COMMUNICATION;
-            let c0 = self.wusels[active_index].wusel.get_ability(&skill);
-            let c1 = self.wusels[passive_index].wusel.get_ability(&skill);
+            let c0 = self.wusels_on_pos[active_index].wusel.get_ability(&skill);
+            let c1 = self.wusels_on_pos[passive_index].wusel.get_ability(&skill);
 
             let (more_active, more_passive) = match c0 {
                 better if better > c1 => (active_index, passive_index),
@@ -1170,11 +1170,11 @@ impl World {
         action_index: usize,
     ) -> bool {
         /* Invalid wusel index. */
-        if wusel_index >= self.wusels.len() {
+        if wusel_index >= self.wusels_on_pos.len() {
             return false;
         }
 
-        let wusel_id = self.wusels[wusel_index].wusel.id;
+        let wusel_id = self.wusels_on_pos[wusel_index].wusel.id;
 
         /* Invalid object index. */
         if object_index >= self.objects.len() {
@@ -1234,7 +1234,7 @@ impl World {
             let (_, _, _, effect_vec) = effect;
             for e in effect_vec {
                 log::debug!("- Apply effect: {:?}", e);
-                self.wusels[wusel_index].wusel.mod_need(e.0, e.1);
+                self.wusels_on_pos[wusel_index].wusel.mod_need(e.0, e.1);
             }
         }
 
