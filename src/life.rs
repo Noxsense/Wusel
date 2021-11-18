@@ -622,12 +622,12 @@ impl World {
         }
     }
 
-    /** Get the identifier of all wusels, which are alive. */
+    /** Get the indices of all wusels, which are alive. */
     pub fn wusel_get_all_alive(self: &Self) -> Vec<usize> {
         let mut alive: Vec<usize> = vec![];
         for i in 0..self.wusels_on_pos.len() {
             if self.wusels_on_pos[i].wusel.is_alive() {
-                alive.push(self.wusels_on_pos[i].wusel.get_id());
+                alive.push(i);
             }
         }
         return alive;
