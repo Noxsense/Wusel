@@ -140,15 +140,17 @@ fn main() -> Result<(), io::Error> {
 
         /* Draw selected wusel's needs (right position below field). */
 
-        for wusel_id in 0usize..4usize {
+        let mut wusel_offset = 0u16;
+        for wusel_id in world.wusel_get_all_alive().iter() {
             // TODO
 
-            let next_x = need_panel_position.0 + wusel_id as u16 * 30;
+            let next_x = need_panel_position.0 + wusel_offset as u16 * 30;
+            wusel_offset += 1;
 
             if next_x + 30 < screen_width {
                 render_wusel_tasklist(
                     (next_x, need_panel_position.1 - 2),
-                    world.wusel_get_tasklist(wusel_id as usize),
+                    world.wusel_get_tasklist(*wusel_id as usize),
                 );
 
                 let needs: Vec<(life::Need, u32, u32)> = life::Need::VALUES
@@ -157,7 +159,7 @@ fn main() -> Result<(), io::Error> {
                         (
                             *need,
                             world.wusel_get_need_full(*need),
-                            world.wusel_get_need(wusel_id, *need),
+                            world.wusel_get_need(*wusel_id, *need),
                         )
                     })
                     .collect();

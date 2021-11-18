@@ -622,6 +622,17 @@ impl World {
         }
     }
 
+    /** Get the identifier of all wusels, which are alive. */
+    pub fn wusel_get_all_alive(self: &Self) -> Vec<usize> {
+        let mut alive: Vec<usize> = vec![];
+        for i in 0..self.wusels.len() {
+            if self.wusels[i].wusel.is_alive() {
+                alive.push(self.wusels[i].wusel.get_id());
+            }
+        }
+        return alive;
+    }
+
     /** Get the indices of all wusels, which are currently having no tasks to do. */
     pub fn wusel_get_all_unbusy(self: &Self) -> Vec<usize> {
         let mut unbusy: Vec<usize> = vec![];
@@ -1827,6 +1838,10 @@ impl Wusel {
         }
 
         return new;
+    }
+
+    fn get_id(self: &Self) -> usize {
+        return self.id;
     }
 
     /** Tick one unit.
