@@ -1,5 +1,8 @@
 /**
- * Here is a collection of functions to write and draw on the terminal screen.
+ * module tui.
+ * - Here, functions to render on the terminal user interface are provided.
+ * @author Nox
+ * @version 2021.0.1
  */
 
 use termion;

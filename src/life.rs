@@ -1,4 +1,11 @@
-extern crate rand;
+/**
+ * module Life.
+ * - This module contains actuall all game world and life logics and mechanics.
+ * @author Nox
+ * @version 2021.0.1
+ */
+
+use rand;
 
 /** (Private) Wrapping Wusels and positions together. */
 struct WuselOnPosIdx {

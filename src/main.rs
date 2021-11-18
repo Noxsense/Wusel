@@ -1,5 +1,15 @@
-extern crate rand;
+/**
+ * main.
+ *
+ * This is a life simulation game where life is given to multiple wusels whose life can be in your
+ * hand, otherwise they will try really hard to keep them alive on their own and you can watch they
+ * cute little waddeling and 'wuseln'.
+ *
+ * @author Nox
+ * @version 2021.0.1
+ */
 
+use rand;
 use std;
 use termion;
 
