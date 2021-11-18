@@ -1,16 +1,23 @@
+/**
+ * Here is a collection of functions to write and draw on the terminal screen.
+ */
+
+use termion;
+
+pub fn cursor_to(position: (u16, u16)) {
+    print!("{}", termion::cursor::Goto(position.0, position.1));
+}
+
 pub fn render_reset(end_position: (u16, u16)) {
     /* Position to below field, clear everything below. */
-    print!(
-        "{pos_clear}{colour_reset}{clear}{pos_then}",
-        pos_clear = termion::cursor::Goto(end_position.0, end_position.1),
-        colour_reset = termion::color::Fg(termion::color::Reset),
-        pos_then = termion::cursor::Goto(end_position.0, end_position.1 + 1), // continue here.
-        clear = termion::clear::AfterCursor
-    );
+    cursor_to(end_position);
+    render_reset_colours();
+    print!("{}", termion::clear::AfterCursor);
+    cursor_to(end_position);
 }
 
 pub fn render_clear_all() {
-    println!("{}{}", termion::clear::All, termion::cursor::Hide);
+    print!("{}{}", termion::clear::All, termion::cursor::Hide);
 }
 
 pub fn render_reset_colours() {
@@ -34,28 +41,27 @@ pub fn render_rectangle(
 
     /* Draw horizontal lines. */
     for x in (x0 + 1)..(x1) {
-        print!(
-            "{}{}",
-            termion::cursor::Goto(x, y0),
-            horizontal_border_symbol
-        );
-        print!(
-            "{}{}",
-            termion::cursor::Goto(x, y1),
-            horizontal_border_symbol
-        );
+        cursor_to((x, y0));
+        print!("{}", horizontal_border_symbol);
+
+        cursor_to((x, y1));
+        print!("{}", horizontal_border_symbol);
     }
 
     /* Draw vertical lines. */
     for y in (y0 + 1)..(y1) {
-        print!("{}{}", termion::cursor::Goto(x0, y), vertical_border_symbol);
-        print!("{}{}", termion::cursor::Goto(x1, y), vertical_border_symbol);
+        cursor_to((x1, y));
+        print!("{}", vertical_border_symbol);
+
+        cursor_to((x1, y));
+        print!("{}", vertical_border_symbol);
     }
 
     /* Draw Corners. */
     for x in [x0, x1] {
         for y in [y0, y1] {
-            print!("{}{}", termion::cursor::Goto(x, y), corner_symbol);
+            cursor_to((x, y));
+            print!("{}", corner_symbol);
         }
     }
 
@@ -69,7 +75,8 @@ pub fn render_rectangle_filled(a: (u16, u16), b: (u16, u16), fill: &String) {
 
     for x in x0..x1 {
         for y in y0..y1 {
-            print!("{}{}", termion::cursor::Goto(x, y), fill);
+            cursor_to((x, y));
+            print!("{}", fill);
         }
     }
 
@@ -105,16 +112,16 @@ pub fn render_default_bar(
     render_rectangle_by_offset(position, (bar_width as u16, 1), &render_rest);
     render_rectangle_by_offset(position, (filled_bar as u16, 1), &render_filled); // overwrite.
 
-    print!(
-        "{bar_start}[{bar_end}]",
-        bar_start = termion::cursor::Goto(position.0, position.1),
-        bar_end = termion::cursor::Goto(position.0 + panel_width as u16 - 2, position.1)
-    );
+    cursor_to((position.0, position.1));
+    print!("[");
+
+    cursor_to((position.0 + panel_width as u16 - 2, position.1));
+    print!("]");
 
     if show_percentage {
+        cursor_to((position.0 + 1, position.1));
         print!(
-            "{goto}{bar_bit}{percentage:3}% ",
-            goto = termion::cursor::Goto(position.0 + 1, position.1),
+            "{bar_bit}{percentage:3}% ",
             bar_bit = if filled_bar > 0 {
                 render_filled
             } else {

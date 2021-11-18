@@ -193,7 +193,7 @@ fn main() -> Result<(), io::Error> {
         std::thread::sleep(step_sleep); // wait.
 
         // cursor to bottom.
-        print!("{}", termion::cursor::Goto(1, screen_height));
+        tui::cursor_to((1, screen_height));
     }
 
     if clear_on_exit {
@@ -232,9 +232,9 @@ fn render_field(w: usize, h: usize, positions: Vec<Vec<(char, usize)>>) {
         color_bg = termion::color::Rgb(92, 194, 97);
 
         /* Draw position symbol. */
+        tui::cursor_to((x, y));
         print!(
-            "{hide}{pos}{color_fg}{color_bg}{render_symbol}",
-            pos = termion::cursor::Goto(x, y),
+            "{hide}{color_fg}{color_bg}{render_symbol}",
             color_bg = termion::color::Bg(color_bg),
             color_fg = termion::color::Fg(color_fg),
             render_symbol = render_symbol,
@@ -246,18 +246,16 @@ fn render_field(w: usize, h: usize, positions: Vec<Vec<(char, usize)>>) {
 }
 
 fn render_time(position: (u16, u16), time: usize) {
+    tui::cursor_to(position);
     print!(
-        "{goto}{formatted_time}",
-        goto = termion::cursor::Goto(position.0, position.1),
+        "{formatted_time}",
         formatted_time = format!("Step Counter: {} => Time: {}", time, time)
     );
 }
 
 fn render_wusel_tasklist(position: (u16, u16), tasklist: Vec<String>) {
-    print!(
-        "{goto}> ",
-        goto = termion::cursor::Goto(position.0, position.1)
-    );
+    tui::cursor_to(position);
+    print!("> ");
     for task in tasklist {
         print!("[{task}] ", task = task);
     }
@@ -273,11 +271,8 @@ fn render_wusel_need_bar(
     let mut offset: u16 = 0;
     let (x, y) = position;
     for (need, need_full, need_now) in needs {
-        print!(
-            "{goto}{title:9}",
-            goto = termion::cursor::Goto(x, y + offset),
-            title = need.name()
-        );
+        tui::cursor_to((x, y + offset));
+        print!("{title:9}", title = need.name());
 
         tui::render_default_bar(
             (x + 10, y + offset),
