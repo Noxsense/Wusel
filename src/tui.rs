@@ -4,8 +4,25 @@
  * @author Nox
  * @version 2021.0.1
  */
-
 use termion;
+
+#[derive(Debug, PartialEq, Clone, Copy, Eq)]
+pub enum TextStyle {
+    Blink, // blinking text (not widely supported)
+    CrossedOut, // (not widely supported)
+    Framed, // framed text (not widely supported)
+    Bold, // Bold text.
+    Invert, // Inverted colors (negative mode).
+    Italic, // Italic text.
+    Underline, // Underlined text.
+}
+
+pub fn hash_color_to_rgb(color_hash: u32) -> termion::color::Rgb {
+    let r: u8 = ((color_hash >> 4)) as u8;
+    let g: u8 = ((color_hash >> 2) % 256) as u8;
+    let b: u8 = ((color_hash % 256)) as u8;
+    return termion::color::Rgb(r, g, b);
+}
 
 pub fn cursor_to(position: (u16, u16)) {
     print!("{}", termion::cursor::Goto(position.0, position.1));
@@ -23,12 +40,72 @@ pub fn render_clear_all() {
     print!("{}{}", termion::clear::All, termion::cursor::Hide);
 }
 
+pub fn render_reset_style() {
+    // also uncolours.
+    print!("{}", termion::style::Reset);
+}
+
 pub fn render_reset_colours() {
     print!(
         "{}{}",
         termion::color::Bg(termion::color::Reset),
-        termion::color::Fg(termion::color::Reset)
+        termion::color::Fg(termion::color::Reset),
     );
+}
+
+pub fn render_spot(
+    postion: (u16, u16),
+    character: char,
+    color_fg: Option<termion::color::Rgb>,
+    color_bg: Option<termion::color::Rgb>,
+    styles: Option<Vec<TextStyle>>,
+    reset_style: bool,
+    reset_color: bool,
+) {
+    cursor_to(postion);
+
+    if let Some(color_bg_rgb) = color_bg {
+        print!("{bg}", bg = termion::color::Bg(color_bg_rgb));
+    }
+
+    if let Some(color_fg_rgb) = color_fg {
+        print!("{fg}", fg = termion::color::Fg(color_fg_rgb));
+    }
+
+    if let Some(text_styles) = styles {
+        for style in text_styles {
+            match style {
+                TextStyle::Blink => print!("{}", termion::style::Blink),
+                TextStyle::Bold => print!("{}", termion::style::Bold),
+                TextStyle::CrossedOut => print!("{}", termion::style::CrossedOut),
+                TextStyle::Framed => print!("{}", termion::style::Framed),
+                TextStyle::Invert => print!("{}", termion::style::Invert),
+                TextStyle::Italic => print!("{}", termion::style::Italic),
+                TextStyle::Underline => print!("{}", termion::style::Underline),
+            }
+        }
+    }
+
+    print!("{}", character);
+
+    if reset_style {
+        render_reset_style();
+
+        // FIXME workaround, restore colours, if not resetted.
+        if !reset_color {
+            if let Some(color_bg_rgb) = color_bg {
+                print!("{bg}", bg = termion::color::Bg(color_bg_rgb));
+            }
+
+            if let Some(color_fg_rgb) = color_fg {
+                print!("{fg}", fg = termion::color::Fg(color_fg_rgb));
+            }
+        }
+    }
+
+    if reset_color {
+        render_reset_colours();
+    }
 }
 
 /** Draw a rectangle between the spanning postions, do not fill/overwrite the area. */

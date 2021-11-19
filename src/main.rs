@@ -16,12 +16,8 @@ use termion;
 pub mod life;
 pub mod tui;
 
-use std::io;
-// use std::io::{Read, Write, stdout, stdin};
-// use termion::raw::IntoRawMode;
-
 /** The main method of the wusel world. */
-fn main() -> Result<(), io::Error> {
+fn main() -> Result<(), std::io::Error> {
     env_logger::init(); // initiate the logger.
 
     let args: Vec<String> = std::env::args().collect();
@@ -90,7 +86,7 @@ fn main() -> Result<(), io::Error> {
     /* Position. */
     world.object_set_position(bibimbap_id, world.position_random());
 
-    // TODO (2021-11-17) make mutable to change during the game.
+
     let steps_per_second = arg_steps_per_second;
     let step_sleep = std::time::Duration::from_millis(1000 / steps_per_second);
 
@@ -127,7 +123,7 @@ fn main() -> Result<(), io::Error> {
 
     for _ in 0..iterations {
         // world.positions_recalculate_grid();
-        render_field(w, h, world.positions_for_grid());
+        render_field(w, world.positions_for_grid());
 
         /* Tick the world, show time. */
         render_time(time_position, world.get_time());
@@ -213,9 +209,24 @@ fn main() -> Result<(), io::Error> {
     Ok(())
 }
 
+
+fn get_render_for_position(c: char) -> (char, Option<termion::color::Rgb>, Option<termion::color::Rgb>, Option<Vec<tui::TextStyle>>) {
+    return match c {
+        '\u{263A}'  => ('\u{263A}', Some(termion::color::Rgb(0, 0, 0)), None, Some(vec![tui::TextStyle::Bold])), // wusel, -- smiley, alternatively or w
+        '#'         => ('#', Some(termion::color::Rgb(000, 000, 000)), None, None), // construction, eg. wall
+        'm'         => ('m', Some(termion::color::Rgb(099, 067, 014)), None, None), // furniture, eg. chair
+        '*'         => ('*', Some(termion::color::Rgb(000, 000, 100)), None, None), // miscellaneous, eg. food
+        'ó'         => ('ó', Some(termion::color::Rgb(200, 000, 000)), None, None), // food
+        _           => (' ', Some(termion::color::Rgb(000, 100, 000)), Some(termion::color::Rgb(222, 255, 222)), None), // empty
+    };
+}
+
 /** Clean he view and draw the field, put the cursor, two lines below the field, to write there. */
-fn render_field(w: usize, h: usize, positions: Vec<Vec<(char, usize)>>) {
+fn render_field(w: usize, positions: Vec<Vec<(char, usize)>>) {
     /* Draw field. */
+    let reset_color_after_draw = false;
+    let reset_style_after_draw = true;
+
     for p in 0..positions.len() {
         /* All things on this position. */
         let on_pos = &positions[p];
@@ -224,32 +235,14 @@ fn render_field(w: usize, h: usize, positions: Vec<Vec<(char, usize)>>) {
         x = (p % w) as u16 + 2;
         y = (p / w) as u16 + 2;
 
-        let color_bg: termion::color::Rgb;
-        let color_fg: termion::color::Rgb;
-        let render_symbol: char;
+        let on_pos_first = on_pos.get(0).unwrap_or(&('\0', 0usize)).0;
 
-        // TODO (2021-11-15) from position, get form and colour.
-        let position_is_free = on_pos.len() < 1;
+        let render_data = get_render_for_position(on_pos_first);
 
-        if position_is_free {
-            color_fg = termion::color::Rgb(0, 255, 0);
-            render_symbol = '`';
-        } else {
-            color_fg = termion::color::Rgb(255, 0, 0);
-            render_symbol = on_pos[0].0;
-        }
-
-        color_bg = termion::color::Rgb(92, 194, 97);
+        let (render_char, render_fg, render_bg, render_styles) = render_data;
 
         /* Draw position symbol. */
-        tui::cursor_to((x, y));
-        print!(
-            "{hide}{color_fg}{color_bg}{render_symbol}",
-            color_bg = termion::color::Bg(color_bg),
-            color_fg = termion::color::Fg(color_fg),
-            render_symbol = render_symbol,
-            hide = termion::cursor::Hide,
-        );
+        tui::render_spot((x, y), render_char, render_fg, render_bg, render_styles, reset_style_after_draw, reset_color_after_draw);
     }
 
     tui::render_reset_colours();
