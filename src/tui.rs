@@ -8,19 +8,19 @@ use termion;
 
 #[derive(Debug, PartialEq, Clone, Copy, Eq)]
 pub enum TextStyle {
-    Blink, // blinking text (not widely supported)
+    Blink,      // blinking text (not widely supported)
     CrossedOut, // (not widely supported)
-    Framed, // framed text (not widely supported)
-    Bold, // Bold text.
-    Invert, // Inverted colors (negative mode).
-    Italic, // Italic text.
-    Underline, // Underlined text.
+    Framed,     // framed text (not widely supported)
+    Bold,       // Bold text.
+    Invert,     // Inverted colors (negative mode).
+    Italic,     // Italic text.
+    Underline,  // Underlined text.
 }
 
 pub fn hash_color_to_rgb(color_hash: u32) -> termion::color::Rgb {
-    let r: u8 = ((color_hash >> 4)) as u8;
+    let r: u8 = (color_hash >> 4) as u8;
     let g: u8 = ((color_hash >> 2) % 256) as u8;
-    let b: u8 = ((color_hash % 256)) as u8;
+    let b: u8 = (color_hash % 256) as u8;
     return termion::color::Rgb(r, g, b);
 }
 
@@ -187,14 +187,18 @@ pub fn render_progres_bar_from_percent(
 ) {
     // max width of that actual bar.
     let bar_max: u16 = panel_size - 3; // minus border.
-    let bar_now: u16 = (percentage / 100f32 * bar_max  as f32) as u16;
+    let bar_now: u16 = (percentage / 100f32 * bar_max as f32) as u16;
 
     let percentage_discrete: u8 = (percentage).round() as u8;
     let percentage_word: [char; 4] = [
-        if percentage_discrete / 100 == 1 { '1' } else {' '},
+        if percentage_discrete / 100 == 1 {
+            '1'
+        } else {
+            ' '
+        },
         (48u8 + (percentage_discrete / 10) % 10) as char,
         (48u8 + (percentage_discrete % 10)) as char,
-        '%'
+        '%',
     ];
 
     let (p0, p1) = position;

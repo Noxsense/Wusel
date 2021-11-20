@@ -8,7 +8,6 @@
  * @author Nox
  * @version 2021.0.1
  */
-
 use rand;
 use std;
 use termion;
@@ -85,7 +84,6 @@ fn main() -> Result<(), std::io::Error> {
 
     /* Position. */
     world.object_set_position(bibimbap_id, world.position_random());
-
 
     let steps_per_second = arg_steps_per_second;
     let step_sleep = std::time::Duration::from_millis(1000 / steps_per_second);
@@ -211,8 +209,14 @@ fn main() -> Result<(), std::io::Error> {
     Ok(())
 }
 
-
-fn get_render_for_position(c: char) -> (char, Option<termion::color::Rgb>, Option<termion::color::Rgb>, Option<Vec<tui::TextStyle>>) {
+fn get_render_for_position(
+    c: char,
+) -> (
+    char,
+    Option<termion::color::Rgb>,
+    Option<termion::color::Rgb>,
+    Option<Vec<tui::TextStyle>>,
+) {
     return match c {
         '\u{263A}'  => ('\u{263A}', Some(termion::color::Rgb(0, 0, 0)), None, Some(vec![tui::TextStyle::Bold])), // wusel, -- smiley, alternatively or w
         '#'         => ('#', Some(termion::color::Rgb(000, 000, 000)), None, None), // construction, eg. wall
@@ -244,7 +248,15 @@ fn render_field(w: usize, positions: Vec<Vec<(char, usize)>>) {
         let (render_char, render_fg, render_bg, render_styles) = render_data;
 
         /* Draw position symbol. */
-        tui::render_spot((x, y), render_char, render_fg, render_bg, render_styles, reset_style_after_draw, reset_color_after_draw);
+        tui::render_spot(
+            (x, y),
+            render_char,
+            render_fg,
+            render_bg,
+            render_styles,
+            reset_style_after_draw,
+            reset_color_after_draw,
+        );
     }
 
     tui::render_reset_colours();
@@ -290,7 +302,7 @@ fn render_wusel_need_bar(
             Some((
                 termion::color::Rgb(0, 255, 0),
                 termion::color::Rgb(255, 0, 0),
-                )),
+            )),
             draw_horizontal,
         );
         offset += 1;

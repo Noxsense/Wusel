@@ -4,7 +4,6 @@
  * @author Nox
  * @version 2021.0.1
  */
-
 use rand;
 
 /** (Private) Wrapping Wusels and positions together. */
@@ -167,7 +166,7 @@ pub struct World {
 
     // wusels the main live force in here
     wusels_alltime_count: usize, // coount of all ever created wusels
-    wusels_on_pos: Vec<WuselOnPosIdx>,  // vector of [ wusels, their positions ]
+    wusels_on_pos: Vec<WuselOnPosIdx>, // vector of [ wusels, their positions ]
 
     relations: std::collections::BTreeMap<(usize, usize), Relation>, // vector of wusel relations
 
@@ -655,7 +654,9 @@ impl World {
     pub fn wusel_assign_task(self: &mut Self, wusel_index: usize, taskb: TaskBuilder) {
         if wusel_index < self.wusels_on_pos.len() {
             /* Task apply wusel[index] as actor. */
-            self.wusels_on_pos[wusel_index].wusel.add_task(self.clock, taskb);
+            self.wusels_on_pos[wusel_index]
+                .wusel
+                .add_task(self.clock, taskb);
             log::debug!("task successfully assigned")
         }
     }
@@ -844,7 +845,9 @@ impl World {
             true => task.start_time,
             false => {
                 /* Notify the start of the task (for the wusel). */
-                self.wusels_on_pos[actor_id].wusel.start_ongoing_task(self.clock);
+                self.wusels_on_pos[actor_id]
+                    .wusel
+                    .start_ongoing_task(self.clock);
 
                 self.clock // starting now
             }
@@ -955,7 +958,9 @@ impl World {
 
         /* Notify the task succeeded to do a step. */
         if succeeded {
-            self.wusels_on_pos[actor_index].wusel.notify_ongoing_succeeded();
+            self.wusels_on_pos[actor_index]
+                .wusel
+                .notify_ongoing_succeeded();
         }
     }
 
@@ -1095,13 +1100,19 @@ impl World {
                  * B: [Listen A, Talk A, Task B2, Task B3] // let B listen first.
                  */
 
-                let mut i = self.wusels_on_pos[already_waiting_index].wusel.tasklist.len();
+                let mut i = self.wusels_on_pos[already_waiting_index]
+                    .wusel
+                    .tasklist
+                    .len();
                 while i > 0 {
                     i -= 1;
                     if self.wusels_on_pos[already_waiting_index].wusel.tasklist[i].passive_part
                         == *active_is_met
                     {
-                        let met_task = self.wusels_on_pos[already_waiting_index].wusel.tasklist.remove(i);
+                        let met_task = self.wusels_on_pos[already_waiting_index]
+                            .wusel
+                            .tasklist
+                            .remove(i);
                         self.wusels_on_pos[already_waiting_index]
                             .wusel
                             .tasklist
