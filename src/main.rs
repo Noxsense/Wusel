@@ -22,9 +22,9 @@ fn main() -> Result<(), std::io::Error> {
 
     let args: Vec<String> = std::env::args().collect();
 
-    let iterations: u32 = match args.get(1) {
-        Some(arg_str) => arg_str.parse().unwrap_or(10) as u32,
-        None => 10u32,
+    let iterations: usize = match args.get(1) {
+        Some(arg_str) => arg_str.parse().unwrap_or(10) as usize,
+        None => 10usize,
     };
 
     let arg_steps_per_second: u64 = match args.get(2) {
@@ -94,6 +94,7 @@ fn main() -> Result<(), std::io::Error> {
     let (w, h) = (world.get_width() as usize, world.get_depth() as usize);
 
     let time_position: (u16, u16) = (1u16, h as u16 + 3);
+    let timebar_position: (u16, u16) = (w as u16 + 4, 1);
     let need_panel_position: (u16, u16) = (2u16, h as u16 + 6);
     let need_bar_width: u16 = 10;
     let need_panel_show_percentage: bool = true;
@@ -121,12 +122,13 @@ fn main() -> Result<(), std::io::Error> {
         &format!("{}+", termion::color::Fg(termion::color::Rgb(255, 255, 0))),
     );
 
-    for _ in 0..iterations {
+    for i in 0usize..iterations {
         // world.positions_recalculate_grid();
         render_field(w, world.positions_for_grid());
 
         /* Tick the world, show time. */
-        render_time(time_position, world.get_time());
+        render_time(time_position, i, world.get_time());
+        tui::render_progres_bar(timebar_position, h as u16 + 3, false, iterations as u32, i as u32 + 1, None, false);
 
         /* Draw selected wusel's needs (right position below field). */
 
@@ -248,7 +250,7 @@ fn render_field(w: usize, positions: Vec<Vec<(char, usize)>>) {
     tui::render_reset_colours();
 }
 
-fn render_time(position: (u16, u16), time: usize) {
+fn render_time(position: (u16, u16), tick: usize, time: usize) {
     tui::cursor_to(position);
     print!(
         "{formatted_time}",
@@ -273,24 +275,23 @@ fn render_wusel_need_bar(
 ) {
     let mut offset: u16 = 0;
     let (x, y) = position;
+    let draw_horizontal = true;
+
     for (need, need_full, need_now) in needs {
         tui::cursor_to((x, y + offset));
         print!("{title:9}", title = need.name());
 
-        tui::render_default_bar(
+        tui::render_progres_bar(
             (x + 10, y + offset),
             panel_width,
             show_percentage,
             need_full,
             need_now,
-            Some(format!(
-                "{}o",
-                termion::color::Bg(termion::color::Rgb(0, 255, 0))
-            )),
-            Some(format!(
-                "{}-",
-                termion::color::Bg(termion::color::Rgb(255, 0, 0))
-            )),
+            Some((
+                termion::color::Rgb(0, 255, 0),
+                termion::color::Rgb(255, 0, 0),
+                )),
+            draw_horizontal,
         );
         offset += 1;
     }

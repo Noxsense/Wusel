@@ -24,6 +24,15 @@ pub fn hash_color_to_rgb(color_hash: u32) -> termion::color::Rgb {
     return termion::color::Rgb(r, g, b);
 }
 
+pub fn darken_rgb(colour: termion::color::Rgb, darker_value: u8) -> termion::color::Rgb {
+    let termion::color::Rgb(r, g, b) = colour;
+
+    let r1 = r.saturating_sub(darker_value);
+    let g1: u8 = g.saturating_sub(darker_value);
+    let b1: u8 = b.saturating_sub(darker_value);
+    return termion::color::Rgb(r1, g1, b1);
+}
+
 pub fn cursor_to(position: (u16, u16)) {
     print!("{}", termion::cursor::Goto(position.0, position.1));
 }
@@ -168,48 +177,146 @@ pub fn render_rectangle_by_offset(pos: (u16, u16), offset: (u16, u16), fill: &St
     render_rectangle_filled(pos, (pos.0 + offset.0, pos.1 + offset.1), fill);
 }
 
-/** Render a bar at a given position. If min value is not null, try to balance the zero value in the center. */
-pub fn render_default_bar(
+pub fn render_progres_bar_from_percent(
     position: (u16, u16),
-    panel_width: u16,
+    panel_size: u16,
+    show_percentage: bool,
+    percentage: f32,
+    optipnal_colors: Option<(termion::color::Rgb, termion::color::Rgb)>,
+    draw_horizontal: bool,
+) {
+    // max width of that actual bar.
+    let bar_max: u16 = panel_size - 3; // minus border.
+    let bar_now: u16 = (percentage / 100f32 * bar_max  as f32) as u16;
+
+    let percentage_discrete: u8 = (percentage).round() as u8;
+    let percentage_word: [char; 4] = [
+        if percentage_discrete / 100 == 1 { '1' } else {' '},
+        (48u8 + (percentage_discrete / 10) % 10) as char,
+        (48u8 + (percentage_discrete % 10)) as char,
+        '%'
+    ];
+
+    let (p0, p1) = position;
+    let mut bar_character: char;
+
+    if draw_horizontal {
+        /* Draw something like: [#######----] */
+
+        // start bar border.
+        render_spot((p0, p1), '[', None, None, None, false, false);
+
+        // draw bar content.
+        if let Some((full_color, rest_color)) = optipnal_colors {
+            // horizontal, colourful.
+            let mut bar_colour: termion::color::Rgb;
+
+            for i in 1u16..bar_max + 1 {
+                // change colour.
+                if i <= bar_now {
+                    bar_colour = full_color;
+                    bar_character = '#';
+                } else {
+                    bar_colour = rest_color;
+                    bar_character = '-';
+                }
+                if show_percentage && i > 1 && i < 6 {
+                    // render percentage if not empty.
+                    let word_index = i as usize - 2;
+                    if percentage_word[word_index] != ' ' {
+                        bar_colour = darken_rgb(bar_colour, 50u8);
+                        bar_character = percentage_word[word_index];
+                    }
+                }
+                print!("{}{}", termion::color::Fg(bar_colour), bar_character);
+            }
+            render_reset_colours();
+        } else {
+            // horizontal, plain.
+            for i in 1u16..bar_max + 1 {
+                // change colour.
+                if i <= bar_now {
+                    bar_character = '#';
+                } else {
+                    bar_character = '-';
+                }
+                if show_percentage && i > 1 && i < 6 {
+                    // render percentage if not empty.
+                    let word_index = i as usize - 2;
+                    if percentage_word[word_index] != ' ' {
+                        print!("{}", termion::color::Fg(termion::color::Rgb(0, 0, 0)));
+                        bar_character = percentage_word[word_index];
+                    }
+                }
+                print!("{}", bar_character);
+            }
+        }
+        // end bar border.
+        render_spot((p0 + bar_max + 1, p1), ']', None, None, None, false, false);
+    } else {
+        /* Draw vertical bar (down to up). */
+        render_spot((p0, p1), '^', None, None, None, false, false);
+
+        if let Some((full_color, rest_color)) = optipnal_colors {
+            // vertical, colourful
+            let mut bar_colour: termion::color::Rgb;
+
+            for i in 1u16..bar_max + 1 {
+                // change colour.
+                if bar_max - i <= bar_now {
+                    bar_colour = full_color;
+                    bar_character = '#';
+                } else {
+                    bar_colour = rest_color;
+                    bar_character = ':';
+                }
+                cursor_to((p0, p1 + i));
+                print!("{}{}", termion::color::Fg(bar_colour), bar_character);
+            }
+            render_reset_colours();
+        } else {
+            // vertical, plain.
+            for i in 1u16..bar_max + 1 {
+                if bar_max - i <= bar_now {
+                    bar_character = '#';
+                } else {
+                    bar_character = ':';
+                }
+                cursor_to((p0, p1 + i));
+                print!("{}", bar_character);
+            }
+            render_reset_colours();
+        }
+
+        // end bar border.
+        render_spot((p0, p1 + bar_max + 1), 'v', None, None, None, false, false);
+    }
+
+    render_reset_colours();
+}
+
+/** Render a bar at a given position.
+ * If min value is not null, try to balance the zero value in the center. */
+pub fn render_progres_bar(
+    position: (u16, u16),
+    panel_size: u16,
     show_percentage: bool,
     max_value: u32,
     current_value: u32,
-    optional_render_filled: Option<String>,
-    optional_render_rest: Option<String>,
-) {
-    // max width of that actual bar.
-    let bar_width: u16 = panel_width - 2;
+    optipnal_colors: Option<(termion::color::Rgb, termion::color::Rgb)>,
+    draw_horizontal: bool,
+) -> f32 {
+    let percentage_pre: f32 = current_value as f32 / max_value as f32 * 100f32;
+    let percentage: f32 = f32::min(100.0, f32::max(0.0, percentage_pre));
 
-    let percentage: f32 = current_value as f32 / max_value as f32;
-    let percentual: u16 = (percentage * bar_width as f32) as u16;
+    render_progres_bar_from_percent(
+        position,
+        panel_size,
+        show_percentage,
+        percentage,
+        optipnal_colors,
+        draw_horizontal,
+    );
 
-    let filled_bar: u16 = u16::min(percentual, bar_width);
-
-    let render_filled: String = optional_render_filled.unwrap_or(format!("o"));
-    let render_rest: String = optional_render_rest.unwrap_or(format!("."));
-
-    render_rectangle_by_offset(position, (bar_width as u16, 1), &render_rest);
-    render_rectangle_by_offset(position, (filled_bar as u16, 1), &render_filled); // overwrite.
-
-    cursor_to((position.0, position.1));
-    print!("[");
-
-    cursor_to((position.0 + panel_width as u16 - 2, position.1));
-    print!("]");
-
-    if show_percentage {
-        cursor_to((position.0 + 1, position.1));
-        print!(
-            "{bar_bit}{percentage:3}% ",
-            bar_bit = if filled_bar > 0 {
-                render_filled
-            } else {
-                render_rest
-            },
-            percentage = (percentage * 100.0) as u16
-        );
-    };
-
-    render_reset_colours();
+    return percentage;
 }
