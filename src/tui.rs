@@ -6,6 +6,52 @@
  */
 use termion;
 
+pub struct ScreenPos {
+    pub x: u16,
+    pub y: u16,
+}
+
+impl ScreenPos {
+    pub const START: Self
+        = ScreenPos { x: 1, y: 1 };
+
+    pub fn from(position: (u16, u16)) -> Self {
+        Self{ x: position.0, y: position.1}
+    }
+
+    pub fn left_by(&self, offset: u16) -> Self {
+        Self{ x: self.x.saturating_sub(offset), y: self.y }
+    }
+
+    pub fn left(&self) -> Self {
+        self.left_by(1)
+    }
+
+    pub fn right_by(&self, offset: u16) -> Self {
+        Self{ x: self.x.saturating_add(offset), y: self.y }
+    }
+
+    pub fn right(&self) -> Self {
+        self.right_by(1)
+    }
+
+    pub fn up_by(&self, offset: u16) -> Self {
+        Self{ x: self.x, y: self.y.saturating_sub(offset) }
+    }
+
+    pub fn up(&self) -> Self {
+        self.up_by(1)
+    }
+
+    pub fn down_by(&self, offset: u16) -> Self {
+        Self{ x: self.x, y: self.y.saturating_add(offset) }
+    }
+
+    pub fn down(&self) -> Self {
+        self.down_by(1)
+    }
+}
+
 #[derive(Debug, PartialEq, Clone, Copy, Eq)]
 pub enum TextStyle {
     Blink,      // blinking text (not widely supported)
@@ -21,7 +67,7 @@ pub fn hash_color_to_rgb(color_hash: u32) -> termion::color::Rgb {
     let r: u8 = (color_hash >> 4) as u8;
     let g: u8 = ((color_hash >> 2) % 256) as u8;
     let b: u8 = (color_hash % 256) as u8;
-    return termion::color::Rgb(r, g, b);
+    termion::color::Rgb(r, g, b)
 }
 
 pub fn darken_rgb(colour: termion::color::Rgb, darker_value: u8) -> termion::color::Rgb {
@@ -33,11 +79,15 @@ pub fn darken_rgb(colour: termion::color::Rgb, darker_value: u8) -> termion::col
     return termion::color::Rgb(r1, g1, b1);
 }
 
-pub fn cursor_to(position: (u16, u16)) {
-    print!("{}", termion::cursor::Goto(position.0, position.1));
+fn cursor_to_u16(x: u16, y: u16) {
+    print!("{}", termion::cursor::Goto(x, y));
 }
 
-pub fn render_reset(end_position: (u16, u16)) {
+pub fn cursor_to(position: &ScreenPos) {
+    cursor_to_u16(position.x, position.y);
+}
+
+pub fn render_reset(end_position: &ScreenPos) {
     /* Position to below field, clear everything below. */
     cursor_to(end_position);
     render_reset_colours();
@@ -63,7 +113,7 @@ pub fn render_reset_colours() {
 }
 
 pub fn render_spot(
-    postion: (u16, u16),
+    postion: &ScreenPos,
     character: char,
     color_fg: Option<termion::color::Rgb>,
     color_bg: Option<termion::color::Rgb>,
@@ -101,6 +151,8 @@ pub fn render_spot(
         render_reset_style();
 
         // FIXME workaround, restore colours, if not resetted.
+        // if colour was none, but it used the background colour of a previous set, this will also not be reset.
+
         if !reset_color {
             if let Some(color_bg_rgb) = color_bg {
                 print!("{bg}", bg = termion::color::Bg(color_bg_rgb));
@@ -119,37 +171,37 @@ pub fn render_spot(
 
 /** Draw a rectangle between the spanning postions, do not fill/overwrite the area. */
 pub fn render_rectangle(
-    a: (u16, u16),
-    b: (u16, u16),
+    a: &ScreenPos,
+    b: &ScreenPos,
     horizontal_border_symbol: &String,
     vertical_border_symbol: &String,
     corner_symbol: &String,
 ) {
-    let (x0, y0): (u16, u16) = (u16::min(a.0, b.0), u16::min(a.1, b.1)); // top left
-    let (x1, y1): (u16, u16) = (u16::max(a.0, b.0), u16::max(a.1, b.1)); // bottom right
+    let (x0, y0): (u16, u16) = (u16::min(a.x, b.x), u16::min(a.y, b.y)); // top left
+    let (x1, y1): (u16, u16) = (u16::max(a.x, b.x), u16::max(a.y, b.y)); // bottom right
 
     /* Draw horizontal lines. */
     for x in (x0 + 1)..(x1) {
-        cursor_to((x, y0));
+        cursor_to_u16(x, y0);
         print!("{}", horizontal_border_symbol);
 
-        cursor_to((x, y1));
+        cursor_to_u16(x, y1);
         print!("{}", horizontal_border_symbol);
     }
 
     /* Draw vertical lines. */
     for y in (y0 + 1)..(y1) {
-        cursor_to((x0, y));
+        cursor_to_u16(x0, y);
         print!("{}", vertical_border_symbol);
 
-        cursor_to((x1, y));
+        cursor_to_u16(x1, y);
         print!("{}", vertical_border_symbol);
     }
 
     /* Draw Corners. */
     for x in [x0, x1] {
         for y in [y0, y1] {
-            cursor_to((x, y));
+            cursor_to_u16(x, y);
             print!("{}", corner_symbol);
         }
     }
@@ -158,13 +210,13 @@ pub fn render_rectangle(
 }
 
 /** Draw a rectangle between the spanning positions, filling the area. */
-pub fn render_rectangle_filled(a: (u16, u16), b: (u16, u16), fill: &String) {
-    let (x0, y0): (u16, u16) = (u16::min(a.0, b.0), u16::min(a.1, b.1)); // top left
-    let (x1, y1): (u16, u16) = (u16::max(a.0, b.0), u16::max(a.1, b.1)); // bottom right
+pub fn render_rectangle_filled(a: &ScreenPos, b: &ScreenPos, fill: &String) {
+    let (x0, y0): (u16, u16) = (u16::min(a.x, b.x), u16::min(a.y, b.y)); // top left
+    let (x1, y1): (u16, u16) = (u16::max(a.x, b.x), u16::max(a.y, b.y)); // bottom right
 
     for x in x0..x1 {
         for y in y0..y1 {
-            cursor_to((x, y));
+            cursor_to_u16(x, y);
             print!("{}", fill);
         }
     }
@@ -172,13 +224,8 @@ pub fn render_rectangle_filled(a: (u16, u16), b: (u16, u16), fill: &String) {
     render_reset_colours();
 }
 
-/** Draw a line with a certain symbol, this grows either to the right or down. */
-pub fn render_rectangle_by_offset(pos: (u16, u16), offset: (u16, u16), fill: &String) {
-    render_rectangle_filled(pos, (pos.0 + offset.0, pos.1 + offset.1), fill);
-}
-
 pub fn render_progres_bar_from_percent(
-    position: (u16, u16),
+    position: &ScreenPos,
     panel_size: u16,
     show_percentage: bool,
     percentage: f32,
@@ -201,14 +248,13 @@ pub fn render_progres_bar_from_percent(
         '%',
     ];
 
-    let (p0, p1) = position;
     let mut bar_character: char;
 
     if draw_horizontal {
         /* Draw something like: [#######----] */
 
         // start bar border.
-        render_spot((p0, p1), '[', None, None, None, false, false);
+        render_spot(position, '[', None, None, None, false, false);
 
         // draw bar content.
         if let Some((full_color, rest_color)) = optipnal_colors {
@@ -256,10 +302,10 @@ pub fn render_progres_bar_from_percent(
             }
         }
         // end bar border.
-        render_spot((p0 + bar_max + 1, p1), ']', None, None, None, false, false);
+        render_spot(&position.right_by(bar_max + 1), ']', None, None, None, false, false);
     } else {
         /* Draw vertical bar (down to up). */
-        render_spot((p0, p1), '^', None, None, None, false, false);
+        render_spot(position, '^', None, None, None, false, false);
 
         if let Some((full_color, rest_color)) = optipnal_colors {
             // vertical, colourful
@@ -274,7 +320,7 @@ pub fn render_progres_bar_from_percent(
                     bar_colour = rest_color;
                     bar_character = ':';
                 }
-                cursor_to((p0, p1 + i));
+                cursor_to(&position.down_by(i));
                 print!("{}{}", termion::color::Fg(bar_colour), bar_character);
             }
             render_reset_colours();
@@ -286,14 +332,14 @@ pub fn render_progres_bar_from_percent(
                 } else {
                     bar_character = ':';
                 }
-                cursor_to((p0, p1 + i));
+                cursor_to(&position.down_by(i));
                 print!("{}", bar_character);
             }
             render_reset_colours();
         }
 
         // end bar border.
-        render_spot((p0, p1 + bar_max + 1), 'v', None, None, None, false, false);
+        render_spot(&position.down_by(bar_max + 1), 'v', None, None, None, false, false);
     }
 
     render_reset_colours();
@@ -302,7 +348,7 @@ pub fn render_progres_bar_from_percent(
 /** Render a bar at a given position.
  * If min value is not null, try to balance the zero value in the center. */
 pub fn render_progres_bar(
-    position: (u16, u16),
+    position: &ScreenPos,
     panel_size: u16,
     show_percentage: bool,
     max_value: u32,
@@ -322,5 +368,5 @@ pub fn render_progres_bar(
         draw_horizontal,
     );
 
-    return percentage;
+    percentage
 }
