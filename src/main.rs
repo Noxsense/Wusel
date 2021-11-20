@@ -206,6 +206,7 @@ fn main() -> Result<(), std::io::Error> {
         tui::render_reset((1u16, 1u16)); // clear whole field.
     }
 
+    tui::cursor_to((1, screen_height));
     Ok(())
 }
 

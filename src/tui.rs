@@ -139,7 +139,7 @@ pub fn render_rectangle(
 
     /* Draw vertical lines. */
     for y in (y0 + 1)..(y1) {
-        cursor_to((x1, y));
+        cursor_to((x0, y));
         print!("{}", vertical_border_symbol);
 
         cursor_to((x1, y));
