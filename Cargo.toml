@@ -1,6 +1,6 @@
 [package]
 name = "wusel"
-version = "0.1.0"
+version = "2021.0.1"
 authors = ["nox"]
 edition = "2018"
 
