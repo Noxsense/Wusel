@@ -572,6 +572,15 @@ impl World {
         self.wusels_alltime_count += 1;
     }
 
+    pub fn wusel_new_random(&mut self, wusel_name: String) {
+        let wusel_gender = WuselGender::random();
+        let wusel_position = Position {
+            x: rand::random::<u32>() % self.get_width(),
+            y: rand::random::<u32>() % self.get_depth(),
+        };
+        self.wusel_new(wusel_name, wusel_gender, wusel_position);
+    }
+
     /** Count how many wusels are currently active. */
     pub fn wusel_count(&self) -> usize {
         self.wusels_on_pos.len()
@@ -714,6 +723,16 @@ impl World {
         }
 
         println!();
+    }
+
+    pub fn wusel_get_name(&self, wusel_id: usize) -> Option<String> {
+        self.wusel_identifier_to_index(wusel_id)
+            .map(|index| self.wusels_on_pos[index].wusel.get_name())
+    }
+
+    pub fn wusel_get_gender(&self, wusel_id: usize) -> Option<WuselGender> {
+        self.wusel_identifier_to_index(wusel_id)
+            .map(|index| self.wusels_on_pos[index].wusel.get_gender())
     }
 
     pub fn wusel_get_tasklist(&mut self, wusel_id: usize) -> Vec<String> {
@@ -1781,6 +1800,21 @@ pub enum WuselGender {
     Male,
 }
 
+impl WuselGender {
+    pub const VALUES: [Self; 2] = [Self::Female, Self::Male];
+
+    pub fn random() -> Self {
+        Self::VALUES[rand::random::<usize>() % Self::VALUES.len()]
+    }
+
+    pub fn to_char(&self) -> char {
+        match self {
+            Self::Female => 'f',
+            Self::Male => 'm',
+        }
+    }
+}
+
 /** Wusel.
  * Bundle of information on a certain position and abilities. */
 pub struct Wusel {
@@ -1901,6 +1935,10 @@ impl Wusel {
     /** Get name of the Wusel. */
     fn get_name(&self) -> String {
         self.name.clone()
+    }
+
+    pub fn get_gender(&self) -> WuselGender {
+        self.gender
     }
 
     /** Show the name, gender and age. */

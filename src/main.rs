@@ -8,13 +8,12 @@
  * @author Nox
  * @version 2021.0.1
  */
-
 // use rand;
 // use std;
 // use termion;
-
 pub mod life;
 pub mod tui;
+pub mod util;
 
 /** The main method of the wusel world. */
 fn main() -> Result<(), std::io::Error> {
@@ -58,26 +57,9 @@ fn main() -> Result<(), std::io::Error> {
     /* Empty world tick. */
     world.tick();
 
-    world.wusel_new(
-        "1st".to_string(),
-        life::WuselGender::Female,
-        life::Position::new(0, 0),
-    );
-    world.wusel_new(
-        "2nd".to_string(),
-        life::WuselGender::Female,
-        life::Position::new(20, 0),
-    );
-    world.wusel_new(
-        "3rd".to_string(),
-        life::WuselGender::Male,
-        life::Position::new(30, 0),
-    );
-    world.wusel_new(
-        "4th".to_string(),
-        life::WuselGender::Male,
-        life::Position::new(40, 0),
-    );
+    for _ in 0..rand::random::<u8>() % 10 + 2 {
+        world.wusel_new_random(util::name_gen(rand::random::<usize>() % 13 + 2));
+    }
 
     /* Transportable bibimbap (korean food) */
     let bibimbap = world.food_new("Bibimbap", 10);
@@ -142,20 +124,39 @@ fn main() -> Result<(), std::io::Error> {
 
         /* Tick the world, show time. */
         render_time(time_position, i, world.get_time());
-        tui::render_progres_bar(timebar_position, h as u16 + 3, false, iterations as u32, i as u32 + 1, None, false);
+        tui::render_progres_bar(
+            timebar_position,
+            h as u16 + 3,
+            false,
+            iterations as u32,
+            i as u32 + 1,
+            None,
+            false,
+        );
 
         /* Draw selected wusel's needs (right position below field). */
 
         for (wusel_offset, wusel_id) in world.wusel_get_all_alive().iter().enumerate() {
             // TODO
 
-            let x_offset = wusel_offset as u16 * 30;
+            let x_offset = wusel_offset as u16 * 23;
 
-            if need_panel_position.x + x_offset + 3 < screen_width {
-                render_wusel_tasklist(
-                   need_panel_position.right_by(x_offset).up_by(2),
-                    world.wusel_get_tasklist(*wusel_id as usize),
+            if need_panel_position.x + x_offset + 20 < screen_width {
+                tui::cursor_to(&need_panel_position.right_by(x_offset).up_by(2));
+                print!(
+                    "{} ({})",
+                    world
+                        .wusel_get_name(*wusel_id as usize)
+                        .unwrap_or_else(|| "No Name".to_string()),
+                    world
+                        .wusel_get_gender(*wusel_id as usize)
+                        .unwrap_or(life::WuselGender::Female)
+                        .to_char(),
                 );
+                // render_wusel_tasklist(
+                //    need_panel_position.right_by(x_offset).up_by(2),
+                //     world.wusel_get_tasklist(*wusel_id as usize),
+                // );
 
                 let needs: Vec<(life::Need, u32, u32)> = life::Need::VALUES
                     .iter()
