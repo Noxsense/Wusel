@@ -4,7 +4,6 @@
  * @author Nox
  * @version 2021.0.1
  */
-
 use crate::life::tasks;
 
 /** Wusel.
@@ -38,13 +37,13 @@ const WEEK: u32 = 7 * DAY; // ticks
 impl Wusel {
     /** From full to 0, how many ticks does it need, when it's only normally decreasing. */
     const WUSEL_FULL_NEEDS: [(Need, u32); 7] = [
-        (Need::WATER, DAY * 3),   // 3 days until dehydrate.
-        (Need::FOOD, WEEK),    // a week until starve.
-        (Need::WARMTH, (8 * HOUR)),       // 8h until freeze to death.
-        (Need::SLEEP, WEEK),   // a week until suffer from sleep loss.
-        (Need::HEALTH, WEEK * 2), // 2 weeks until die of illness.
-        (Need::LOVE, WEEK * 2),   // 2 weeks until become lonely.
-        (Need::FUN, WEEK * 2),    // 2 weeks until unmotivated and depressive.
+        (Need::WATER, DAY * 3),     // 3 days until dehydrate.
+        (Need::FOOD, WEEK),         // a week until starve.
+        (Need::WARMTH, (8 * HOUR)), // 8h until freeze to death.
+        (Need::SLEEP, WEEK),        // a week until suffer from sleep loss.
+        (Need::HEALTH, WEEK * 2),   // 2 weeks until die of illness.
+        (Need::LOVE, WEEK * 2),     // 2 weeks until become lonely.
+        (Need::FUN, WEEK * 2),      // 2 weeks until unmotivated and depressive.
     ];
 
     /** Create a new Wusel with name. */
@@ -243,7 +242,7 @@ impl Wusel {
     /** Change the value for a need relatively.
      * This may create a new value, with default input changed by the change value.
      * @return the new value.*/
-    pub fn modify_need(&mut self, need: Need, change_value: i16) -> u32 {
+    pub fn set_need_relative(&mut self, need: Need, change_value: i16) -> u32 {
         let current: i64 = self.get_need(need) as i64; // get current value (or default)
         let changed: i64 = i64::max(0, current.saturating_add(change_value as i64));
 
@@ -276,7 +275,7 @@ impl Wusel {
         0
     }
 
-    pub fn is_tasklist_empty(&self) -> bool {
+    pub fn has_tasklist_empty(&self) -> bool {
         self.tasklist.is_empty()
     }
 
@@ -286,11 +285,7 @@ impl Wusel {
 
     /** Print the tasklist (as queue). */
     pub fn get_tasklist_names(&self) -> Vec<String> {
-        return self
-            .tasklist
-            .iter()
-            .map(|task| task.get_name())
-            .collect();
+        return self.tasklist.iter().map(|task| task.get_name()).collect();
     }
 
     /** Append a new task to the task list. */
@@ -311,7 +306,7 @@ impl Wusel {
     /** Get the next task in row, that fulfills the given check. */
     pub fn get_next_task_index_with(
         &mut self,
-        task_matcher: &dyn Fn(&tasks::Task) -> bool
+        task_matcher: &dyn Fn(&tasks::Task) -> bool,
     ) -> usize {
         let mut i: usize = self.get_tasklist_len();
         while i > 0usize {
@@ -373,7 +368,7 @@ impl Wusel {
 
     /** Notify the ongoing task, that its done steps are increased
      * This increases the optional ongoing tasks [done_steps](tasks::Task.done_steps). */
-    pub fn notify_ongoing_succeeded(&mut self) {
+    pub fn increase_ongoing_task_steps(&mut self) {
         if let Some(ongoing) = self.tasklist.last_mut() {
             ongoing.increase_done_steps();
         }
@@ -444,7 +439,7 @@ impl WuselGender {
     pub fn to_char_pretty(&self) -> char {
         match self {
             Self::Female => '\u{2640}',
-            Self::Male => '\u{2642}'
+            Self::Male => '\u{2642}',
         }
     }
 }
@@ -526,7 +521,6 @@ pub enum RelationType {
 }
 
 impl RelationType {
-
     pub fn from_romantically(try_romance: bool) -> Self {
         if try_romance {
             Self::Romance
@@ -538,7 +532,7 @@ impl RelationType {
     pub fn to_char(&self) -> char {
         match self {
             Self::Friendship => '\u{2639}', // smiley
-            Self::Romance =>  '\u{2661}', // heart
+            Self::Romance => '\u{2661}',    // heart
         }
     }
 }

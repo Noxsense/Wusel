@@ -4,7 +4,6 @@
  * @author Nox
  * @version 2021.0.1
  */
-
 use termion;
 pub use termion::color::Rgb;
 
@@ -318,7 +317,15 @@ pub fn render_progres_bar_from_percent(
             }
         }
         // end bar border.
-        render_spot(&position.right_by(bar_max + 1), ']', None, None, None, false, false);
+        render_spot(
+            &position.right_by(bar_max + 1),
+            ']',
+            None,
+            None,
+            None,
+            false,
+            false,
+        );
     } else {
         /* Draw vertical bar (down to up). */
         render_spot(position, '^', None, None, None, false, false);
@@ -355,7 +362,15 @@ pub fn render_progres_bar_from_percent(
         }
 
         // end bar border.
-        render_spot(&position.down_by(bar_max + 1), 'v', None, None, None, false, false);
+        render_spot(
+            &position.down_by(bar_max + 1),
+            'v',
+            None,
+            None,
+            None,
+            false,
+            false,
+        );
     }
 
     render_reset_colours();

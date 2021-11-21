@@ -9,6 +9,8 @@ use crate::life::areas;
 use crate::life::world;
 use crate::life::wusel;
 
+pub type ActionId = usize;
+
 /** TaskBuilder, to create a Task for a Wusel.
  * Name, Target, duration and conditions are set with the builder. */
 #[derive(Debug, Clone)]
@@ -38,7 +40,7 @@ impl TaskBuilder {
     }
 
     /** Create a new Task Builder, preset for meeting. */
-    pub fn meet_with(passive: usize, friendly: bool, romantically: bool) -> Self {
+    pub fn meet_with(passive: wusel::WuselId, friendly: bool, romantically: bool) -> Self {
         Self {
             name: "Meeting".to_string(),
             duration: 1,
@@ -47,7 +49,7 @@ impl TaskBuilder {
     }
 
     /** Create a new Task Builder, preset for working on a workbench. */
-    pub fn use_object(object_id: world::ObjectIdentifer, action_id: usize) -> Self {
+    pub fn use_object(object_id: world::ObjectIdentifer, action_id: ActionId) -> Self {
         Self {
             name: format!("Use[{}] Object[{:?}]", action_id, object_id),
             duration: 1,
@@ -56,7 +58,7 @@ impl TaskBuilder {
     }
 
     /** Create a new Task Builder, preset for being met. */
-    pub fn be_met_from(active: usize) -> Self {
+    pub fn be_met_from(active: wusel::WuselId) -> Self {
         Self {
             name: "Being Met".to_string(),
             duration: 1,
@@ -115,10 +117,10 @@ pub enum TaskTag {
     WaitLike,
     MoveToPos(areas::Position),
 
-    UseObject(world::ObjectIdentifer, usize), // object_id, and action_id
+    UseObject(world::ObjectIdentifer, ActionId), // object_id, and action_id
 
-    MeetWith(usize, bool, bool), // commute with another wusel (ID)
-    BeMetFrom(usize),            // be met by another wusel (ID)
+    MeetWith(wusel::WuselId, bool, bool), // commute with another wusel (ID)
+    BeMetFrom(wusel::WuselId),            // be met by another wusel (ID)
 }
 
 /** Task, a Wusel can do. */
@@ -130,7 +132,7 @@ pub struct Task {
     duration: usize,
     done_steps: usize,
 
-    active_actor_id: usize, // wusel ID.
+    active_actor_id: wusel::WuselId, // wusel ID.
     passive_part: TaskTag,  // position | object-to-be | object | wusel | nothing.
 }
 

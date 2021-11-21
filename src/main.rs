@@ -8,10 +8,10 @@
  * @author Nox
  * @version 2021.0.1
  */
+
 // use rand;
 // use std;
 // use termion;
-
 pub mod life;
 pub mod tui;
 pub mod util;
@@ -31,6 +31,8 @@ fn main() -> Result<(), std::io::Error> {
         Some(arg_str) => arg_str.parse().unwrap_or(4),
         None => 8,
     };
+
+    let render = true;
 
     let clear_on_exit: bool = match args.get(3) {
         Some(arg_str) => arg_str == "clear",
@@ -59,7 +61,9 @@ fn main() -> Result<(), std::io::Error> {
     world.tick();
 
     for _ in 0..rand::random::<u8>() % 10 + 2 {
-        world.wusel_new_random(util::more_strings::name_gen(rand::random::<usize>() % 13 + 2));
+        world.wusel_new_random(util::more_strings::name_gen(
+            rand::random::<usize>() % 13 + 2,
+        ));
     }
 
     /* Transportable bibimbap (korean food) */
@@ -120,62 +124,64 @@ fn main() -> Result<(), std::io::Error> {
     );
 
     for i in 0usize..iterations {
-        // world.positions_recalculate_grid();
-        tui::world_view::render_field(w, world.positions_for_grid());
+        if render {
+            // world.positions_recalculate_grid();
+            tui::world_view::render_field(w, world.positions_for_grid());
 
-        /* Tick the world, show time. */
-        tui::world_view::render_time(time_position, i, world.get_time());
-        tui::core::render_progres_bar(
-            timebar_position,
-            h as u16 + 3,
-            false,
-            iterations as u32,
-            i as u32 + 1,
-            None,
-            false,
-        );
+            /* Tick the world, show time. */
+            tui::world_view::render_time(time_position, i, world.get_time());
+            tui::core::render_progres_bar(
+                timebar_position,
+                h as u16 + 3,
+                false,
+                iterations as u32,
+                i as u32 + 1,
+                None,
+                false,
+            );
 
-        /* Draw selected wusel's needs (right position below field). */
+            /* Draw selected wusel's needs (right position below field). */
 
-        for (wusel_offset, wusel_id) in world.wusel_get_all_alive().iter().enumerate() {
-            // TODO
+            for (wusel_offset, wusel_id) in world.wusel_get_all_alive().iter().enumerate() {
+                // TODO
 
-            let x_offset = wusel_offset as u16 * 23;
+                let x_offset = wusel_offset as u16 * 23;
 
-            if need_panel_position.x + x_offset + 20 < screen_width {
-                tui::core::cursor_to(&need_panel_position.right_by(x_offset).up_by(2));
-                print!(
-                    "{} ({})",
-                    world
-                        .wusel_get_name(*wusel_id as usize)
-                        .unwrap_or_else(|| "No Name".to_string()),
-                    world
-                        .wusel_get_gender(*wusel_id as usize)
-                        .unwrap_or(life::wusel::WuselGender::Female)
-                        .to_char(),
-                );
-                // tui::world_view::render_wusel_tasklist(
-                //    need_panel_position.right_by(x_offset).up_by(2),
-                //     world.wusel_get_tasklist(*wusel_id as usize),
-                // );
+                if need_panel_position.x + x_offset + 20 < screen_width {
+                    tui::core::cursor_to(&need_panel_position.right_by(x_offset).up_by(2));
+                    print!(
+                        "{} ({})",
+                        world
+                            .wusel_get_name(*wusel_id as usize)
+                            .unwrap_or_else(|| "No Name".to_string()),
+                        world
+                            .wusel_get_gender(*wusel_id as usize)
+                            .unwrap_or(life::wusel::WuselGender::Female)
+                            .to_char(),
+                    );
+                    // tui::world_view::render_wusel_tasklist(
+                    //    need_panel_position.right_by(x_offset).up_by(2),
+                    //     world.wusel_get_tasklist(*wusel_id as usize),
+                    // );
 
-                let needs: Vec<(life::wusel::Need, u32, u32)> = life::wusel::Need::VALUES
-                    .iter()
-                    .map(|need| {
-                        (
-                            *need,
-                            world.wusel_get_need_full(*need),
-                            world.wusel_get_need(*wusel_id, *need),
-                        )
-                    })
-                    .collect();
+                    let needs: Vec<(life::wusel::Need, u32, u32)> = life::wusel::Need::VALUES
+                        .iter()
+                        .map(|need| {
+                            (
+                                *need,
+                                need.get_full(),
+                                world.wusel_get_need(*wusel_id, *need),
+                            )
+                        })
+                        .collect();
 
-                tui::world_view::render_wusel_need_bar(
-                    need_panel_position.right_by(x_offset),
-                    need_bar_width,
-                    need_panel_show_percentage,
-                    needs,
-                );
+                    tui::world_view::render_wusel_need_bar(
+                        need_panel_position.right_by(x_offset),
+                        need_bar_width,
+                        need_panel_show_percentage,
+                        needs,
+                    );
+                }
             }
         }
 
@@ -189,21 +195,21 @@ fn main() -> Result<(), std::io::Error> {
             match r {
                 i if i < wusel_len && i != widx => {
                     /* Meet randomly with someone: Let [widx] meet [i], if i in [0..|w|). */
-                    world.wusel_assign_task(
+                    world.wusel_assign_to_task(
                         widx,
                         life::tasks::TaskBuilder::meet_with(i, true, true).set_duration(10),
                     );
                 }
                 i if i >= wusel_len && i < 2 * wusel_len => {
                     /* Walk randomly somewhere, if i not an wusel index. */
-                    world.wusel_assign_task(
+                    world.wusel_assign_to_task(
                         widx,
                         life::tasks::TaskBuilder::move_to(world.position_random()),
                     );
                 }
                 i if i >= 2 * wusel_len && i < 3 * wusel_len => {
                     /* Interact with the object. */
-                    world.wusel_assign_task(
+                    world.wusel_assign_to_task(
                         widx,
                         life::tasks::TaskBuilder::use_object(bibimbap_id, 0), // view
                     );

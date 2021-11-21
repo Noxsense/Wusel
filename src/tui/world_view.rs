@@ -4,7 +4,6 @@
  * @author Nox
  * @version 2021.0.1
  */
-
 use crate::tui::core;
 
 fn get_render_for_position(
@@ -89,7 +88,7 @@ pub fn render_wusel_need_bar(
     for (offset, (need, need_full, need_now)) in needs.iter().enumerate() {
         let offset_u16 = offset as u16;
         core::cursor_to(&position.down_by(offset_u16));
-        print!("{title:9}", title = need.name());
+        print!("{title:9}", title = need.get_name());
 
         core::render_progres_bar(
             &bar_start.down_by(offset_u16),
@@ -97,10 +96,7 @@ pub fn render_wusel_need_bar(
             show_percentage,
             *need_full,
             *need_now,
-            Some((
-                core::Rgb(0, 255, 0),
-                core::Rgb(255, 0, 0),
-            )),
+            Some((core::Rgb(0, 255, 0), core::Rgb(255, 0, 0))),
             draw_horizontal,
         );
     }

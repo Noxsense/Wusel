@@ -144,7 +144,7 @@ pub fn proceed(world: &mut world::World, task: tasks::Task) {
     if succeeded {
         world.wusels_on_pos[actor_index]
             .wusel
-            .notify_ongoing_succeeded();
+            .increase_ongoing_task_steps();
     }
 }
 
@@ -273,13 +273,15 @@ fn let_two_wusels_meet(
              * A: [Talk B, tasks::Task A2, tasks::Task A3]
              * B: [Listen A, Talk A, tasks::Task B2, tasks::Task B3] // let B listen first.
              */
-            let waiting_task_index = world.wusels_on_pos[already_waiting_index]
+            let waiting_task_index_opt = world.wusels_on_pos[already_waiting_index]
                 .wusel
                 .get_next_task_index_with(&|task| task.get_passive_part() == *active_is_met);
 
-            world.wusels_on_pos[already_waiting_index]
-                .wusel
-                .prioritize_task(waiting_task_index);
+            if let Some(waiting_task_index) = waiting_task_index_opt {
+                world.wusels_on_pos[already_waiting_index]
+                    .wusel
+                    .prioritize_task(waiting_task_index);
+            }
 
             return MEET_RESULT_KNOCKED; // even if it might be knocked before.
         }
@@ -290,8 +292,8 @@ fn let_two_wusels_meet(
          * (No waiting-to-be-met needs to be deleted.) */
 
         let skill = wusel::Ability::COMMUNICATION;
-        let c0 = world.wusels_on_pos[active_index].wusel.get_ability(&skill);
-        let c1 = world.wusels_on_pos[passive_index].wusel.get_ability(&skill);
+        let c0 = world.wusels_on_pos[active_index].wusel.get_ability(skill);
+        let c1 = world.wusels_on_pos[passive_index].wusel.get_ability(skill);
 
         let (more_active, more_passive) = match c0 {
             better if better > c1 => (active_index, passive_index),
@@ -300,7 +302,7 @@ fn let_two_wusels_meet(
             _ => (passive_index, active_index),
         };
 
-        world.wusel_assign_task(
+        world.wusel_assign_to_task(
             more_passive,
             tasks::TaskBuilder::be_met_from(more_active)
                 .set_name(format!("Be met by {}", more_active)),
@@ -313,7 +315,7 @@ fn let_two_wusels_meet(
      * I am there and wait for them to be ready. */
     if !passive_is_waiting {
         /* Tell passive to be ready for active. */
-        world.wusel_assign_task(passive_index, tasks::TaskBuilder::be_met_from(active_id));
+        world.wusel_assign_to_task(passive_index, tasks::TaskBuilder::be_met_from(active_id));
         return MEET_RESULT_KNOCKED;
     }
 
@@ -414,7 +416,9 @@ fn let_wusel_use_object(
         let (_, _, _, effect_vec) = effect;
         for e in effect_vec {
             log::debug!("- Apply effect: {:?}", e);
-            world.wusels_on_pos[wusel_index].wusel.modify_need(e.0, e.1);
+            world.wusels_on_pos[wusel_index]
+                .wusel
+                .set_need_relative(e.0, e.1);
         }
     }
 

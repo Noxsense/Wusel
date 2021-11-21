@@ -1,38 +1,16 @@
-/**
- * module Life.
+/** module Life.
  * - This module contains actuall all game world and life logics and mechanics.
- *
  * @author Nox
- * @version 2021.0.1
- */
-use rand;
+ * @version 2021.0.1 */
 
 use crate::life::areas;
 use crate::life::tasks;
 use crate::life::wusel;
+use rand;
 
 pub mod task_manager;
-
-/** (Private) Wrapping Wusels and positions together. */
-struct WuselOnPosIdx {
-    wusel: wusel::Wusel,
-    position_index: usize,
-}
-
-/** Where the object is stored / placed. */
-#[derive(Debug, Clone, PartialEq)]
-pub enum Where {
-    AtPosition(usize),         // position index
-    StoredIn(ObjectIdentifer), // storage ID (object ID of the storage)
-    HeldBy(usize),             // held by a wusel (index)
-}
-
-/** (Private) Wrapping Objects and where abouts together. */
-#[derive(Debug)]
-struct ExistingObject {
-    object: Box<Object>,
-    position: Where,
-}
+mod task_test;
+mod unit_tests;
 
 /** The place of existence, time and relations. */
 pub struct World {
@@ -54,7 +32,7 @@ pub struct World {
     obj_count_misc: usize,      // all ever created miscellaneous objects
     obj_count_food: usize,      // all ever created food objects
 
-    actions: Vec<String>,               // actions to do.
+    actions: Vec<String>,                      // actions to do.
     actions_effects: Vec<tasks::ActionAffect>, // how various actions on various objects may influence
 }
 
@@ -107,6 +85,85 @@ impl World {
         }
     }
 
+    /** Get the world's current time. */
+    pub fn get_time(&self) -> usize {
+        self.clock
+    }
+
+    /** Increase clock and proceed decay of all things and relations. */
+    pub fn tick(&mut self) {
+        self.clock += 1;
+
+        /* A new day is over: Forward the day structure to the world. */
+        let new_day: bool = self.clock % Self::TICKS_PER_DAY == 0;
+
+        let mut some_busy_wusel: Vec<wusel::WuselId> = vec![];
+        let mut new_babies: Vec<(wusel::WuselId, Option<wusel::WuselId>, wusel::WuselGender)> = vec![];
+        let mut dying_wusels: Vec<wusel::WuselId> = vec![];
+
+        /* Decay on every object and living. */
+        for (i, w) in self.wusels_on_pos.iter_mut().enumerate() {
+            /* Watch all tasks, remove tasks, which may be aborted or ran out. */
+            w.wusel.auto_clean_tasks();
+
+            /* Peek into the ongoing task, and maybe proceed them.
+             * This may lead to remove the done task. */
+            if !w.wusel.has_tasklist_empty() {
+                some_busy_wusel.push(i);
+            } else {
+                /* Wusel is currently not busy. => maybe apply an idle/auto task. */
+            }
+
+            /* If pregnant: Maybe push out the child => Failure, Early or too late. */
+            if w.wusel.is_pregnant() {
+                let other_parent: Option<usize> = w.wusel.get_other_parent();
+                let pregnancy_days: Option<u8> = w.wusel.get_remaining_pregnancy_days();
+                let maybe_now: u8 = rand::random::<u8>() % 100;
+                let possibility: u8 = match pregnancy_days {
+                    Some(0) => 90,
+                    Some(1) => 75,
+                    _ => 10,
+                };
+                if (0u8..possibility).contains(&maybe_now) {
+                    log::debug!("Pop the baby!");
+                    let gender = wusel::WuselGender::random();
+                    new_babies.push((w.wusel.get_id(), other_parent, gender));
+                    // end pregnancy.
+                    w.wusel.set_pregnancy(None, None);
+                }
+            }
+
+            let alive = w.wusel.wusel_tick(new_day);
+
+            /* The wusel just died. Remove if from active wusels later. */
+            if !alive {
+                dying_wusels.push(i);
+            }
+        }
+
+        /* Execute ongoing tasks, unmutable wusel context.. */
+        for w in some_busy_wusel.iter() {
+            if let Some(t) = self.wusels_on_pos[*w].wusel.peek_ongoing_task() {
+                /* Decide how to progress the command. */
+                let u = (*t).clone();
+                task_manager::proceed(self, u);
+            }
+        }
+
+        for _ in self.relations.iter() { /* Decay of relations over time. */ }
+
+        /* Command further name giving and attention from the player. */
+        for baby in new_babies.iter() {
+            log::debug!(
+                "New parents {}  and {} ({})",
+                baby.0,
+                baby.1.unwrap_or(usize::MAX),
+                baby.2.to_char(),
+            );
+            // put babies to the wusel set.
+        }
+    }
+
     /* World Inventory. */
     const WORLD_INVENTORY: Where = Where::StoredIn((ObjectType::Miscellaneous, "World-Storage", 0));
 
@@ -150,7 +207,11 @@ impl World {
     }
 
     /** Get the next optional neighbour to the given position within the given box. */
-    pub fn position_get_neighbour_on(&self, pos: areas::Position, direction: areas::Way) -> Option<areas::Position> {
+    pub fn position_get_neighbour_on(
+        &self,
+        pos: areas::Position,
+        direction: areas::Way,
+    ) -> Option<areas::Position> {
         self.get_area().get_directed_neighbour(pos, direction)
     }
 
@@ -419,7 +480,9 @@ impl World {
     /** Get an index for the wusel with the requesting index.
      * Return LEN, if none is found. */
     pub fn wusel_identifier_to_index(&self, id: usize) -> Option<usize> {
-        self.wusels_on_pos.iter().position(|w| w.wusel.get_id() == id)
+        self.wusels_on_pos
+            .iter()
+            .position(|w| w.wusel.get_id() == id)
     }
 
     /** Add a wusel to the world.
@@ -479,7 +542,8 @@ impl World {
             /* Update the self.positions. */
             let old_pos_index = self.wusels_on_pos[wusel_index].position_index;
 
-            let new_pos = areas::Position::new(u32::min(pos.x, self.width), u32::min(pos.y, self.depth));
+            let new_pos =
+                areas::Position::new(u32::min(pos.x, self.width), u32::min(pos.y, self.depth));
             let new_pos_index = self.position_to_index(new_pos);
 
             /* Set the new position. */
@@ -516,30 +580,176 @@ impl World {
     pub fn wusel_get_all_unbusy(&self) -> Vec<usize> {
         let mut unbusy: Vec<usize> = vec![];
         for i in 0..self.wusels_on_pos.len() {
-            if self.wusels_on_pos[i].wusel.is_tasklist_empty() {
+            if self.wusels_on_pos[i].wusel.has_tasklist_empty() {
                 unbusy.push(i);
             }
         }
         unbusy
     }
 
+    pub fn wusel_is_alive(&self, wusel_id: wusel::WuselId) -> Option<bool> {
+        self.wusel_identifier_to_index(wusel_id)
+            .map(|index| self.wusels_on_pos[index].wusel.is_alive())
+    }
+
+    pub fn wusel_get_lived_days(&self, wusel_id: wusel::WuselId) -> Option<u32> {
+        self.wusel_identifier_to_index(wusel_id)
+            .map(|index| self.wusels_on_pos[index].wusel.get_lived_days())
+    }
+
+    pub fn wusel_set_life_state(&mut self, wusel_id: wusel::WuselId, life_state: wusel::Life) {
+        if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
+            self.wusels_on_pos[index].wusel.set_life_state(life_state);
+        }
+    }
+
+    pub fn wusel_get_name(&self, wusel_id: wusel::WuselId) -> Option<String> {
+        self.wusel_identifier_to_index(wusel_id)
+            .map(|index| self.wusels_on_pos[index].wusel.get_name())
+    }
+
+    pub fn wusel_set_name(&mut self, wusel_id: wusel::WuselId, new_name: String) {
+        if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
+            self.wusels_on_pos[index].wusel.set_name(new_name);
+        }
+    }
+
+    pub fn wusel_get_gender(&self, wusel_id: wusel::WuselId) -> Option<wusel::WuselGender> {
+        self.wusel_identifier_to_index(wusel_id)
+            .map(|index| self.wusels_on_pos[index].wusel.get_gender())
+    }
+
+    pub fn wusel_set_gender(&mut self, wusel_id: wusel::WuselId, new_gender: wusel::WuselGender) {
+        if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
+            self.wusels_on_pos[index].wusel.set_gender(new_gender);
+        }
+    }
+
+    pub fn wusel_get_need(&mut self, wusel_id: wusel::WuselId, need: wusel::Need) -> u32 {
+        self.wusel_identifier_to_index(wusel_id)
+            .map(|index| self.wusels_on_pos[index].wusel.get_need(need))
+            .unwrap_or(0u32)
+    }
+
+    pub fn wusel_set_need(&mut self, wusel_id: wusel::WuselId, need: &wusel::Need, new_value: u32) {
+        if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
+            self.wusels_on_pos[index].wusel.set_need(*need, new_value);
+        }
+    }
+
+    pub fn wusel_set_need_relative(
+        &mut self,
+        wusel_id: wusel::WuselId,
+        need: &wusel::Need,
+        relative: i16,
+    ) {
+        if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
+            self.wusels_on_pos[index]
+                .wusel
+                .set_need_relative(*need, relative);
+        }
+    }
+
+    pub fn wusel_get_ability(
+        &self,
+        wusel_id: wusel::WuselId,
+        ability: wusel::Ability,
+    ) -> Option<u32> {
+        self.wusel_identifier_to_index(wusel_id)
+            .map(|index| self.wusels_on_pos[index].wusel.get_ability(ability))
+    }
+
+    pub fn wusel_set_ability(
+        &mut self,
+        wusel_id: wusel::WuselId,
+        ability: wusel::Ability,
+        new_value: u32,
+    ) {
+        if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
+            self.wusels_on_pos[index]
+                .wusel
+                .set_ability(ability, new_value);
+        }
+    }
+
+    pub fn wusel_improve(&mut self, wusel_id: wusel::WuselId, ability: wusel::Ability) {
+        if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
+            self.wusels_on_pos[index].wusel.improve(ability);
+        }
+    }
+
+    pub fn wusel_has_tasklist_empty(&self, wusel_id: wusel::WuselId) -> Option<bool> {
+        self.wusel_identifier_to_index(wusel_id)
+            .map(|index| self.wusels_on_pos[index].wusel.has_tasklist_empty())
+    }
+
+    pub fn wusel_get_tasklist_len(&self, wusel_id: wusel::WuselId) -> Option<usize> {
+        self.wusel_identifier_to_index(wusel_id)
+            .map(|index| self.wusels_on_pos[index].wusel.get_tasklist_len())
+    }
+
+    pub fn wusel_get_tasklist_names(&mut self, wusel_id: wusel::WuselId) -> Vec<String> {
+        if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
+            self.wusels_on_pos[index].wusel.get_tasklist_names()
+        } else {
+            vec![]
+        }
+    }
+
     /** Give an available wusel (by index) a new task. */
-    pub fn wusel_assign_task(&mut self, wusel_index: usize, taskb: tasks::TaskBuilder) {
+    pub fn wusel_assign_to_task(&mut self, wusel_index: usize, taskb: tasks::TaskBuilder) {
         if wusel_index < self.wusels_on_pos.len() {
             /* Task apply wusel[index] as actor. */
             self.wusels_on_pos[wusel_index]
                 .wusel
-                .add_task(self.clock, taskb);
+                .assign_to_task(self.clock, taskb);
             log::debug!("task successfully assigned")
         }
     }
 
-    /** Abort an assigned task from an available wusel (by index). */
-    pub fn wusel_abort_task(&mut self, wusel_index: usize, task_index: usize) {
-        if wusel_index < self.wusels_on_pos.len() {
-            /* Remove task. */
-            self.wusels_on_pos[wusel_index].wusel.abort_task(task_index);
+    pub fn wusel_abort_task(&mut self, wusel_id: wusel::WuselId, task_index: usize) {
+        if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
+            self.wusels_on_pos[index].wusel.abort_task(task_index);
         }
+    }
+
+    pub fn wusel_peek_ongoing_task(&self, wusel_id: wusel::WuselId) -> Option<&tasks::Task> {
+        if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
+            self.wusels_on_pos[index].wusel.peek_ongoing_task()
+        } else {
+            None
+        }
+    }
+
+    pub fn wusel_is_pregnant(&self, wusel_id: wusel::WuselId) -> Option<bool> {
+        self.wusel_identifier_to_index(wusel_id)
+            .map(|index| self.wusels_on_pos[index].wusel.is_pregnant())
+    }
+    pub fn wusel_set_pregnancy(
+        &mut self,
+        wusel_id: wusel::WuselId,
+        other_parent: Option<usize>,
+        remaining_days: Option<u8>,
+    ) {
+        if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
+            self.wusels_on_pos[index]
+                .wusel
+                .set_pregnancy(other_parent, remaining_days);
+        }
+    }
+    pub fn wusel_get_other_parent(&self, wusel_id: wusel::WuselId) -> Option<usize> {
+        self.wusel_identifier_to_index(wusel_id)
+            .map(|index| self.wusels_on_pos[index].wusel.get_other_parent())
+            .unwrap_or(None)
+    }
+    pub fn wusel_get_remaining_pregnancy_days(&self, wusel_id: wusel::WuselId) -> Option<u8> {
+        self.wusel_identifier_to_index(wusel_id)
+            .map(|index| {
+                self.wusels_on_pos[index]
+                    .wusel
+                    .get_remaining_pregnancy_days()
+            })
+            .unwrap_or(None)
     }
 
     /** Show all relations for a wusel, given by index.
@@ -586,120 +796,6 @@ impl World {
         println!();
     }
 
-    pub fn wusel_get_name(&self, wusel_id: usize) -> Option<String> {
-        self.wusel_identifier_to_index(wusel_id)
-            .map(|index| self.wusels_on_pos[index].wusel.get_name())
-    }
-
-    pub fn wusel_get_gender(&self, wusel_id: usize) -> Option<wusel::WuselGender> {
-        self.wusel_identifier_to_index(wusel_id)
-            .map(|index| self.wusels_on_pos[index].wusel.get_gender())
-    }
-
-    pub fn wusel_get_tasklist_names(&mut self, wusel_id: usize) -> Vec<String> {
-        if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
-            self.wusels_on_pos[index].wusel.get_tasklist_names()
-        } else {
-            vec![]
-        }
-    }
-
-    pub fn wusel_get_need_full(&mut self, need: wusel::Need) -> u32 {
-        wusel::Wusel::default_need_full(&need)
-    }
-
-    /** Get the wusel's need. */
-    pub fn wusel_get_need(&mut self, wusel_id: usize, need: wusel::Need) -> u32 {
-        if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
-            self.wusels_on_pos[index].wusel.get_need(need)
-        } else {
-            0
-        }
-    }
-
-    /** Set the wusel's need to a new value. */
-    pub fn wusel_set_need(&mut self, wusel_id: usize, need: &wusel::Need, new_value: u32) {
-        if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
-            self.wusels_on_pos[index].wusel.set_need(*need, new_value);
-        }
-    }
-
-    /** Get the world's current time. */
-    pub fn get_time(&self) -> usize {
-        self.clock
-    }
-
-    /** Increase clock and proceed decay of all things and relations. */
-    pub fn tick(&mut self) {
-        self.clock += 1;
-
-        /* A new day is over: Forward the day structure to the world. */
-        let new_day: bool = self.clock % Self::TICKS_PER_DAY == 0;
-
-        let mut some_busy_wusel: Vec<usize> = vec![];
-        let mut new_babies: Vec<(usize, Option<usize>, wusel::WuselGender)> = vec![];
-        let mut dying_wusels: Vec<usize> = vec![];
-
-        /* Decay on every object and living. */
-        for (i, w) in self.wusels_on_pos.iter_mut().enumerate() {
-            /* Watch all tasks, remove tasks, which may be aborted or ran out. */
-            w.wusel.auto_clean_tasks();
-
-            /* Peek into the ongoing task, and maybe proceed them.
-             * This may lead to remove the done task. */
-            if !w.wusel.is_tasklist_empty() {
-                some_busy_wusel.push(i);
-            } else {
-                /* Wusel is currently not busy. => maybe apply an idle/auto task. */
-            }
-
-            /* If pregnant: Maybe push out the child => Failure, Early or too late. */
-            if w.wusel.is_pregnant() {
-                let other_parent: Option<usize> = w.wusel.get_other_parent();
-                let pregnancy_days: Option<u8> = w.wusel.get_remaining_pregnancy_days();
-                let maybe_now: u8 = rand::random::<u8>() % 100;
-                let possibility: u8 = match pregnancy_days {
-                    Some(0) => 90,
-                    Some(1) => 75,
-                    _ => 10,
-                };
-                if (0u8..possibility).contains(&maybe_now) {
-                    log::debug!("Pop the baby!");
-                    let gender = wusel::WuselGender::random();
-                    new_babies.push((w.wusel.get_id(), other_parent, gender));
-                }
-            }
-
-            let alive = w.wusel.wusel_tick(new_day);
-
-            /* The wusel just died. Remove if from active wusels later. */
-            if !alive {
-                dying_wusels.push(i);
-            }
-        }
-
-        /* Execute ongoing tasks, unmutable wusel context.. */
-        for w in some_busy_wusel.iter() {
-            if let Some(t) = self.wusels_on_pos[*w].wusel.peek_ongoing_task() {
-                /* Decide how to progress the command. */
-                let u = (*t).clone();
-                task_manager::proceed(self, u);
-            }
-        }
-
-        for _ in self.relations.iter() { /* Decay of relations over time. */ }
-
-        /* Command further name giving and attention from the player. */
-        for baby in new_babies.iter() {
-            log::debug!(
-                "New parents {}  and {} ({})",
-                baby.0,
-                baby.1.unwrap_or(usize::MAX),
-                baby.2.to_char(),
-            );
-        }
-    }
-
     /** Update the relation of two wusels, given by their ID. */
     pub fn wusel_update_relations(
         &mut self,
@@ -718,12 +814,36 @@ impl World {
 
         let change = if nice { 1 } else { -1 };
 
-       /* Get the relation if available.
-        * update a key, guarding against the key possibly not being set. */
-       let rel = self.relations.entry(key).or_insert_with(wusel::Relation::new);
+        /* Get the relation if available.
+         * update a key, guarding against the key possibly not being set. */
+        let rel = self
+            .relations
+            .entry(key)
+            .or_insert_with(wusel::Relation::new);
 
-       rel.update(relationtype, change);
+        rel.update(relationtype, change);
     }
+}
+
+/** (Private) Wrapping Wusels and positions together. */
+struct WuselOnPosIdx {
+    wusel: wusel::Wusel,
+    position_index: usize,
+}
+
+/** Where the object is stored / placed. */
+#[derive(Debug, Clone, PartialEq)]
+pub enum Where {
+    AtPosition(usize),         // position index
+    StoredIn(ObjectIdentifer), // storage ID (object ID of the storage)
+    HeldBy(usize),             // held by a wusel (index)
+}
+
+/** (Private) Wrapping Objects and where abouts together. */
+#[derive(Debug)]
+struct ExistingObject {
+    object: Box<Object>,
+    position: Where,
 }
 
 /** Types of an object. */
@@ -780,257 +900,4 @@ pub struct Consumable {
 
     /* While consuming it, one part (1/size) while change the needs as following. */
     need_change: std::collections::HashMap<wusel::Need, i16>,
-}
-
-/** Test doing tasks. */
-#[cfg(test)]
-mod test {
-
-    // use super;
-
-    #[test]
-    fn test_consume_bread() {
-        // TODO refactor test.
-
-        log::debug!("[TEST] Creating new stuff, let the wusels eat the bread.");
-        let mut test_world: super::World = super::World::new(20, 5); // small world.
-        log::debug!("Test World created");
-
-        /* Empty test_world tick. */
-        test_world.tick();
-        log::debug!("Test World ticked");
-
-        test_world.wusel_new(
-            "Eater".to_string(),
-            super::wusel::WuselGender::Female,
-            super::areas::Position::new(1, 0),
-        ); // female
-        test_world.wusel_new(
-            "Starver".to_string(),
-            super::wusel::WuselGender::Male,
-            super::areas::Position::new(2, 0),
-        ); // male
-        log::debug!("Test World's wusels created.");
-
-        /* Create food: transportable, no storage. */
-        let food1 = test_world.food_new("Bread", 100);
-
-        let (food1_id, food1_index) = food1;
-
-        log::debug!("Test World's food created, index: {}.", food1_index);
-
-        let food2 = test_world.object_duplicate(0).unwrap(); // unsafe, but must be true.
-
-        let (food2_id, food2_index) = food2;
-        test_world.object_set_position(food2_id, test_world.position_random());
-
-        log::debug!("Test World's food duplicated, index: {}.", food2_index);
-
-        /* Put a copy into the world. */
-        test_world.object_set_position(food1_id, test_world.position_random());
-
-        log::debug!("Test World's food put onto a position.");
-
-        /* Get the food and transport it somewhere else. */
-        test_world.wusel_assign_task(1, super::tasks::TaskBuilder::use_object(food1_id, 1)); // take
-        test_world.wusel_assign_task(1, super::tasks::TaskBuilder::move_to(test_world.position_random()));
-        test_world.wusel_assign_task(1, super::tasks::TaskBuilder::use_object(food1_id, 2)); // drop
-        test_world.wusel_assign_task(1, super::tasks::TaskBuilder::move_to(test_world.position_random()));
-        test_world.wusel_assign_task(1, super::tasks::TaskBuilder::use_object(food1_id, 1)); // take not exisiting?
-
-        /* Let the other wusel wait, than it's tries to get the food as well, and consume it. */
-        test_world.wusel_assign_task(
-            0,
-            super::tasks::TaskBuilder::move_to(super::areas::Position::new(
-                test_world.get_width() - 1,
-                test_world.get_depth() - 1,
-            )),
-        );
-        test_world.wusel_assign_task(0, super::tasks::TaskBuilder::use_object(food1_id, 1)); // take as well.
-        test_world.wusel_assign_task(0, super::tasks::TaskBuilder::move_to(test_world.position_random()));
-        test_world.wusel_assign_task(0, super::tasks::TaskBuilder::use_object(food1_id, 3)); // consume.
-        test_world.wusel_assign_task(0, super::tasks::TaskBuilder::move_to(test_world.position_random()));
-        test_world.wusel_assign_task(0, super::tasks::TaskBuilder::move_to(test_world.position_random()));
-        log::debug!("Test World's task to work at the workbench assigned.");
-
-        // show everyone's stats.
-        for i in 0usize..2 {
-            // test_world.wusel_show_tasklist(i); // tasks
-            for n in super::Need::VALUES.iter() {
-                test_world.wusel_set_need(i, n, 100);
-            }
-        }
-        log::debug!("Test World's wusels' needs artificially reduced.");
-
-        /* Show the grid.. */
-        let (_w, _h): (usize, usize) = (
-            test_world.get_width() as usize,
-            test_world.get_depth() as usize,
-        );
-
-        println!(
-            "{clear}{hide}",
-            clear = termion::clear::All,
-            hide = termion::cursor::Hide
-        ); // clear the test screen
-
-        for _ in 0..300 {
-            // render_field(_w, _h, test_world.positions_for_grid());
-            println!();
-            log::debug!(
-                "Test World's current grid, time: {}.",
-                test_world.get_time()
-            );
-
-            test_world.tick(); // progress time.
-
-            if !test_world.wusel_get_all_unbusy().is_empty() {
-                log::debug!("Test world is done, to be busy.");
-                break;
-            }
-
-            std::thread::sleep(std::time::Duration::from_millis(100)); // wait.
-        }
-    }
-
-    /** Test doing tasks. */
-    #[test]
-    fn test_create_bread() {
-        // TODO refactor test.
-
-        // Example: Wusel wants to cook.
-        // 1. Go to (free) cooking station: (move)
-        // 2. Wait for the Station to be free
-        // 3. Work on station.
-        // 4. Fetch tomatoes to be cut and prepared (needs Tomatoes)
-        // 5. Cut (consume) tomatoes, create sauce
-        // 6. Heat up sauce. (> use up cold <? Consumable with extra states?)
-        // 7. Creates hot tomato sauce. (can get cold or be eaten.)
-        //
-        // OPTIONAL
-        // Or should tools also be "Consumed" after 1M uses?
-        // Knife dull and then .. gone
-        // Couch is sit broken after several times?
-
-        /* Cook a meal, that needs a working station, tomatoes, a knife and pot.
-         * Or knife and Pot as part of the station.
-         * Cut a meal, boil the meal => consumes tomatoes, creates tomato soup. */
-
-        // abort if difficulty is too high
-        // walk to station.position, wait until free, block
-        // get required ingredients
-        // do required steps, eg. station changing, prbly a list of subtasks?
-
-        // using objects may influence the needs and skills.
-        // eg.
-        // * eating uses energy, but fills water and hunger
-        // * sleeping fills energy
-        // * doing sports uses energy and water and fills sportivité abilities.
-    }
-
-    /** Test mutually meeting, which may cause deadlocks.
-     * -----
-     * 1at: [Read, Meet 2nd].
-     * 2nd: [Meet 3rd]
-     * 3rd: [Meet 4th]
-     * 4th: [Meet 1st]
-     * -----
-     * 1at: [Read, Meet 2nd] + [Met by 4th]
-     * 2nd: [Meet 3rd]
-     * 3rd: [Meet 4th] + [Met by 2nd]
-     * 4th: [Meet 1st] + [Met by 3rd]
-     * -----
-     * 1st done with reading and wants to meet 2nd.
-     * -----
-     * 1at: [Meet 2nd, Met by 4th]
-     * 2nd: [Meet 3rd] + [Met by 1st]
-     * 3rd: [Meet 4th, Met by 2nd]
-     * 4th: [Meet 1st, Met by 3rd]
-     * -----
-     * Nothing happens, since everyone waits for the other to be done.
-     * 2nd, 3rd and 4th stop meeting. (they waited too long)
-     * -----
-     * 1at: [Meet 2nd, Met by 4th]
-     * 2nd: [Met by 1st]
-     * 3rd: [Met by 2nd]
-     * 4th: [Met by 3rd]
-     * -----
-     * The active meeter, they were about to be met by is gone, stop being met.
-     * 1at: [Meet 2nd, Met by 4th]
-     * 2nd: [Met by 1st]
-     * 3rd: []
-     * 4th: []
-     * -----
-     * 1st meets 2nd; 4th is not meeting 1st anymore. No tasks left.
-     */
-    #[test]
-    fn test_mutal_meeting() {
-        // TODO refactor test.
-
-        println!("[test] Mutual Meeting, causes for circular deadlocks.");
-        let mut test_world: super::World = super::World::new(80, 30);
-
-        /* Empty test_world tick. */
-        test_world.tick();
-
-        test_world.wusel_new(
-            "1st".to_string(),
-            super::wusel::WuselGender::Female,
-            super::areas::Position { x: 1, y: 0 },
-        ); // female
-        test_world.wusel_new(
-            "2nd".to_string(),
-            super::wusel::WuselGender::Female,
-            super::areas::Position { x: 3, y: 0 },
-        ); // female
-        test_world.wusel_new(
-            "3rd".to_string(),
-            super::wusel::WuselGender::Male,
-            super::areas::Position { x: 5, y: 0 },
-        ); // male
-        test_world.wusel_new(
-            "4th".to_string(),
-            super::wusel::WuselGender::Male,
-            super::areas::Position { x: 9, y: 0 },
-        ); // male
-
-        // 4 wusels created.
-        assert_eq!(4, test_world.wusel_count());
-
-        /* Create an easy talk, without any preconditions.
-         * => no preconditions.
-         * => does 'nothing' for ticks steps. */
-        let reading: super::tasks::TaskBuilder =
-            super::tasks::TaskBuilder::new(String::from("Reading")).set_duration(5 /*ticks*/);
-
-        test_world.tick();
-
-        // first wusel is also doing something else
-        test_world.wusel_assign_task(0, reading.clone()); // do reading.
-
-        // scenario: everyone wants too meet the next one.
-        test_world.wusel_assign_task(
-            0,
-            super::tasks::TaskBuilder::meet_with(1, true, false).set_duration(7),
-        ); // mutual meeting.
-        test_world.wusel_assign_task(
-            1,
-            super::tasks::TaskBuilder::meet_with(2, true, false).set_duration(7),
-        ); // mutual meeting.
-        test_world.wusel_assign_task(
-            2,
-            super::tasks::TaskBuilder::meet_with(3, true, false).set_duration(7),
-        ); // mutual meeting.
-        test_world.wusel_assign_task(
-            3,
-            super::tasks::TaskBuilder::meet_with(0, true, false).set_duration(7),
-        ); // mutual meeting.
-
-        /* 90 ticks later. */
-        for _ in 0..90 {
-            test_world.tick();
-            // println!("\nTasks at time {}:", test_world.get_time());
-            // for w in 0..4 { test_world.wusel_show_tasklist(w); }
-        }
-    }
 }

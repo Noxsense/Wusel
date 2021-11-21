@@ -4,91 +4,77 @@
  * @author Nox
  * @version 2021.0.1
  */
-
+use crate::life;
 use crate::life::tasks;
+
+pub type WuselId = usize;
 
 /** Wusel.
  * Bundle of information on a certain position and abilities. */
 pub struct Wusel {
-    id: usize,
-
-    /* Name */
+    id: WuselId,
     name: String,
-
-    gender: WuselGender, // WuselGender::Female => able to bear children, male => able to inject children
-    pregnancy: Option<(Option<usize>, u8)>, // optional pregnancy with father's ID and remaining days.
-
-    life: Life,      // alive | dead | ghost
-    lived_days: u32, // last lived day.
-
-    needs: Vec<(Need, u32)>,
-
-    /* Abilities. */
-    abilities: Vec<(Ability, u32)>, // ability levels.
-
-    /* List of tasks. */
+    gender: WuselGender,
+    pregnancy: Option<(Option<WuselId>, u8)>, // other partner optional
+    life: Life,
+    lived_days: u32,
+    needs: std::collections::HashMap<Need, u32>,
+    abilities: std::collections::HashMap<Ability, u32>,
     tasklist: Vec<tasks::Task>,
 }
 
-const MINUTE: u32 = 2; // ticks
-const HOUR: u32 = 60 * MINUTE; // ticks
-const DAY: u32 = 24 * HOUR; // ticks
-const WEEK: u32 = 7 * DAY; // ticks
-
 impl Wusel {
-    /** From full to 0, how many ticks does it need, when it's only normally decreasing. */
-    const WUSEL_FULL_NEEDS: [(Need, u32); 7] = [
-        (Need::WATER, DAY * 3),   // 3 days until dehydrate.
-        (Need::FOOD, WEEK),    // a week until starve.
-        (Need::WARMTH, (8 * HOUR)),       // 8h until freeze to death.
-        (Need::SLEEP, WEEK),   // a week until suffer from sleep loss.
-        (Need::HEALTH, WEEK * 2), // 2 weeks until die of illness.
-        (Need::LOVE, WEEK * 2),   // 2 weeks until become lonely.
-        (Need::FUN, WEEK * 2),    // 2 weeks until unmotivated and depressive.
-    ];
-
-    /** Create a new Wusel with name. */
-    pub fn new(id: usize, name: String, gender: WuselGender) -> Self {
+    pub fn new(id: WuselId, name: String, gender: WuselGender) -> Self {
         let mut new = Self {
             id,
             name,
-
             gender,
             pregnancy: None,
-
             life: Life::ALIVE,
             lived_days: 0,
-
-            needs: vec![],
-            abilities: vec![],
+            needs: std::collections::HashMap::new(),
+            abilities: std::collections::HashMap::new(),
             tasklist: vec![],
         };
 
-        /* Initiate all known needs to FULL. */
-        for (n, full) in &Self::WUSEL_FULL_NEEDS {
-            new.needs.push((*n, *full));
+        for n in Need::VALUES.iter() {
+            new.needs.insert(*n, n.get_full());
         }
 
         new
     }
 
-    #[allow(dead_code)]
-    pub fn get_id(&self) -> usize {
+    pub fn get_id(&self) -> WuselId {
         self.id
     }
 
-    /** Check, if this Wusel is alive. */
     pub fn is_alive(&self) -> bool {
         matches!(self.life, Life::ALIVE)
     }
 
-    /** Get name of the Wusel. */
+    pub fn get_lived_days(&self) -> u32 {
+        self.lived_days
+    }
+
+    pub fn set_life_state(&mut self, life_state: Life) -> bool {
+        self.life = life_state;
+        self.is_alive()
+    }
+
     pub fn get_name(&self) -> String {
         self.name.clone()
     }
 
+    pub fn set_name(&mut self, new_name: String) {
+        self.name = new_name;
+    }
+
     pub fn get_gender(&self) -> WuselGender {
         self.gender
+    }
+
+    pub fn set_gender(&mut self, new_gender: WuselGender) {
+        self.gender = new_gender;
     }
 
     /** Tick one unit.
@@ -96,21 +82,36 @@ impl Wusel {
      * Maybe let it age one day.
      * @return if the wusel is still alive in the end. */
     pub fn wusel_tick(&mut self, add_day: bool) -> bool {
-        /* If in action, need changes may also apply, eg. eating. */
-        // self.act(); // proceed on task, if tasklist is providing one.
+        let is_ill = false;
+        let in_cold_environment = false;
+
+        let mut life_state = Life::ALIVE;
 
         /* Decrease every value by DEFAULT_NEED_DECAY_PER_MINUTE * minutes. */
-        for i in 0..self.needs.len() {
-            let (n, v) = self.needs[i];
-            let decay = n.get_default_decay();
+        for (need, value) in self.needs.iter_mut() {
+            let mut decay = need.get_default_decay();
 
-            // XXX when SICK: decay health
-            // XXX when IN COLD: decay warmth
+            if is_ill {
+                // XXX when SICK: decay health
+                decay += 1;
+            }
 
-            self.needs[i] = (n, if v < decay { 0 } else { v - decay });
+            if in_cold_environment {
+                // XXX when IN COLD: decay warmth
+                decay += 1;
+            }
+
+            *value = value.saturating_sub(decay);
+
+            if *value < 1 && need.is_fatal() {
+                life_state = Life::DEAD;
+            }
         }
 
-        /* Add a new day. */
+        if life_state != Life::ALIVE {
+            self.life = life_state;
+        }
+
         if add_day {
             self.add_new_day()
         }
@@ -118,107 +119,53 @@ impl Wusel {
         self.is_alive()
     }
 
-    /** Count a new day to the lived lived. */
     fn add_new_day(&mut self) {
         if self.is_alive() {
-            /* Age one day. */
             self.lived_days += 1;
 
-            /* Decay all abilities by one point. */
-            for i in 0..self.abilities.len() {
-                let (abi, val) = self.abilities[i];
-                self.abilities[i] = (abi, val - 1);
+            for (_, value) in self.abilities.iter_mut() {
+                *value = value.saturating_sub(1);
             }
 
-            /* If pregnant, reduce time until arrival. */
-            self.pregnancy = match self.pregnancy {
-                Some((father, days)) if days > 0 => Some((father, days - 1)),
-                _ => self.pregnancy,
+            if let Some((other_parent, days)) = self.pregnancy {
+                self.pregnancy = Some((other_parent, days.saturating_sub(1)));
             }
         }
     }
 
-    /** Get the default need value. */
-    pub fn default_need_full(need: &Need) -> u32 {
-        for (n, v) in Self::WUSEL_FULL_NEEDS.iter() {
-            if n == need {
-                return *v;
-            }
-        }
-        0 // else 0, if not an default need.
-    }
-
-    /** Get the value for a need.
-     * This may append the needs with a new default value, if the need is not
-     * yet inserted. */
-    pub fn get_need(&mut self, need: Need) -> u32 {
-        /* Find the need and return the value. */
-        let size: usize = self.needs.len();
-        for i in 0..(size) {
-            let (n, v) = self.needs[i];
-            if n == need {
-                return v;
-            } // return assigned value
-        }
-        /* If not found: Append with default Need value. */
-        let default: u32 = 0;
-        self.needs.push((need, default));
-        default
+    pub fn get_need(&self, need: Need) -> u32 {
+        *self.needs.get(&need).unwrap_or(&0u32)
     }
 
     /** Set the value for a need.
      * This may append the needs with the new given value. */
-    pub fn set_need(&mut self, need: Need, new_value: u32) {
-        /* Find the need and change the value. */
-        let size: usize = self.needs.len();
-        for i in 0..(size) {
-            let (n, _) = self.needs[i];
-            if n == need {
-                self.needs[i] = (n, new_value); // update the value.
-                return; // done
-            }
-        }
-        /* If not found: Append with default Need value. */
-        self.needs.push((need, new_value));
+    pub fn set_need(&mut self, need: Need, new_value: u32) -> u32 {
+        self.needs.insert(need, new_value).unwrap_or(0u32)
     }
 
     /** Change the value for a need relatively.
      * This may create a new value, with default input changed by the change value.
      * @return the new value.*/
-    pub fn modify_need(&mut self, need: Need, change_value: i16) -> u32 {
+    pub fn set_need_relative(&mut self, need: Need, change_value: i16) -> u32 {
         let current: i64 = self.get_need(need) as i64; // get current value (or default)
         let changed: i64 = i64::max(0, current.saturating_add(change_value as i64));
-
-        self.set_need(need, changed as u32); // change the value.
-        self.get_need(need) // final need's value.
+        self.set_need(need, changed as u32) // change the value.
     }
 
-    /** Improve the given ability by one point. */
-    #[allow(dead_code)]
-    fn improve(&mut self, ability: &Ability) {
-        /* Improve the given ability. */
-        for i in 0..(self.abilities.len()) {
-            let (a, v) = self.abilities[i];
-            if *ability == a {
-                self.abilities[i] = (a, v + 1);
-                return;
-            }
-        }
-        /* If the given ability is not yet learned, add it to the abilities. */
-        self.abilities.push((*ability, 1));
+    pub fn get_ability(&self, ability: Ability) -> u32 {
+        *self.abilities.get(&ability).unwrap_or(&0u32)
     }
 
-    /** Get the value for a requested ability. */
-    pub fn get_ability(&self, ability: &Ability) -> u32 {
-        for (a, v) in self.abilities.iter() {
-            if a == ability {
-                return *v;
-            }
-        }
-        0
+    pub fn set_ability(&mut self, ability: Ability, new_value: u32) -> u32 {
+        self.abilities.insert(ability, new_value).unwrap_or(0u32)
     }
 
-    pub fn is_tasklist_empty(&self) -> bool {
+    pub fn improve(&mut self, ability: Ability) {
+        let value = *self.abilities.get(&ability).unwrap_or(&0u32);
+        self.abilities.insert(ability, value.saturating_add(1));
+    }
+
+    pub fn has_tasklist_empty(&self) -> bool {
         self.tasklist.is_empty()
     }
 
@@ -226,55 +173,102 @@ impl Wusel {
         self.tasklist.len()
     }
 
-    /** Print the tasklist (as queue). */
     pub fn get_tasklist_names(&self) -> Vec<String> {
-        return self
-            .tasklist
-            .iter()
-            .map(|task| task.get_name())
-            .collect();
+        return self.tasklist.iter().map(|task| task.get_name()).collect();
     }
 
-    /** Append a new task to the task list. */
-    pub fn add_task(&mut self, init_time: usize, task_builder: tasks::TaskBuilder) {
-        /* Task apply self as actor. */
+    pub fn assign_to_task(&mut self, init_time: usize, task_builder: tasks::TaskBuilder) {
         let task = task_builder.assign(init_time, self);
         self.tasklist.insert(0, task); // revert queue
     }
 
-    /** Put task from task list to next-ongoing-task position. */
-    pub fn prioritize_task(&mut self, task_index: usize) {
+    pub fn prioritize_task(&mut self, task_index: usize) -> bool {
+        println!(
+            "Priorize Task: {}, Tasks #{}",
+            task_index,
+            self.tasklist.len()
+        );
         if task_index < self.tasklist.len() {
+            println!(" ... doing.");
             let task = self.tasklist.remove(task_index);
             self.tasklist.push(task); // push to end (which is next in row)
+            true
+        } else {
+            false
         }
     }
 
-    /** Get the next task in row, that fulfills the given check. */
-    pub fn get_next_task_index_with(
-        &mut self,
-        task_matcher: &dyn Fn(&tasks::Task) -> bool
-    ) -> usize {
-        let mut i: usize = self.get_tasklist_len();
-        while i > 0usize {
-            i -= 1;
-            if task_matcher(&self.tasklist[i]) {
-                return i;
-            }
-        }
-        usize::MAX
-    }
-
-    /** Abort a task in the task list. */
     pub fn abort_task(&mut self, index: usize) {
         if index < self.tasklist.len() {
             self.tasklist.remove(index);
         }
-        /* Otherwise no task is aborted. */
+    }
+
+    /**
+     * Check if tasklist contains a task with a given passive part.
+     * (supportive, not for the user.)
+     */
+    pub fn has_task_with(&self, task_tag: &tasks::TaskTag) -> bool {
+        let index = self
+            .get_next_task_index_with(&|task: &tasks::Task| task.get_passive_part() == *task_tag);
+        index.is_some()
+    }
+
+    /**
+     * Check if tasklist contains a matching the given expression.
+     * (supportive, not for the user.)
+     */
+    pub fn get_next_task_index_with(
+        &self,
+        task_matcher: &dyn Fn(&tasks::Task) -> bool,
+    ) -> Option<usize> {
+        self.tasklist
+            .iter()
+            .rev()
+            .position(|task| task_matcher(task))
+            .map(|index| self.tasklist.len() - 1 - index) // re-reverse
+    }
+
+    pub fn peek_ongoing_task(&self) -> Option<&tasks::Task> {
+        self.tasklist.last()
+    }
+
+    /** Start the ongoing task.
+     * This may set the started flag to true, if not yet set and maybe
+     * updates the starting time.
+     * (supportive, not for the user.)
+     */
+    pub fn start_ongoing_task(&mut self, start_time: usize) {
+        if let Some(t) = self.tasklist.last_mut() {
+            if !t.has_started() {
+                // update to then.
+                t.start_at(start_time);
+            }
+        }
+    }
+
+    /** Notify the ongoing task, that its done steps are increased
+     * This increases the optional ongoing tasks [done_steps](tasks::Task.done_steps).
+     * (supportive, not for the user.)
+     * */
+    pub fn increase_ongoing_task_steps(&mut self) {
+        if let Some(ongoing) = self.tasklist.last_mut() {
+            ongoing.increase_done_steps();
+        }
+    }
+
+    /**
+     * Drop last task.
+     * (supportive, not for the user.)
+     */
+    pub fn pop_ongoing_task(&mut self) -> Option<tasks::Task> {
+        self.tasklist.pop()
     }
 
     /** Clean task list.
-     * Remove ongoing tasks if there are no steps left. */
+     * Remove ongoing tasks if there are no steps left.
+     * (supportive, not for the user.)
+     */
     pub fn auto_clean_tasks(&mut self) {
         /* Remove ongoing task, if it is done. */
         while let Some(ongoing) = self.peek_ongoing_task() {
@@ -286,53 +280,25 @@ impl Wusel {
         }
     }
 
-    /** Check, if this wusel has a task with the requested passive tag. */
-    pub fn has_task_with(&self, task_tag: &tasks::TaskTag) -> bool {
-        for t in self.tasklist.iter() {
-            if t.get_passive_part() == *task_tag {
-                return true;
-            }
-        }
-        false
-    }
-
-    /** Peek the ongoing task. */
-    pub fn peek_ongoing_task(&self) -> Option<&tasks::Task> {
-        self.tasklist.last()
-    }
-
-    /** Start the ongoing task.
-     * This may set the started flag to true, if not yet set and maybe
-     * updates the starting time. */
-    pub fn start_ongoing_task(&mut self, start_time: usize) {
-        if let Some(t) = self.tasklist.last_mut() {
-            if !t.has_started() {
-                // update to then.
-                t.start_at(start_time);
-            }
-        }
-    }
-
-    /** Notify the ongoing task, that its done steps are increased
-     * This increases the optional ongoing tasks [done_steps](tasks::Task.done_steps). */
-    pub fn notify_ongoing_succeeded(&mut self) {
-        if let Some(ongoing) = self.tasklist.last_mut() {
-            ongoing.increase_done_steps();
-        }
-    }
-
-    /** Pop the ongoing task (queue reversed). */
-    pub fn pop_ongoing_task(&mut self) -> Option<tasks::Task> {
-        self.tasklist.pop()
-    }
-
-    /** Check, if the wusel is pregnant. */
-    #[allow(dead_code)]
     pub fn is_pregnant(&self) -> bool {
         self.pregnancy != None
     }
 
-    pub fn get_other_parent(&self) -> Option<usize> {
+    pub fn set_pregnancy(
+        &mut self,
+        other_parent_index: Option<WuselId>,
+        remaining_days: Option<u8>,
+    ) {
+        if let Some(remaining_days) = remaining_days {
+            // other parent can be none, ... divine intervention.
+            self.pregnancy = Some((other_parent_index, remaining_days));
+        } else {
+            // no remaining days unsets the pregnancy.
+            self.pregnancy = None;
+        }
+    }
+
+    pub fn get_other_parent(&self) -> Option<WuselId> {
         // self.pregnancy.0.map(|other_parent| other_parent.get_id());
         if let Some((other_parent, _)) = self.pregnancy {
             other_parent // can also be only one parent (self)
@@ -341,10 +307,8 @@ impl Wusel {
         }
     }
 
-    /** Get the remaining days of an possible Pregnancy. */
-    #[allow(dead_code)]
     pub fn get_remaining_pregnancy_days(&self) -> Option<u8> {
-        if let Some((_father, days)) = self.pregnancy {
+        if let Some((_, days)) = self.pregnancy {
             Some(days)
         } else {
             None
@@ -386,13 +350,13 @@ impl WuselGender {
     pub fn to_char_pretty(&self) -> char {
         match self {
             Self::Female => '\u{2640}',
-            Self::Male => '\u{2642}'
+            Self::Male => '\u{2642}',
         }
     }
 }
 
 /** A need, the Wusel needs to satisfy to survive. */
-#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq, PartialOrd)]
 pub enum Need {
     WATER,
     FOOD,
@@ -404,7 +368,6 @@ pub enum Need {
 }
 
 impl Need {
-    /** Custom iterable values. */
     pub const VALUES: [Self; 7] = [
         Self::WATER,
         Self::FOOD,
@@ -415,12 +378,7 @@ impl Need {
         Self::HEALTH,
     ];
 
-    const DEFAULT_NEED_DECAY_PER_MINUTE: [u32; 7] = [
-        1, 1, 1, 1, 1, 0, /*warmth*/
-        0, /*health*/ // by outer sources
-    ];
-
-    pub fn name(&self) -> &str {
+    pub fn get_name(&self) -> &str {
         match self {
             Self::WATER => "water",
             Self::FOOD => "food",
@@ -433,17 +391,43 @@ impl Need {
     }
 
     pub fn get_default_decay(&self) -> u32 {
-        for i in 0..Self::VALUES.len() {
-            if self == &Self::VALUES[i] {
-                return Self::DEFAULT_NEED_DECAY_PER_MINUTE[i];
-            }
+        match self {
+            Self::WATER | Self::FOOD | Self::SLEEP | Self::LOVE | Self::FUN => 1,
+            Self::WARMTH => 0, // by external sources
+            Self::HEALTH => 0, // by external sources
         }
-        0 // default: no decay.
+    }
+
+    /** From full to 0:
+     * How many ticks does it need, when it's only normally decreasing.
+     * This is adapted to nromal human life.
+     */
+    pub fn get_full(&self) -> u32 {
+        match self {
+            Need::WARMTH => life::HOUR * 8, // 8 hours until freeze to death.
+            Need::WATER => life::DAY * 3,   // 3 days until dehydrate.
+            Need::FOOD => life::WEEK,       // a week until starve.
+            Need::SLEEP => life::WEEK,      // a week until suffer from sleep loss.
+            Need::LOVE => life::WEEK * 2,   // 2 weeks until become lonely.
+            Need::FUN => life::WEEK * 2,    // 2 weeks until unmotivated and depressive.
+            Need::HEALTH => life::WEEK * 2, // 2 weeks until die of illness.
+        }
+    }
+
+    /** From full to 0:
+     * How many ticks does it need, when it's only normally decreasing.
+     * This is adapted to nromal human life.
+     */
+    pub fn is_fatal(&self) -> bool {
+        match self {
+            Self::WATER | Self::FOOD | Self::WARMTH | Self::HEALTH => true,
+            Self::SLEEP | Self::LOVE | Self::FUN => false,
+        }
     }
 }
 
 /** An ability, the Wusel can learn to improve their lifestyle. */
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub enum Ability {
     COOKING,
     COMMUNICATION,
@@ -452,7 +436,14 @@ pub enum Ability {
 }
 
 impl Ability {
-    fn get_name(&self) -> &str {
+    pub const VALUES: [Self; 4] = [
+        Self::COOKING,
+        Self::COMMUNICATION,
+        Self::FITNESS,
+        Self::FINESSE,
+    ];
+
+    pub fn get_name(&self) -> &str {
         match self {
             Self::COOKING => "cooking",
             Self::COMMUNICATION => "communication",
@@ -468,7 +459,6 @@ pub enum RelationType {
 }
 
 impl RelationType {
-
     pub fn from_romantically(try_romance: bool) -> Self {
         if try_romance {
             Self::Romance
@@ -480,7 +470,7 @@ impl RelationType {
     pub fn to_char(&self) -> char {
         match self {
             Self::Friendship => '\u{2639}', // smiley
-            Self::Romance =>  '\u{2661}', // heart
+            Self::Romance => '\u{2661}',    // heart
         }
     }
 }
@@ -488,12 +478,9 @@ impl RelationType {
 /** Pair of Wusels which may have a relation. */
 #[derive(Clone, Debug)]
 pub struct Relation {
-    officially: String, // officially known state (Friends, Spouse, etc..)
-
-    friendship: i32, // shared friendship between both.
-
-    romance: i32, // shared romance between both
-
+    officially: String,    // officially known state (Friends, Spouse, etc..)
+    friendship: i32,       // shared friendship between both.
+    romance: i32,          // shared romance between both
     kindred_distance: i32, // blood relation (distance)
 }
 
@@ -504,7 +491,6 @@ impl Default for Relation {
 }
 
 impl Relation {
-    /** Create a new empty relationship for just met strangers. */
     pub fn new() -> Self {
         Self {
             officially: String::from("Strangers"),
@@ -529,7 +515,6 @@ impl Relation {
         self.friendship += change;
     }
 
-    /** Print this relation to a String. */
     pub fn show(&self) -> String {
         format!(
             "'{official}' {relation_friendly_char}{friendly} {relation_romance_char}{romance}{kinship}",
