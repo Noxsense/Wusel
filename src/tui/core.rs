@@ -1,10 +1,28 @@
 /**
- * module tui.
+ * module tui::core.
  * - Here, functions to render on the terminal user interface are provided.
  * @author Nox
  * @version 2021.0.1
  */
+
 use termion;
+pub use termion::color::Rgb;
+
+pub fn hash_color_to_rgb(color_hash: u32) -> Rgb {
+    let r: u8 = (color_hash >> 4) as u8;
+    let g: u8 = ((color_hash >> 2) % 256) as u8;
+    let b: u8 = (color_hash % 256) as u8;
+    Rgb(r, g, b)
+}
+
+pub fn darken_rgb(colour: Rgb, darker_value: u8) -> Rgb {
+    let Rgb(r, g, b) = colour;
+
+    let r1 = r.saturating_sub(darker_value);
+    let g1: u8 = g.saturating_sub(darker_value);
+    let b1: u8 = b.saturating_sub(darker_value);
+    Rgb(r1, g1, b1)
+}
 
 pub struct ScreenPos {
     pub x: u16,
@@ -77,22 +95,6 @@ pub enum TextStyle {
     Underline,  // Underlined text.
 }
 
-pub fn hash_color_to_rgb(color_hash: u32) -> termion::color::Rgb {
-    let r: u8 = (color_hash >> 4) as u8;
-    let g: u8 = ((color_hash >> 2) % 256) as u8;
-    let b: u8 = (color_hash % 256) as u8;
-    termion::color::Rgb(r, g, b)
-}
-
-pub fn darken_rgb(colour: termion::color::Rgb, darker_value: u8) -> termion::color::Rgb {
-    let termion::color::Rgb(r, g, b) = colour;
-
-    let r1 = r.saturating_sub(darker_value);
-    let g1: u8 = g.saturating_sub(darker_value);
-    let b1: u8 = b.saturating_sub(darker_value);
-    termion::color::Rgb(r1, g1, b1)
-}
-
 fn cursor_to_u16(x: u16, y: u16) {
     print!("{}", termion::cursor::Goto(x, y));
 }
@@ -129,8 +131,8 @@ pub fn render_reset_colours() {
 pub fn render_spot(
     postion: &ScreenPos,
     character: char,
-    color_fg: Option<termion::color::Rgb>,
-    color_bg: Option<termion::color::Rgb>,
+    color_fg: Option<Rgb>,
+    color_bg: Option<Rgb>,
     styles: Option<Vec<TextStyle>>,
     reset_style: bool,
     reset_color: bool,
@@ -243,7 +245,7 @@ pub fn render_progres_bar_from_percent(
     panel_size: u16,
     show_percentage: bool,
     percentage: f32,
-    optipnal_colors: Option<(termion::color::Rgb, termion::color::Rgb)>,
+    optipnal_colors: Option<(Rgb, Rgb)>,
     draw_horizontal: bool,
 ) {
     // max width of that actual bar.
@@ -273,7 +275,7 @@ pub fn render_progres_bar_from_percent(
         // draw bar content.
         if let Some((full_color, rest_color)) = optipnal_colors {
             // horizontal, colourful.
-            let mut bar_colour: termion::color::Rgb;
+            let mut bar_colour: Rgb;
 
             for i in 1u16..bar_max + 1 {
                 // change colour.
@@ -308,7 +310,7 @@ pub fn render_progres_bar_from_percent(
                     // render percentage if not empty.
                     let word_index = i as usize - 2;
                     if percentage_word[word_index] != ' ' {
-                        print!("{}", termion::color::Fg(termion::color::Rgb(0, 0, 0)));
+                        print!("{}", termion::color::Fg(Rgb(0, 0, 0)));
                         bar_character = percentage_word[word_index];
                     }
                 }
@@ -323,7 +325,7 @@ pub fn render_progres_bar_from_percent(
 
         if let Some((full_color, rest_color)) = optipnal_colors {
             // vertical, colourful
-            let mut bar_colour: termion::color::Rgb;
+            let mut bar_colour: Rgb;
 
             for i in 1u16..bar_max + 1 {
                 // change colour.
@@ -367,7 +369,7 @@ pub fn render_progres_bar(
     show_percentage: bool,
     max_value: u32,
     current_value: u32,
-    optipnal_colors: Option<(termion::color::Rgb, termion::color::Rgb)>,
+    optipnal_colors: Option<(Rgb, Rgb)>,
     draw_horizontal: bool,
 ) -> f32 {
     let percentage_pre: f32 = current_value as f32 / max_value as f32 * 100f32;

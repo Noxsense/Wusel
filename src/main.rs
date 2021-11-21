@@ -38,7 +38,7 @@ fn main() -> Result<(), std::io::Error> {
     };
 
     //clear on start.
-    tui::general::render_clear_all();
+    tui::core::render_clear_all();
 
     let (screen_width, screen_height) = match termion::terminal_size() {
         Ok((w, h)) => (w, h),
@@ -75,27 +75,27 @@ fn main() -> Result<(), std::io::Error> {
     /* Draw the field and make some real automation. */
     let (w, h) = (world.get_width() as usize, world.get_depth() as usize);
 
-    let time_position: &tui::general::ScreenPos = &tui::general::ScreenPos {
+    let time_position: &tui::core::ScreenPos = &tui::core::ScreenPos {
         x: 1u16,
         y: h as u16 + 3,
     };
-    let timebar_position: &tui::general::ScreenPos = &tui::general::ScreenPos {
+    let timebar_position: &tui::core::ScreenPos = &tui::core::ScreenPos {
         x: w as u16 + 4,
         y: 1,
     };
-    let need_panel_position: &tui::general::ScreenPos = &tui::general::ScreenPos {
+    let need_panel_position: &tui::core::ScreenPos = &tui::core::ScreenPos {
         x: 2u16,
         y: h as u16 + 6,
     };
     let need_bar_width: u16 = 10;
     let need_panel_show_percentage: bool = true;
 
-    tui::general::render_clear_all();
+    tui::core::render_clear_all();
 
     // frame game field
-    tui::general::render_rectangle(
-        &tui::general::ScreenPos { x: 1, y: 1 },
-        &tui::general::ScreenPos {
+    tui::core::render_rectangle(
+        &tui::core::ScreenPos { x: 1, y: 1 },
+        &tui::core::ScreenPos {
             x: w as u16 + 2,
             y: h as u16 + 2,
         },
@@ -105,12 +105,12 @@ fn main() -> Result<(), std::io::Error> {
     );
 
     // frame need panel
-    tui::general::render_rectangle(
-        &tui::general::ScreenPos {
+    tui::core::render_rectangle(
+        &tui::core::ScreenPos {
             x: need_panel_position.x - 1,
             y: need_panel_position.y - 1,
         },
-        &tui::general::ScreenPos {
+        &tui::core::ScreenPos {
             x: need_panel_position.x + 9 + need_bar_width,
             y: need_panel_position.y + 7,
         },
@@ -121,11 +121,11 @@ fn main() -> Result<(), std::io::Error> {
 
     for i in 0usize..iterations {
         // world.positions_recalculate_grid();
-        render_field(w, world.positions_for_grid());
+        tui::world_view::render_field(w, world.positions_for_grid());
 
         /* Tick the world, show time. */
-        render_time(time_position, i, world.get_time());
-        tui::general::render_progres_bar(
+        tui::world_view::render_time(time_position, i, world.get_time());
+        tui::core::render_progres_bar(
             timebar_position,
             h as u16 + 3,
             false,
@@ -143,7 +143,7 @@ fn main() -> Result<(), std::io::Error> {
             let x_offset = wusel_offset as u16 * 23;
 
             if need_panel_position.x + x_offset + 20 < screen_width {
-                tui::general::cursor_to(&need_panel_position.right_by(x_offset).up_by(2));
+                tui::core::cursor_to(&need_panel_position.right_by(x_offset).up_by(2));
                 print!(
                     "{} ({})",
                     world
@@ -154,7 +154,7 @@ fn main() -> Result<(), std::io::Error> {
                         .unwrap_or(life::world::WuselGender::Female)
                         .to_char(),
                 );
-                // render_wusel_tasklist(
+                // tui::world_view::render_wusel_tasklist(
                 //    need_panel_position.right_by(x_offset).up_by(2),
                 //     world.wusel_get_tasklist(*wusel_id as usize),
                 // );
@@ -170,7 +170,7 @@ fn main() -> Result<(), std::io::Error> {
                     })
                     .collect();
 
-                render_wusel_need_bar(
+                tui::world_view::render_wusel_need_bar(
                     need_panel_position.right_by(x_offset),
                     need_bar_width,
                     need_panel_show_percentage,
@@ -181,7 +181,7 @@ fn main() -> Result<(), std::io::Error> {
 
         world.tick();
 
-        /* Give some unbusy wusels the task to move circumference. */
+        /* Give some unbusy wusels the task to move around. */
         let unbusy = world.wusel_get_all_unbusy();
         let wusel_len = world.wusel_count();
         for widx in unbusy {
@@ -215,115 +215,16 @@ fn main() -> Result<(), std::io::Error> {
         std::thread::sleep(step_sleep); // wait.
 
         // cursor to bottom.
-        tui::general::cursor_to(&tui::general::ScreenPos {
+        tui::core::cursor_to(&tui::core::ScreenPos {
             x: 1,
             y: screen_height,
         });
     }
 
     if clear_on_exit {
-        tui::general::render_reset(&tui::general::ScreenPos::START); // clear whole field.
+        tui::core::render_reset(&tui::core::ScreenPos::START); // clear whole field.
     }
 
-    tui::general::cursor_to(&tui::general::ScreenPos::START.down_by(screen_height));
+    tui::core::cursor_to(&tui::core::ScreenPos::START.down_by(screen_height));
     Ok(())
-}
-
-fn get_render_for_position(
-    c: char,
-) -> (
-    char,
-    Option<termion::color::Rgb>,
-    Option<termion::color::Rgb>,
-    Option<Vec<tui::general::TextStyle>>,
-) {
-    match c {
-        '\u{263A}'  => ('\u{263A}', Some(termion::color::Rgb(0, 0, 0)), None, Some(vec![tui::general::TextStyle::Bold])), // wusel, -- smiley, alternatively or w
-        '#'         => ('#', Some(termion::color::Rgb(000, 000, 000)), None, None), // construction, eg. wall
-        'm'         => ('m', Some(termion::color::Rgb(99, 67, 14)), None, None), // furniture, eg. chair
-        '*'         => ('*', Some(termion::color::Rgb(000, 000, 100)), None, None), // miscellaneous, eg. food
-        'ó'         => ('ó', Some(termion::color::Rgb(200, 000, 000)), None, None), // food
-        _           => (' ', Some(termion::color::Rgb(000, 100, 000)), Some(termion::color::Rgb(222, 255, 222)), None), // empty
-    }
-}
-
-/** Clean he view and draw the field, put the cursor, two lines below the field, to write there. */
-fn render_field(w: usize, positions: Vec<Vec<(char, usize)>>) {
-    /* Draw field. */
-    let reset_color_after_draw = false;
-    let reset_style_after_draw = true;
-
-    for (p, on_pos) in positions.iter().enumerate() {
-        /* All things on this position. */
-
-        let (x, y): (u16, u16);
-        x = (p % w) as u16 + 2;
-        y = (p / w) as u16 + 2;
-
-        let on_pos_first = on_pos.get(0).unwrap_or(&('\0', 0usize)).0;
-
-        let render_data = get_render_for_position(on_pos_first);
-
-        let (render_char, render_fg, render_bg, render_styles) = render_data;
-
-        /* Draw position symbol. */
-        tui::general::render_spot(
-            &tui::general::ScreenPos { x, y },
-            render_char,
-            render_fg,
-            render_bg,
-            render_styles,
-            reset_style_after_draw,
-            reset_color_after_draw,
-        );
-    }
-
-    tui::general::render_reset_colours();
-}
-
-fn render_time(position: &tui::general::ScreenPos, tick: usize, time: usize) {
-    tui::general::cursor_to(position);
-    print!(
-        "{formatted_time}",
-        formatted_time = format!("Step Counter: {} => Time: {}", tick, time)
-    );
-}
-
-fn render_wusel_tasklist(position: tui::general::ScreenPos, tasklist: Vec<String>) {
-    tui::general::cursor_to(&position);
-    print!("> ");
-    for task in tasklist {
-        print!("[{task}] ", task = task);
-    }
-}
-
-/** Render a Need Panel. */
-fn render_wusel_need_bar(
-    position: tui::general::ScreenPos,
-    panel_width: u16,
-    show_percentage: bool,
-    needs: Vec<(life::world::Need, u32, u32)>,
-) {
-    let draw_horizontal = true;
-
-    let bar_start = position.right_by(10);
-
-    for (offset, (need, need_full, need_now)) in needs.iter().enumerate() {
-        let offset_u16 = offset as u16;
-        tui::general::cursor_to(&position.down_by(offset_u16));
-        print!("{title:9}", title = need.name());
-
-        tui::general::render_progres_bar(
-            &bar_start.down_by(offset_u16),
-            panel_width,
-            show_percentage,
-            *need_full,
-            *need_now,
-            Some((
-                termion::color::Rgb(0, 255, 0),
-                termion::color::Rgb(255, 0, 0),
-            )),
-            draw_horizontal,
-        );
-    }
 }

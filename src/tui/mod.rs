@@ -1,1 +1,2 @@
-pub mod general;
+pub mod core;
+pub mod world_view;
