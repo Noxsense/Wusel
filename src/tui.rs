@@ -12,15 +12,20 @@ pub struct ScreenPos {
 }
 
 impl ScreenPos {
-    pub const START: Self
-        = ScreenPos { x: 1, y: 1 };
+    pub const START: Self = ScreenPos { x: 1, y: 1 };
 
     pub fn from(position: (u16, u16)) -> Self {
-        Self{ x: position.0, y: position.1}
+        Self {
+            x: position.0,
+            y: position.1,
+        }
     }
 
     pub fn left_by(&self, offset: u16) -> Self {
-        Self{ x: self.x.saturating_sub(offset), y: self.y }
+        Self {
+            x: self.x.saturating_sub(offset),
+            y: self.y,
+        }
     }
 
     pub fn left(&self) -> Self {
@@ -28,7 +33,10 @@ impl ScreenPos {
     }
 
     pub fn right_by(&self, offset: u16) -> Self {
-        Self{ x: self.x.saturating_add(offset), y: self.y }
+        Self {
+            x: self.x.saturating_add(offset),
+            y: self.y,
+        }
     }
 
     pub fn right(&self) -> Self {
@@ -36,7 +44,10 @@ impl ScreenPos {
     }
 
     pub fn up_by(&self, offset: u16) -> Self {
-        Self{ x: self.x, y: self.y.saturating_sub(offset) }
+        Self {
+            x: self.x,
+            y: self.y.saturating_sub(offset),
+        }
     }
 
     pub fn up(&self) -> Self {
@@ -44,7 +55,10 @@ impl ScreenPos {
     }
 
     pub fn down_by(&self, offset: u16) -> Self {
-        Self{ x: self.x, y: self.y.saturating_add(offset) }
+        Self {
+            x: self.x,
+            y: self.y.saturating_add(offset),
+        }
     }
 
     pub fn down(&self) -> Self {
@@ -76,7 +90,7 @@ pub fn darken_rgb(colour: termion::color::Rgb, darker_value: u8) -> termion::col
     let r1 = r.saturating_sub(darker_value);
     let g1: u8 = g.saturating_sub(darker_value);
     let b1: u8 = b.saturating_sub(darker_value);
-    return termion::color::Rgb(r1, g1, b1);
+    termion::color::Rgb(r1, g1, b1)
 }
 
 fn cursor_to_u16(x: u16, y: u16) {
@@ -173,9 +187,9 @@ pub fn render_spot(
 pub fn render_rectangle(
     a: &ScreenPos,
     b: &ScreenPos,
-    horizontal_border_symbol: &String,
-    vertical_border_symbol: &String,
-    corner_symbol: &String,
+    horizontal_border_symbol: &str,
+    vertical_border_symbol: &str,
+    corner_symbol: &str,
 ) {
     let (x0, y0): (u16, u16) = (u16::min(a.x, b.x), u16::min(a.y, b.y)); // top left
     let (x1, y1): (u16, u16) = (u16::max(a.x, b.x), u16::max(a.y, b.y)); // bottom right
@@ -210,7 +224,7 @@ pub fn render_rectangle(
 }
 
 /** Draw a rectangle between the spanning positions, filling the area. */
-pub fn render_rectangle_filled(a: &ScreenPos, b: &ScreenPos, fill: &String) {
+pub fn render_rectangle_filled(a: &ScreenPos, b: &ScreenPos, fill: &str) {
     let (x0, y0): (u16, u16) = (u16::min(a.x, b.x), u16::min(a.y, b.y)); // top left
     let (x1, y1): (u16, u16) = (u16::max(a.x, b.x), u16::max(a.y, b.y)); // bottom right
 

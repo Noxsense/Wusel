@@ -9,9 +9,9 @@
  * @version 2021.0.1
  */
 
-use rand;
-use std;
-use termion;
+// use rand;
+// use std;
+// use termion;
 
 pub mod life;
 pub mod tui;
@@ -92,9 +92,18 @@ fn main() -> Result<(), std::io::Error> {
     /* Draw the field and make some real automation. */
     let (w, h) = (world.get_width() as usize, world.get_depth() as usize);
 
-    let time_position: &tui::ScreenPos = &tui::ScreenPos{ x: 1u16, y: h as u16 + 3};
-    let timebar_position: &tui::ScreenPos = &tui::ScreenPos{ x: w as u16 + 4, y: 1};
-    let need_panel_position: &tui::ScreenPos = &tui::ScreenPos{ x: 2u16, y: h as u16 + 6};
+    let time_position: &tui::ScreenPos = &tui::ScreenPos {
+        x: 1u16,
+        y: h as u16 + 3,
+    };
+    let timebar_position: &tui::ScreenPos = &tui::ScreenPos {
+        x: w as u16 + 4,
+        y: 1,
+    };
+    let need_panel_position: &tui::ScreenPos = &tui::ScreenPos {
+        x: 2u16,
+        y: h as u16 + 6,
+    };
     let need_bar_width: u16 = 10;
     let need_panel_show_percentage: bool = true;
 
@@ -102,8 +111,11 @@ fn main() -> Result<(), std::io::Error> {
 
     // frame game field
     tui::render_rectangle(
-        &tui::ScreenPos{ x: 1, y: 1},
-        &tui::ScreenPos{ x: w as u16 + 2, y: h as u16 + 2},
+        &tui::ScreenPos { x: 1, y: 1 },
+        &tui::ScreenPos {
+            x: w as u16 + 2,
+            y: h as u16 + 2,
+        },
         &format!("{}-", termion::color::Fg(termion::color::Rgb(0, 0, 255))),
         &format!("{}|", termion::color::Fg(termion::color::Rgb(0, 255, 0))),
         &format!("{}+", termion::color::Fg(termion::color::Rgb(255, 0, 0))),
@@ -111,8 +123,14 @@ fn main() -> Result<(), std::io::Error> {
 
     // frame need panel
     tui::render_rectangle(
-        &tui::ScreenPos{ x: need_panel_position.x - 1, y: need_panel_position.y - 1},
-        &tui::ScreenPos{ x:  need_panel_position.x + 9 + need_bar_width, y: need_panel_position.y + 7},
+        &tui::ScreenPos {
+            x: need_panel_position.x - 1,
+            y: need_panel_position.y - 1,
+        },
+        &tui::ScreenPos {
+            x: need_panel_position.x + 9 + need_bar_width,
+            y: need_panel_position.y + 7,
+        },
         &format!("{}-", termion::color::Fg(termion::color::Rgb(255, 255, 0))),
         &format!("{}|", termion::color::Fg(termion::color::Rgb(255, 255, 0))),
         &format!("{}+", termion::color::Fg(termion::color::Rgb(255, 255, 0))),
@@ -195,7 +213,10 @@ fn main() -> Result<(), std::io::Error> {
         std::thread::sleep(step_sleep); // wait.
 
         // cursor to bottom.
-        tui::cursor_to(&tui::ScreenPos{ x: 1, y: screen_height });
+        tui::cursor_to(&tui::ScreenPos {
+            x: 1,
+            y: screen_height,
+        });
     }
 
     if clear_on_exit {
@@ -217,7 +238,7 @@ fn get_render_for_position(
     match c {
         '\u{263A}'  => ('\u{263A}', Some(termion::color::Rgb(0, 0, 0)), None, Some(vec![tui::TextStyle::Bold])), // wusel, -- smiley, alternatively or w
         '#'         => ('#', Some(termion::color::Rgb(000, 000, 000)), None, None), // construction, eg. wall
-        'm'         => ('m', Some(termion::color::Rgb(099, 067, 014)), None, None), // furniture, eg. chair
+        'm'         => ('m', Some(termion::color::Rgb(99, 67, 14)), None, None), // furniture, eg. chair
         '*'         => ('*', Some(termion::color::Rgb(000, 000, 100)), None, None), // miscellaneous, eg. food
         'ó'         => ('ó', Some(termion::color::Rgb(200, 000, 000)), None, None), // food
         _           => (' ', Some(termion::color::Rgb(000, 100, 000)), Some(termion::color::Rgb(222, 255, 222)), None), // empty
@@ -230,9 +251,8 @@ fn render_field(w: usize, positions: Vec<Vec<(char, usize)>>) {
     let reset_color_after_draw = false;
     let reset_style_after_draw = true;
 
-    for p in 0..positions.len() {
+    for (p, on_pos) in positions.iter().enumerate() {
         /* All things on this position. */
-        let on_pos = &positions[p];
 
         let (x, y): (u16, u16);
         x = (p % w) as u16 + 2;
@@ -246,7 +266,7 @@ fn render_field(w: usize, positions: Vec<Vec<(char, usize)>>) {
 
         /* Draw position symbol. */
         tui::render_spot(
-            &tui::ScreenPos{ x, y},
+            &tui::ScreenPos { x, y },
             render_char,
             render_fg,
             render_bg,

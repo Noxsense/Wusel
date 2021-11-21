@@ -33,7 +33,7 @@ impl Position {
     }
 
     /** Get the distance between two positions. */
-    pub fn distance_to(self: &Self, other: &Self) -> f32 {
+    pub fn distance_to(&self, other: &Self) -> f32 {
         (((self.x as i64 - other.x as i64).pow(2) + (self.y as i64 - other.y as i64).pow(2)) as f32)
             .sqrt()
     }
@@ -63,23 +63,23 @@ impl Area {
         let (min_x, max_x) = (<u32>::min(a.x, b.x), <u32>::max(a.x, b.x));
         let (min_y, max_y) = (<u32>::min(a.y, b.y), <u32>::max(a.y, b.y));
 
-        return Area {
+        Area {
             anchor: Position::new(min_x, min_y),
             /* If only one position is spanned: width/depth: 1. */
             width: <u32>::max(1, max_x - min_x),
             depth: <u32>::max(1, max_y - min_y),
             iterator_index: 0,
-        };
+        }
     }
 
     /** Check, if the position is in the area. */
-    pub fn contains_position(self: &Self, pos: &Position) -> bool {
+    pub fn contains_position(&self, pos: &Position) -> bool {
         (self.anchor.x <= pos.x && pos.x < (self.anchor.x + self.width))
             && (self.anchor.y <= pos.y && pos.y < (self.anchor.y + self.depth))
     }
 
     /** Get a random position within this area. */
-    pub fn position_random(self: &Self) -> Position {
+    pub fn position_random(&self) -> Position {
         Position::new(
             self.anchor.x + (rand::random::<u32>() % (self.anchor.x + self.width)),
             self.anchor.y + (rand::random::<u32>() % (self.anchor.y + self.depth)),
@@ -87,7 +87,7 @@ impl Area {
     }
 
     /** Get all valid neighbours of a position within the area. */
-    pub fn get_all_neighbours(self: &Self, pos: Position) -> Vec<Position> {
+    pub fn get_all_neighbours(&self, pos: Position) -> Vec<Position> {
         // TODO (maka a storage, to not calculate it every time. )
         let mut neighbours: Vec<Position> = vec![];
 
@@ -97,11 +97,11 @@ impl Area {
                 neighbours.push(n);
             }
         }
-        return neighbours;
+        neighbours
     }
 
     /** Get a requested neighbour of a given position within this area. */
-    pub fn get_directed_neighbour(self: &Self, pos: Position, direction: Way) -> Option<Position> {
+    pub fn get_directed_neighbour(&self, pos: Position, direction: Way) -> Option<Position> {
         let change = direction.as_direction_tuple();
 
         let box_width = self.anchor.x + self.width;
@@ -127,14 +127,14 @@ impl Area {
             return None;
         }
 
-        return Some(Position::new(
+        Some(Position::new(
             (pos.x as i64 + change.0 as i64) as u32,
             (pos.y as i64 + change.1 as i64) as u32,
-        ));
+        ))
     }
 
     /** Get the optional position, which is on the given index. */
-    pub fn position_from_index(self: &Self, index: u32) -> Option<Position> {
+    pub fn position_from_index(&self, index: u32) -> Option<Position> {
         if index < self.width * self.depth {
             Some(Position::new(
                 index % self.width + self.anchor.x,
@@ -150,7 +150,7 @@ impl Iterator for Area {
     type Item = Position;
 
     /** Iterator over the positions of the field. */
-    fn next(self: &mut Self) -> Option<Self::Item> {
+    fn next(&mut self) -> Option<Self::Item> {
         let index = self.iterator_index;
         self.iterator_index += 1;
         self.position_from_index(index)
@@ -176,16 +176,23 @@ pub struct World {
     obj_count_misc: usize,      // all ever created miscellaneous objects
     obj_count_food: usize,      // all ever created food objects
 
-    actions: Vec<String>, // actions to do.
-    actions_effects: Vec<(ObjectIdentifer, usize, &'static str, Vec<(Need, i16)>)>, // how various actions on various objects may influence
+    actions: Vec<String>,               // actions to do.
+    actions_effects: Vec<ActionAffect>, // how various actions on various objects may influence
 }
+
+type ActionAffect = (
+    ObjectIdentifer,  // affected object
+    usize,            // object subtype
+    &'static str,     // name
+    Vec<(Need, i16)>, // affected needs
+);
 
 impl World {
     /** Create a new world. */
     pub fn new(width: u32, depth: u32) -> Self {
-        return Self {
-            width: width,
-            depth: depth,
+        Self {
+            width,
+            depth,
             positions: vec![vec![]; width as usize * depth as usize],
 
             clock: 0,
@@ -226,7 +233,7 @@ impl World {
                     vec![(Need::WATER, -50), (Need::FOOD, 200)], // effect
                 ),
             ],
-        };
+        }
     }
 
     /* World Inventory. */
@@ -235,16 +242,16 @@ impl World {
     pub const TICKS_PER_DAY: usize = 2880; // 24h by 0.5 minutes
 
     /** Get width of the world. */
-    pub fn get_width(self: &Self) -> u32 {
+    pub fn get_width(&self) -> u32 {
         self.width
     }
 
     /** Get height of the world. */
-    pub fn get_depth(self: &Self) -> u32 {
+    pub fn get_depth(&self) -> u32 {
         self.depth
     }
 
-    pub fn get_area(self: &Self) -> Area {
+    pub fn get_area(&self) -> Area {
         Area::new(Position::new(0, 0), self.width, self.depth)
     }
 
@@ -252,44 +259,41 @@ impl World {
 
     /** Get the `positions` index for the requesting position (width, height).
      * If the position is not in world, this index is not in [0, positions.len()).*/
-    fn position_to_index(self: &Self, pos: Position) -> usize {
+    fn position_to_index(&self, pos: Position) -> usize {
         (pos.x + self.width * pos.y) as usize
     }
 
     /** Get the position tuple from the given index in this world. */
-    fn position_from_index(self: &Self, idx: usize) -> Position {
+    fn position_from_index(&self, idx: usize) -> Position {
         Position::new(idx as u32 % self.width, idx as u32 / self.width)
     }
 
     /** Get a random position in this world. */
-    pub fn position_random(self: &Self) -> Position {
+    pub fn position_random(&self) -> Position {
         self.get_area().position_random()
     }
 
     /** Get the (valid) neighbours for a position. */
-    pub fn position_get_all_neighbours(self: &Self, pos: Position) -> Vec<Position> {
+    pub fn position_get_all_neighbours(&self, pos: Position) -> Vec<Position> {
         self.get_area().get_all_neighbours(pos)
     }
 
     /** Get the next optional neighbour to the given position within the given box. */
-    pub fn position_get_neighbour_on(
-        self: &Self,
-        pos: Position,
-        direction: Way,
-    ) -> Option<Position> {
+    pub fn position_get_neighbour_on(&self, pos: Position, direction: Way) -> Option<Position> {
         self.get_area().get_directed_neighbour(pos, direction)
     }
 
     /** Check if the position is inside the world bounds. */
-    pub fn position_containing(self: &Self, pos: Position) -> bool {
+    pub fn position_containing(&self, pos: Position) -> bool {
         self.get_area().contains_position(&pos)
     }
 
     /** Get the distance between two positions represented by indices in this world. */
-    fn positions_indices_distance(self: &Self, a_index: usize, b_index: usize) -> f32 {
+    #[allow(dead_code)]
+    fn positions_indices_distance(&self, a_index: usize, b_index: usize) -> f32 {
         let a = self.position_from_index(a_index);
         let b = self.position_from_index(b_index);
-        return a.distance_to(&b);
+        a.distance_to(&b)
     }
 
     /** Wusel char. */
@@ -307,15 +311,13 @@ impl World {
     /** Check all positions.
      * Recalculate all positions, if they really consist what they promised. */
     #[allow(dead_code)]
-    pub fn positions_recalculate_grid(self: &mut Self) {
+    pub fn positions_recalculate_grid(&mut self) {
         self.positions = vec![vec![]; self.width as usize * self.depth as usize];
 
         let valid_index = self.positions.len();
 
-        let mut wusel_index = 0usize;
-        for w in self.wusels_on_pos.iter() {
+        for (wusel_index, w) in self.wusels_on_pos.iter().enumerate() {
             let idx = self.wusels_on_pos[wusel_index].position_index;
-            wusel_index += 1;
 
             /* Add ID to position. */
             if idx < valid_index {
@@ -326,16 +328,16 @@ impl World {
 
     /** Get the positions of all active wusels. */
     #[allow(dead_code)]
-    pub fn positions_for_wusels(self: &Self) -> Vec<Position> {
+    pub fn positions_for_wusels(&self) -> Vec<Position> {
         let mut positions = vec![];
         for w in self.wusels_on_pos.iter() {
             positions.push(self.position_from_index((*w).position_index)); // usize -> Position
         }
-        return positions;
+        positions
     }
 
     /** Get all the positions as they are. */
-    pub fn positions_for_grid(self: &Self) -> Vec<Vec<(char, usize)>> {
+    pub fn positions_for_grid(&self) -> Vec<Vec<(char, usize)>> {
         self.positions.clone()
     }
 
@@ -345,11 +347,7 @@ impl World {
     }
 
     /** Find a given thing (given by `ID`), placed on a certain position (given by `position_index`). */
-    fn positions_find_index(
-        self: &Self,
-        position_index: usize,
-        id: &(char, usize),
-    ) -> Option<usize> {
+    fn positions_find_index(&self, position_index: usize, id: &(char, usize)) -> Option<usize> {
         self.positions[position_index]
             .iter()
             .position(|obj_id| obj_id == id)
@@ -359,15 +357,16 @@ impl World {
      * Placed in a world inventory/storage first, can be placed in world.
      * Returns the new object's index for the world's objects. */
     pub fn object_new(
-        self: &mut Self,
-        obj_type: ObjectType,
-        subtype: ObjectSubtype,
+        &mut self,
+        subtyped_object: ObjectWithSubType,
         name: String,
         transportable: bool,
         passable: bool,
         consumable_parts: Option<usize>,
         storage_capacity: usize,
     ) -> (ObjectIdentifer, usize) {
+        let (obj_type, subtype) = subtyped_object;
+
         /* Which object's counter to increase. */
         let new_obj_count: usize = match obj_type {
             ObjectType::Construction => {
@@ -393,12 +392,12 @@ impl World {
         /* Add the new object into the world active objects. */
         self.objects.push(ExistingObject {
             object: Box::new(Object {
-                name: name,
+                name,
                 object_id: (obj_type, subtype, new_obj_count),
-                transportable: transportable,
-                passable: passable,
+                transportable,
+                passable,
                 consumable: consumable_parts,
-                storage_capacity: storage_capacity,
+                storage_capacity,
             }),
             position: Self::WORLD_INVENTORY,
         });
@@ -418,14 +417,9 @@ impl World {
      *
      * Placed in a world inventory/storage first, can be placed in world.
      * Returns the new object's index for the world's objects. */
-    pub fn food_new(
-        self: &mut Self,
-        name: ObjectSubtype,
-        bites: usize,
-    ) -> (ObjectIdentifer, usize) {
+    pub fn food_new(&mut self, name: ObjectSubtype, bites: usize) -> (ObjectIdentifer, usize) {
         self.object_new(
-            ObjectType::Food,
-            name,
+            (ObjectType::Food, name),
             name.to_string(),
             true,
             true,
@@ -436,28 +430,27 @@ impl World {
 
     /** Duplicate a world object: Use all attributes, but change the ID
      * This will create a new object, currently in world's storage. */
-    pub fn object_duplicate(
-        self: &mut Self,
-        base_index: usize,
-    ) -> Option<(ObjectIdentifer, usize)> {
+    pub fn object_duplicate(&mut self, base_index: usize) -> Option<(ObjectIdentifer, usize)> {
         /* Duplicate non existing?. */
         if base_index >= self.objects.len() {
             return None;
         }
 
         Some(self.object_new(
-            (&*self.objects[base_index].object).object_id.0,
-            (&*self.objects[base_index].object).object_id.1,
-            (&*self.objects[base_index].object).name.clone(),
-            (&*self.objects[base_index].object).transportable,
-            (&*self.objects[base_index].object).passable,
-            (&*self.objects[base_index].object).consumable,
-            (&*self.objects[base_index].object).storage_capacity,
+            (
+                (*self.objects[base_index].object).object_id.0, // obj type
+                (*self.objects[base_index].object).object_id.1, // obj sub-type
+            ),
+            (*self.objects[base_index].object).name.clone(),
+            (*self.objects[base_index].object).transportable,
+            (*self.objects[base_index].object).passable,
+            (*self.objects[base_index].object).consumable,
+            (*self.objects[base_index].object).storage_capacity,
         ))
     }
 
     /** Find the optional index of an object, given by an ID. */
-    fn object_identifier_to_index(self: &Self, object_id: ObjectIdentifer) -> Option<usize> {
+    fn object_identifier_to_index(&self, object_id: ObjectIdentifer) -> Option<usize> {
         self.objects
             .iter()
             .position(|o| o.object.object_id == object_id)
@@ -465,7 +458,7 @@ impl World {
 
     /** Get the optional position of an object, given by an index.
      * If the position is held by a storage, get the pos of the storage. */
-    fn object_index_get_position(self: &Self, object_index: usize) -> Option<Position> {
+    fn object_index_get_position(&self, object_index: usize) -> Option<Position> {
         match self.objects[object_index].position {
             Where::AtPosition(pos_index) => Some(self.position_from_index(pos_index)),
             // get nested position.
@@ -478,7 +471,7 @@ impl World {
 
     /** Get the optional position of an object, given by an ID.
      * If the position is held by a storage, get the pos of the storage. */
-    pub fn object_get_position(self: &Self, object_id: ObjectIdentifer) -> Option<Position> {
+    pub fn object_get_position(&self, object_id: ObjectIdentifer) -> Option<Position> {
         if let Some(object_index) = self.object_identifier_to_index(object_id) {
             self.object_index_get_position(object_index)
         } else {
@@ -487,7 +480,7 @@ impl World {
     }
 
     /** Place an object on a new position. */
-    pub fn object_set_position(self: &mut Self, object_id: ObjectIdentifer, pos: Position) {
+    pub fn object_set_position(&mut self, object_id: ObjectIdentifer, pos: Position) {
         if let Some(object_index) = self.object_identifier_to_index(object_id) {
             let position_index = self.position_to_index(pos);
             self.object_set_whereabouts(object_index, Where::AtPosition(position_index));
@@ -498,7 +491,7 @@ impl World {
      * The object is given by an (vector) index of all currently active objects.
      * If the object is removed from a world position, this will remove the object from the old
      * position.  */
-    fn object_set_whereabouts(self: &mut Self, object_index: usize, whereto: Where) {
+    fn object_set_whereabouts(&mut self, object_index: usize, whereto: Where) {
         /* Invalid index. => Abort. */
         if object_index >= self.objects.len() {
             return;
@@ -529,7 +522,7 @@ impl World {
     }
 
     /** Destroy an object given by a certain all-active-object's index. */
-    fn object_destroy(self: &mut Self, object_index: usize) {
+    fn object_destroy(&mut self, object_index: usize) {
         if object_index >= self.objects.len() {
             return;
         }
@@ -554,14 +547,14 @@ impl World {
 
     /** Get an index for the wusel with the requesting index.
      * Return LEN, if none is found. */
-    fn wusel_identifier_to_index(self: &Self, id: usize) -> Option<usize> {
+    fn wusel_identifier_to_index(&self, id: usize) -> Option<usize> {
         self.wusels_on_pos.iter().position(|w| w.wusel.id == id)
     }
 
     /** Add a wusel to the world.
      * ID is the current wusel count.
      * TODO (2020-11-20) what is about dead wusels and decreasing length? */
-    pub fn wusel_new(self: &mut Self, name: String, gender: WuselGender, pos: Position) {
+    pub fn wusel_new(&mut self, name: String, gender: WuselGender, pos: Position) {
         let id = self.wusels_alltime_count; // almost identifier (for a long time unique)
         let w = Wusel::new(id, name, gender); // new wusel at (pos)
 
@@ -580,12 +573,12 @@ impl World {
     }
 
     /** Count how many wusels are currently active. */
-    pub fn wusel_count(self: &Self) -> usize {
+    pub fn wusel_count(&self) -> usize {
         self.wusels_on_pos.len()
     }
 
     /** Get the position of the indexed wusel. */
-    pub fn wusel_get_position(self: &Self, wusel_index: Option<usize>) -> Option<Position> {
+    pub fn wusel_get_position(&self, wusel_index: Option<usize>) -> Option<Position> {
         if let Some(wusel_index) = wusel_index {
             if wusel_index < self.wusels_on_pos.len() {
                 Some(self.position_from_index(self.wusels_on_pos[wusel_index].position_index))
@@ -593,13 +586,13 @@ impl World {
                 None // outside the map.
             }
         } else {
-            return None;
+            None
         }
     }
 
     /** Set the position of the indexed wusel to the nearest valid position
      * If the position may land out of the grid, put it to the nearest border. */
-    pub fn wusel_set_position(self: &mut Self, wusel_index: usize, pos: Position) {
+    pub fn wusel_set_position(&mut self, wusel_index: usize, pos: Position) {
         if wusel_index < self.wusels_on_pos.len() {
             let id = self.wusels_on_pos[wusel_index].wusel.id;
 
@@ -629,29 +622,29 @@ impl World {
     }
 
     /** Get the indices of all wusels, which are alive. */
-    pub fn wusel_get_all_alive(self: &Self) -> Vec<usize> {
+    pub fn wusel_get_all_alive(&self) -> Vec<usize> {
         let mut alive: Vec<usize> = vec![];
         for i in 0..self.wusels_on_pos.len() {
             if self.wusels_on_pos[i].wusel.is_alive() {
                 alive.push(i);
             }
         }
-        return alive;
+        alive
     }
 
     /** Get the indices of all wusels, which are currently having no tasks to do. */
-    pub fn wusel_get_all_unbusy(self: &Self) -> Vec<usize> {
+    pub fn wusel_get_all_unbusy(&self) -> Vec<usize> {
         let mut unbusy: Vec<usize> = vec![];
         for i in 0..self.wusels_on_pos.len() {
-            if self.wusels_on_pos[i].wusel.tasklist.len() < 1 {
+            if self.wusels_on_pos[i].wusel.tasklist.is_empty() {
                 unbusy.push(i);
             }
         }
-        return unbusy;
+        unbusy
     }
 
     /** Give an available wusel (by index) a new task. */
-    pub fn wusel_assign_task(self: &mut Self, wusel_index: usize, taskb: TaskBuilder) {
+    pub fn wusel_assign_task(&mut self, wusel_index: usize, taskb: TaskBuilder) {
         if wusel_index < self.wusels_on_pos.len() {
             /* Task apply wusel[index] as actor. */
             self.wusels_on_pos[wusel_index]
@@ -662,7 +655,7 @@ impl World {
     }
 
     /** Abort an assigned task from an available wusel (by index). */
-    pub fn wusel_abort_task(self: &mut Self, wusel_index: usize, task_index: usize) {
+    pub fn wusel_abort_task(&mut self, wusel_index: usize, task_index: usize) {
         if wusel_index < self.wusels_on_pos.len() {
             /* Remove task. */
             self.wusels_on_pos[wusel_index].wusel.abort_task(task_index);
@@ -670,7 +663,7 @@ impl World {
     }
 
     /** Print overview of (selected) wusel to std::out.*/
-    pub fn wusel_show_overview(self: &Self, wusel_index: usize) {
+    pub fn wusel_show_overview(&self, wusel_index: usize) {
         /* No wusel is there to show. */
         if wusel_index >= self.wusels_on_pos.len() {
             println!("There is no wusel to show.");
@@ -681,7 +674,7 @@ impl World {
 
     /** Show all relations for a wusel, given by index.
      * Prints directly to std::out. */
-    pub fn wusel_show_relations(self: &Self, wusel_index: usize) {
+    pub fn wusel_show_relations(&self, wusel_index: usize) {
         if wusel_index >= self.wusels_on_pos.len() {
             println!("There is no wusel to show.");
             return;
@@ -720,10 +713,10 @@ impl World {
             print!("Has no relations.");
         }
 
-        println!("");
+        println!();
     }
 
-    pub fn wusel_get_tasklist(self: &mut Self, wusel_id: usize) -> Vec<String> {
+    pub fn wusel_get_tasklist(&mut self, wusel_id: usize) -> Vec<String> {
         if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
             self.wusels_on_pos[index].wusel.get_tasklist()
         } else {
@@ -731,12 +724,12 @@ impl World {
         }
     }
 
-    pub fn wusel_get_need_full(self: &mut Self, need: Need) -> u32 {
+    pub fn wusel_get_need_full(&mut self, need: Need) -> u32 {
         Wusel::default_need_full(&need)
     }
 
     /** Get the wusel's need. */
-    pub fn wusel_get_need(self: &mut Self, wusel_id: usize, need: Need) -> u32 {
+    pub fn wusel_get_need(&mut self, wusel_id: usize, need: Need) -> u32 {
         if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
             self.wusels_on_pos[index].wusel.get_need(need)
         } else {
@@ -745,19 +738,19 @@ impl World {
     }
 
     /** Set the wusel's need to a new value. */
-    pub fn wusel_set_need(self: &mut Self, wusel_id: usize, need: &Need, new_value: u32) {
+    pub fn wusel_set_need(&mut self, wusel_id: usize, need: &Need, new_value: u32) {
         if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
             self.wusels_on_pos[index].wusel.set_need(*need, new_value);
         }
     }
 
     /** Get the world's current time. */
-    pub fn get_time(self: &Self) -> usize {
+    pub fn get_time(&self) -> usize {
         self.clock
     }
 
     /** Increase clock and proceed decay of all things and relations. */
-    pub fn tick(self: &mut Self) {
+    pub fn tick(&mut self) {
         self.clock += 1;
 
         /* A new day is over: Forward the day structure to the world. */
@@ -768,14 +761,13 @@ impl World {
         let mut dying_wusels: Vec<usize> = vec![];
 
         /* Decay on every object and living. */
-        let mut i: usize = 0;
-        for w in self.wusels_on_pos.iter_mut() {
+        for (i, w) in self.wusels_on_pos.iter_mut().enumerate() {
             /* Watch all tasks, remove tasks, which may be aborted or ran out. */
             w.wusel.auto_clean_tasks();
 
             /* Peek into the ongoing task, and maybe proceed them.
              * This may lead to remove the done task. */
-            if w.wusel.tasklist.len() > 0 {
+            if !w.wusel.tasklist.is_empty() {
                 some_busy_wusel.push(i);
             } else {
                 /* Wusel is currently not busy. => maybe apply an idle/auto task. */
@@ -802,8 +794,6 @@ impl World {
             if !alive {
                 dying_wusels.push(i);
             }
-
-            i += 1;
         }
 
         /* Execute ongoing tasks, unmutable wusel context.. */
@@ -872,13 +862,9 @@ impl World {
                         None => true,
 
                         /* Other party is busy. */
-                        Some(t) => match t.passive_part {
-                            /* => Do not end (proceed), since the other party is still meeting with this actor. */
-                            TaskTag::MeetWith(id, _nice, _love) if id == actor_id => false,
-
-                            /* => proceed task, other party is busy with sth else. */
-                            _ => true,
-                        },
+                        Some(t) => {
+                            !matches!(t.passive_part, TaskTag::MeetWith(id, _nice, _love) if id == actor_id)
+                        }
                     }
                 } else {
                     /* => proceed, since the other party was invalid. */
@@ -986,7 +972,7 @@ impl World {
      *
      * #Return, if they actually met (true), or only preconditions needed to be satisfied (false). */
     fn let_two_wusels_meet(
-        self: &mut Self,
+        &mut self,
         active_index: usize,
         passive_index: usize,
         intention_good: bool,
@@ -1024,19 +1010,15 @@ impl World {
         /* Get the passive wusel's current task.
          * If it is being met by the active, succeed a step with the meeting,
          * otherwise see below. */
-        let passives_ongoing_tasktag: Option<TaskTag> =
-            if let Some(t) = self.wusels_on_pos[passive_index].wusel.peek_ongoing_task() {
-                Some(t.passive_part.clone())
-            } else {
-                None
-            };
+        let passives_ongoing_tasktag: Option<TaskTag> = self.wusels_on_pos[passive_index]
+            .wusel
+            .peek_ongoing_task()
+            .map(|t| t.passive_part.clone());
 
         let active_is_met = &TaskTag::BeMetFrom(active_id);
 
-        let handshake_okay = match &passives_ongoing_tasktag {
-            Some(tag) if *tag == *active_is_met => true,
-            _ => false,
-        };
+        let handshake_okay =
+            matches!(&passives_ongoing_tasktag, Some(tag) if *tag == *active_is_met);
 
         if handshake_okay {
             let performance: bool; // how well is the communication
@@ -1063,10 +1045,7 @@ impl World {
             .has_task_with(active_is_met);
 
         /* Check if they both want an (actively) Meeting each other. */
-        let mutuall_meeting_as_actives = match &passives_ongoing_tasktag {
-            Some(TaskTag::MeetWith(id, _, _)) if *id == active_id => true,
-            _ => false,
-        };
+        let mutuall_meeting_as_actives = matches!(&passives_ongoing_tasktag, Some(TaskTag::MeetWith(id, _, _)) if *id == active_id);
 
         /* They are blocking each other by waiting.
          * A: "I want to talk with you, but wait until you're done with your task."
@@ -1157,7 +1136,7 @@ impl World {
         }
 
         /* If the passive target is not yet ready to talk, wait.  */
-        return Self::MEET_RESULT_WAITED;
+        Self::MEET_RESULT_WAITED
     }
 
     const TASK_HOLD: bool = false;
@@ -1182,7 +1161,7 @@ impl World {
      * - Wusel cannot `consume` some bread held by another wusel (shower placed).
      */
     fn let_wusel_use_object(
-        self: &mut Self,
+        &mut self,
         wusel_index: usize,
         object_index: usize,
         action_index: usize,
@@ -1312,7 +1291,7 @@ impl World {
     /** Let the wusel walk to a position, if they are not close.
      * Return true, if they are close enough. */
     fn let_wusel_walk_to_position_if_not_close(
-        self: &mut Self,
+        &mut self,
         wusel_index: usize,
         goal: Position,
         max_distance: f32,
@@ -1340,7 +1319,7 @@ impl World {
      * If the goal, is reached, the walk is done.
      *
      * #Return, if wusel has stopped walking / is on goal (true), otherwise true, if they are still walking. */
-    fn let_wusel_walk_to_position(self: &mut Self, wusel_index: usize, goal: Position) -> bool {
+    fn let_wusel_walk_to_position(&mut self, wusel_index: usize, goal: Position) -> bool {
         let pos = self.wusel_get_position(Some(wusel_index));
 
         if pos == None {
@@ -1368,7 +1347,7 @@ impl World {
             /* Get the current positions neighbours. */
             let neighbours = self.position_get_all_neighbours(pos);
 
-            if neighbours.len() < 1 {
+            if neighbours.is_empty() {
                 log::info!("Wusel cannot move, it's enclosed, wait forever");
                 return true;
             }
@@ -1379,7 +1358,7 @@ impl World {
 
             /* Find closest neighbour to goal. */
             for p in neighbours.iter() {
-                let distance = goal.distance_to(&p);
+                let distance = goal.distance_to(p);
 
                 if distance < closest_distance {
                     closest = *p;
@@ -1389,17 +1368,17 @@ impl World {
 
             /* move to closest position. */
             self.wusel_set_position(wusel_index, closest);
-            return false; // still walking.
+            false // still walking.
         } else {
             /* Calculate the path and go it next time. */
             log::info!("Calculate the path to {:?}", goal);
-            return false; // still walking.
+            false // still walking.
         }
     }
 
     /** Update the relation of two wusels, given by their ID. */
     pub fn wusel_update_relations(
-        self: &mut Self,
+        &mut self,
         wusel0_id: usize,
         wusel1_id: usize,
         nice: bool,
@@ -1452,21 +1431,21 @@ impl Way {
         Self::SE, // south
     ];
     /** Get the offsets to walk, to get to the way point. */
-    pub fn as_direction_tuple(self: &Self) -> (i8, i8) {
+    pub fn as_direction_tuple(&self) -> (i8, i8) {
         match self {
             /* Go north. */
-            Way::NW => return (-1, 1),
-            Way::N => return (0, 1),
-            Way::NE => return (1, 1),
+            Way::NW => (-1, 1),
+            Way::N => (0, 1),
+            Way::NE => (1, 1),
 
             /* Stay on longitude. */
-            Way::W => return (-1, 0),
-            Way::E => return (1, 0),
+            Way::W => (-1, 0),
+            Way::E => (1, 0),
 
             /* Go south. */
-            Way::SW => return (-1, -1),
-            Way::S => return (0, -1),
-            Way::SE => return (1, -1),
+            Way::SW => (-1, -1),
+            Way::S => (0, -1),
+            Way::SE => (1, -1),
         }
     }
 }
@@ -1480,8 +1459,11 @@ pub enum ObjectType {
     Food,
 }
 
+type ObjectWithSubType = (ObjectType, ObjectSubtype);
+
 /** Identifier type (tuple) for an object. */
 type ObjectIdentifer = (ObjectType, ObjectSubtype, usize);
+
 type ObjectSubtype = &'static str; // String doesn't support Copy Trait, what is used for the TaskTag.
 
 /** A world object indicates an object in the world which is not a wusel. */
@@ -1506,6 +1488,7 @@ pub enum Where {
 /** A Recipe is a list of required abilities, consumables or positions
  * to create a certain product after a certain time.
  * Recipe: [ components, Workstation ] + Time => Product. */
+#[allow(dead_code)]
 struct Recipe {
     id: usize,
     product: usize,
@@ -1558,7 +1541,7 @@ impl Relation {
     pub const RELATION_ROMANCE: char = '\u{2661}'; // heart
 
     /** Print this relation to a String. */
-    pub fn show(self: &Self) -> String {
+    pub fn show(&self) -> String {
         format!(
             "'{official}' {rel_f}{friendly} {rel_r}{romance}{kinship}",
             official = self.officially,
@@ -1616,8 +1599,8 @@ impl Need {
         0, /*health*/ // by outer sources
     ];
 
-    pub fn name(self: &Self) -> &str {
-        return match self {
+    pub fn name(&self) -> &str {
+        match self {
             Self::WATER => "water",
             Self::FOOD => "food",
             Self::WARMTH => "warmth",
@@ -1625,16 +1608,16 @@ impl Need {
             Self::HEALTH => "health",
             Self::LOVE => "love",
             Self::FUN => "fun",
-        };
+        }
     }
 
-    pub fn get_default_decay(self: &Self) -> u32 {
+    pub fn get_default_decay(&self) -> u32 {
         for i in 0..Self::VALUES.len() {
             if self == &Self::VALUES[i] {
                 return Self::DEFAULT_NEED_DECAY_PER_MINUTE[i];
             }
         }
-        return 0; // default: no decay.
+        0 // default: no decay.
     }
 }
 
@@ -1648,13 +1631,13 @@ pub enum Ability {
 }
 
 impl Ability {
-    fn name(self: &Self) -> &str {
-        return match self {
+    fn name(&self) -> &str {
+        match self {
             Self::COOKING => "cooking",
             Self::COMMUNICATION => "communication",
             Self::FITNESS => "fitness",
             Self::FINESSE => "finesse",
-        };
+        }
     }
 }
 
@@ -1671,7 +1654,7 @@ impl TaskBuilder {
     /** Create a new Task Builder. */
     pub fn new(name: String) -> Self {
         Self {
-            name: name,
+            name,
             duration: 0,
             passive_part: TaskTag::WaitLike,
         }
@@ -1715,33 +1698,33 @@ impl TaskBuilder {
 
     /** Get the name of the future task or all then created tasks. */
     #[allow(dead_code)]
-    pub fn get_name(self: &Self) -> String {
+    pub fn get_name(&self) -> String {
         self.name.clone()
     }
 
     /** Get the duration of the future task or all then created tasks. */
     #[allow(dead_code)]
-    pub fn get_duration(self: &Self) -> usize {
+    pub fn get_duration(&self) -> usize {
         self.duration
     }
 
     /** Rename the task builder in the Task Builder. */
     pub fn set_name(mut self, name: String) -> Self {
         self.name = name;
-        return self;
+        self
     }
 
     /** Set the duration in the Task Builder. */
     pub fn set_duration(mut self, time: usize) -> Self {
         self.duration = time;
-        return self;
+        self
     }
 
     /** Set the duration in the passive part. */
     #[allow(dead_code)]
     pub fn set_passive_part(mut self, passive: TaskTag) -> Self {
         self.passive_part = passive;
-        return self;
+        self
     }
 
     /** Create a new Task from the builder for the requesting [actor](Wusel). */
@@ -1749,7 +1732,7 @@ impl TaskBuilder {
         Task {
             name: self.name,
             started: false,
-            start_time: start_time,
+            start_time,
             duration: self.duration,
             done_steps: 0,
 
@@ -1787,7 +1770,7 @@ impl Task {
     const PATIENCE_TO_MEET: usize = 20; // TODO
 
     /** Get the approximately rest time (in ticks), this task needs. */
-    fn get_rest_time(self: &Self) -> usize {
+    fn get_rest_time(&self) -> usize {
         self.duration - self.done_steps
     }
 }
@@ -1855,18 +1838,19 @@ impl Wusel {
             new.needs.push((*n, *full));
         }
 
-        return new;
+        new
     }
 
-    fn get_id(self: &Self) -> usize {
-        return self.id;
+    #[allow(dead_code)]
+    fn get_id(&self) -> usize {
+        self.id
     }
 
     /** Tick one unit.
      * Reduce the satisfaction of each needs by default values.
      * Maybe let it age one day.
      * @return if the wusel is still alive in the end. */
-    fn wusel_tick(self: &mut Self, add_day: bool) -> bool {
+    fn wusel_tick(&mut self, add_day: bool) -> bool {
         /* If in action, need changes may also apply, eg. eating. */
         // self.act(); // proceed on task, if tasklist is providing one.
 
@@ -1886,11 +1870,11 @@ impl Wusel {
             self.add_new_day()
         }
 
-        return self.is_alive();
+        self.is_alive()
     }
 
     /** Count a new day to the lived lived. */
-    fn add_new_day(self: &mut Self) {
+    fn add_new_day(&mut self) {
         if self.is_alive() {
             /* Age one day. */
             self.lived_days += 1;
@@ -1910,20 +1894,17 @@ impl Wusel {
     }
 
     /** Check, if this Wusel is alive. */
-    fn is_alive(self: &Self) -> bool {
-        return match self.life {
-            Life::ALIVE => true, // all but alive are not alive.
-            _ => false,
-        };
+    fn is_alive(&self) -> bool {
+        matches!(self.life, Life::ALIVE)
     }
 
     /** Get name of the Wusel. */
-    fn get_name(self: &Self) -> String {
+    fn get_name(&self) -> String {
         self.name.clone()
     }
 
     /** Show the name, gender and age. */
-    fn show(self: &Self) -> String {
+    fn show(&self) -> String {
         /* The name */
         let mut string = self.name.clone();
         string.push(' ');
@@ -1940,18 +1921,18 @@ impl Wusel {
 
         /* Show life and age. */
         match self.life {
-            Life::ALIVE => println!(""),
+            Life::ALIVE => println!(),
             Life::DEAD => println!("dead, "),
             Life::GHOST => println!("ghost, "),
         }
         string.push_str(&self.lived_days.to_string());
         string.push_str("d)"); // days
 
-        return string;
+        string
     }
 
     /** Show collected data. */
-    fn show_overview(self: &Self) -> String {
+    fn show_overview(&self) -> String {
         let mut s = format!("==={:=<40}\n", "");
 
         s += &format!("  {}\n", self.show());
@@ -1967,11 +1948,11 @@ impl Wusel {
         // TODO (2020-11-16) show relations.
         s += &format!("{:_<43}\n", "");
 
-        return s;
+        s
     }
 
     /** Print the tasklist (as queue). */
-    fn get_tasklist(self: &Self) -> Vec<String> {
+    fn get_tasklist(&self) -> Vec<String> {
         return self
             .tasklist
             .iter()
@@ -1980,7 +1961,7 @@ impl Wusel {
     }
 
     /** Print the Wusel's abilities. */
-    fn show_abilities(self: &Self) -> String {
+    fn show_abilities(&self) -> String {
         let mut s = String::new();
         for (ability, value) in &self.abilities {
             s += &format!(
@@ -1990,7 +1971,7 @@ impl Wusel {
                 bar = ""
             );
         }
-        return s;
+        s
     }
 
     /** Get the default need value. */
@@ -2000,13 +1981,13 @@ impl Wusel {
                 return *v;
             }
         }
-        return 0; // else return 0, if not an default need.
+        0 // else 0, if not an default need.
     }
 
     /** Get the value for a need.
      * This may append the needs with a new default value, if the need is not
      * yet inserted. */
-    fn get_need(self: &mut Self, need: Need) -> u32 {
+    fn get_need(&mut self, need: Need) -> u32 {
         /* Find the need and return the value. */
         let size: usize = self.needs.len();
         for i in 0..(size) {
@@ -2018,12 +1999,12 @@ impl Wusel {
         /* If not found: Append with default Need value. */
         let default: u32 = 0;
         self.needs.push((need, default));
-        return default;
+        default
     }
 
     /** Set the value for a need.
      * This may append the needs with the new given value. */
-    fn set_need(self: &mut Self, need: Need, new_value: u32) {
+    fn set_need(&mut self, need: Need, new_value: u32) {
         /* Find the need and change the value. */
         let size: usize = self.needs.len();
         for i in 0..(size) {
@@ -2040,7 +2021,7 @@ impl Wusel {
     /** Change the value for a need relatively.
      * This may create a new value, with default input changed by the change value.
      * @return the new value.*/
-    fn mod_need(self: &mut Self, need: Need, change_value: i16) -> u32 {
+    fn mod_need(&mut self, need: Need, change_value: i16) -> u32 {
         let current = self.get_need(need) as i64; // get current value (or default)
 
         let mut changed = current + (change_value as i64);
@@ -2050,11 +2031,12 @@ impl Wusel {
 
         self.set_need(need, changed as u32); // change the value.
 
-        return self.get_need(need); // return final need's value.
+        self.get_need(need) // final need's value.
     }
 
     /** Improve the given ability by one point. */
-    fn improve(self: &mut Self, ability: &Ability) {
+    #[allow(dead_code)]
+    fn improve(&mut self, ability: &Ability) {
         /* Improve the given ability. */
         for i in 0..(self.abilities.len()) {
             let (a, v) = self.abilities[i];
@@ -2068,7 +2050,7 @@ impl Wusel {
     }
 
     /** Get the value for a requested ability. */
-    pub fn get_ability(self: &Self, ability: &Ability) -> u32 {
+    pub fn get_ability(&self, ability: &Ability) -> u32 {
         for (a, v) in self.abilities.iter() {
             if a == ability {
                 return *v;
@@ -2078,14 +2060,14 @@ impl Wusel {
     }
 
     /** Append a new task to the task list. */
-    fn add_task(self: &mut Self, init_time: usize, task_builder: TaskBuilder) {
+    fn add_task(&mut self, init_time: usize, task_builder: TaskBuilder) {
         /* Task apply self as actor. */
         let task = task_builder.assign(init_time, self);
         self.tasklist.insert(0, task); // revert queue
     }
 
     /** Abort a task in the task list. */
-    fn abort_task(self: &mut Self, index: usize) {
+    fn abort_task(&mut self, index: usize) {
         if index < self.tasklist.len() {
             self.tasklist.remove(index);
         }
@@ -2094,7 +2076,7 @@ impl Wusel {
 
     /** Clean task list.
      * Remove ongoing tasks if there are no steps left. */
-    fn auto_clean_tasks(self: &mut Self) {
+    fn auto_clean_tasks(&mut self) {
         /* Remove ongoing task, if it is done. */
         while let Some(ongoing) = self.peek_ongoing_task() {
             if ongoing.get_rest_time() < 1 {
@@ -2106,24 +2088,24 @@ impl Wusel {
     }
 
     /** Check, if this wusel has a task with the requested passive tag. */
-    fn has_task_with(self: &Self, task_tag: &TaskTag) -> bool {
+    fn has_task_with(&self, task_tag: &TaskTag) -> bool {
         for t in self.tasklist.iter() {
             if t.passive_part == *task_tag {
                 return true;
             }
         }
-        return false;
+        false
     }
 
     /** Peek the ongoing task. */
-    fn peek_ongoing_task(self: &Self) -> Option<&Task> {
+    fn peek_ongoing_task(&self) -> Option<&Task> {
         self.tasklist.last()
     }
 
     /** Start the ongoing task.
      * This may set the started flag to true, if not yet set and maybe
      * updates the starting time. */
-    fn start_ongoing_task(self: &mut Self, start_time: usize) {
+    fn start_ongoing_task(&mut self, start_time: usize) {
         if let Some(t) = self.tasklist.last_mut() {
             if !t.started {
                 t.started = true;
@@ -2134,26 +2116,26 @@ impl Wusel {
 
     /** Notify the ongoing task, that its done steps are increased
      * This increases the optional ongoing tasks [done_steps](Task.done_steps). */
-    fn notify_ongoing_succeeded(self: &mut Self) {
+    fn notify_ongoing_succeeded(&mut self) {
         if let Some(ongoing) = self.tasklist.last_mut() {
             ongoing.done_steps += 1;
         }
     }
 
     /** Pop the ongoing task (queue reversed). */
-    fn pop_ongoing_task(self: &mut Self) -> Option<Task> {
+    fn pop_ongoing_task(&mut self) -> Option<Task> {
         self.tasklist.pop()
     }
 
     /** Check, if the wusel is pregnant. */
     #[allow(dead_code)]
-    pub fn is_pregnant(self: &Self) -> bool {
-        return self.pregnancy != None;
+    pub fn is_pregnant(&self) -> bool {
+        self.pregnancy != None
     }
 
     /** Get the remaining days of an possible Pregnancy. */
     #[allow(dead_code)]
-    pub fn get_remaining_pregnancy_days(self: &Self) -> Option<u8> {
+    pub fn get_remaining_pregnancy_days(&self) -> Option<u8> {
         if let Some((_father, days)) = self.pregnancy {
             Some(days)
         } else {
@@ -2271,7 +2253,7 @@ mod test {
                                                    // test_world.wusel_show_tasklist(i); // tasks
             }
 
-            if test_world.wusel_get_all_unbusy().len() > 1 {
+            if !test_world.wusel_get_all_unbusy().is_empty() {
                 log::debug!("Test world is done, to be busy.");
                 break;
             }
