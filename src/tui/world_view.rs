@@ -80,7 +80,7 @@ pub fn render_wusel_need_bar(
     position: core::ScreenPos,
     panel_width: u16,
     show_percentage: bool,
-    needs: Vec<(crate::life::world::Need, u32, u32)>,
+    needs: Vec<(crate::life::wusel::Need, u32, u32)>,
 ) {
     let draw_horizontal = true;
 

@@ -151,7 +151,7 @@ fn main() -> Result<(), std::io::Error> {
                         .unwrap_or_else(|| "No Name".to_string()),
                     world
                         .wusel_get_gender(*wusel_id as usize)
-                        .unwrap_or(life::world::WuselGender::Female)
+                        .unwrap_or(life::wusel::WuselGender::Female)
                         .to_char(),
                 );
                 // tui::world_view::render_wusel_tasklist(
@@ -159,7 +159,7 @@ fn main() -> Result<(), std::io::Error> {
                 //     world.wusel_get_tasklist(*wusel_id as usize),
                 // );
 
-                let needs: Vec<(life::world::Need, u32, u32)> = life::world::Need::VALUES
+                let needs: Vec<(life::wusel::Need, u32, u32)> = life::wusel::Need::VALUES
                     .iter()
                     .map(|need| {
                         (
@@ -191,21 +191,21 @@ fn main() -> Result<(), std::io::Error> {
                     /* Meet randomly with someone: Let [widx] meet [i], if i in [0..|w|). */
                     world.wusel_assign_task(
                         widx,
-                        life::world::TaskBuilder::meet_with(i, true, true).set_duration(10),
+                        life::tasks::TaskBuilder::meet_with(i, true, true).set_duration(10),
                     );
                 }
                 i if i >= wusel_len && i < 2 * wusel_len => {
                     /* Walk randomly somewhere, if i not an wusel index. */
                     world.wusel_assign_task(
                         widx,
-                        life::world::TaskBuilder::move_to(world.position_random()),
+                        life::tasks::TaskBuilder::move_to(world.position_random()),
                     );
                 }
                 i if i >= 2 * wusel_len && i < 3 * wusel_len => {
                     /* Interact with the object. */
                     world.wusel_assign_task(
                         widx,
-                        life::world::TaskBuilder::use_object(bibimbap_id, 0), // view
+                        life::tasks::TaskBuilder::use_object(bibimbap_id, 0), // view
                     );
                 }
                 _ => {} // do nothing randomly.
