@@ -11,6 +11,7 @@
 // use rand;
 // use std;
 // use termion;
+
 pub mod life;
 pub mod tui;
 pub mod util;
@@ -37,7 +38,7 @@ fn main() -> Result<(), std::io::Error> {
     };
 
     //clear on start.
-    tui::render_clear_all();
+    tui::general::render_clear_all();
 
     let (screen_width, screen_height) = match termion::terminal_size() {
         Ok((w, h)) => (w, h),
@@ -47,7 +48,7 @@ fn main() -> Result<(), std::io::Error> {
     let width: u32 = screen_width as u32 - (2 * 3);
     let height: u32 = (screen_height as u32) - (2 * 3) - 8; // minus gap for time.
 
-    let mut world: life::World = life::World::new(width, height);
+    let mut world: life::world::World = life::world::World::new(width, height);
     log::debug!(
         "Created a new world: w:{w}, h:{h}",
         w = world.get_width(),
@@ -58,7 +59,7 @@ fn main() -> Result<(), std::io::Error> {
     world.tick();
 
     for _ in 0..rand::random::<u8>() % 10 + 2 {
-        world.wusel_new_random(util::name_gen(rand::random::<usize>() % 13 + 2));
+        world.wusel_new_random(util::more_strings::name_gen(rand::random::<usize>() % 13 + 2));
     }
 
     /* Transportable bibimbap (korean food) */
@@ -74,27 +75,27 @@ fn main() -> Result<(), std::io::Error> {
     /* Draw the field and make some real automation. */
     let (w, h) = (world.get_width() as usize, world.get_depth() as usize);
 
-    let time_position: &tui::ScreenPos = &tui::ScreenPos {
+    let time_position: &tui::general::ScreenPos = &tui::general::ScreenPos {
         x: 1u16,
         y: h as u16 + 3,
     };
-    let timebar_position: &tui::ScreenPos = &tui::ScreenPos {
+    let timebar_position: &tui::general::ScreenPos = &tui::general::ScreenPos {
         x: w as u16 + 4,
         y: 1,
     };
-    let need_panel_position: &tui::ScreenPos = &tui::ScreenPos {
+    let need_panel_position: &tui::general::ScreenPos = &tui::general::ScreenPos {
         x: 2u16,
         y: h as u16 + 6,
     };
     let need_bar_width: u16 = 10;
     let need_panel_show_percentage: bool = true;
 
-    tui::render_clear_all();
+    tui::general::render_clear_all();
 
     // frame game field
-    tui::render_rectangle(
-        &tui::ScreenPos { x: 1, y: 1 },
-        &tui::ScreenPos {
+    tui::general::render_rectangle(
+        &tui::general::ScreenPos { x: 1, y: 1 },
+        &tui::general::ScreenPos {
             x: w as u16 + 2,
             y: h as u16 + 2,
         },
@@ -104,12 +105,12 @@ fn main() -> Result<(), std::io::Error> {
     );
 
     // frame need panel
-    tui::render_rectangle(
-        &tui::ScreenPos {
+    tui::general::render_rectangle(
+        &tui::general::ScreenPos {
             x: need_panel_position.x - 1,
             y: need_panel_position.y - 1,
         },
-        &tui::ScreenPos {
+        &tui::general::ScreenPos {
             x: need_panel_position.x + 9 + need_bar_width,
             y: need_panel_position.y + 7,
         },
@@ -124,7 +125,7 @@ fn main() -> Result<(), std::io::Error> {
 
         /* Tick the world, show time. */
         render_time(time_position, i, world.get_time());
-        tui::render_progres_bar(
+        tui::general::render_progres_bar(
             timebar_position,
             h as u16 + 3,
             false,
@@ -142,7 +143,7 @@ fn main() -> Result<(), std::io::Error> {
             let x_offset = wusel_offset as u16 * 23;
 
             if need_panel_position.x + x_offset + 20 < screen_width {
-                tui::cursor_to(&need_panel_position.right_by(x_offset).up_by(2));
+                tui::general::cursor_to(&need_panel_position.right_by(x_offset).up_by(2));
                 print!(
                     "{} ({})",
                     world
@@ -150,7 +151,7 @@ fn main() -> Result<(), std::io::Error> {
                         .unwrap_or_else(|| "No Name".to_string()),
                     world
                         .wusel_get_gender(*wusel_id as usize)
-                        .unwrap_or(life::WuselGender::Female)
+                        .unwrap_or(life::world::WuselGender::Female)
                         .to_char(),
                 );
                 // render_wusel_tasklist(
@@ -158,7 +159,7 @@ fn main() -> Result<(), std::io::Error> {
                 //     world.wusel_get_tasklist(*wusel_id as usize),
                 // );
 
-                let needs: Vec<(life::Need, u32, u32)> = life::Need::VALUES
+                let needs: Vec<(life::world::Need, u32, u32)> = life::world::Need::VALUES
                     .iter()
                     .map(|need| {
                         (
@@ -190,21 +191,21 @@ fn main() -> Result<(), std::io::Error> {
                     /* Meet randomly with someone: Let [widx] meet [i], if i in [0..|w|). */
                     world.wusel_assign_task(
                         widx,
-                        life::TaskBuilder::meet_with(i, true, true).set_duration(10),
+                        life::world::TaskBuilder::meet_with(i, true, true).set_duration(10),
                     );
                 }
                 i if i >= wusel_len && i < 2 * wusel_len => {
                     /* Walk randomly somewhere, if i not an wusel index. */
                     world.wusel_assign_task(
                         widx,
-                        life::TaskBuilder::move_to(world.position_random()),
+                        life::world::TaskBuilder::move_to(world.position_random()),
                     );
                 }
                 i if i >= 2 * wusel_len && i < 3 * wusel_len => {
                     /* Interact with the object. */
                     world.wusel_assign_task(
                         widx,
-                        life::TaskBuilder::use_object(bibimbap_id, 0), // view
+                        life::world::TaskBuilder::use_object(bibimbap_id, 0), // view
                     );
                 }
                 _ => {} // do nothing randomly.
@@ -214,17 +215,17 @@ fn main() -> Result<(), std::io::Error> {
         std::thread::sleep(step_sleep); // wait.
 
         // cursor to bottom.
-        tui::cursor_to(&tui::ScreenPos {
+        tui::general::cursor_to(&tui::general::ScreenPos {
             x: 1,
             y: screen_height,
         });
     }
 
     if clear_on_exit {
-        tui::render_reset(&tui::ScreenPos::START); // clear whole field.
+        tui::general::render_reset(&tui::general::ScreenPos::START); // clear whole field.
     }
 
-    tui::cursor_to(&tui::ScreenPos::START.down_by(screen_height));
+    tui::general::cursor_to(&tui::general::ScreenPos::START.down_by(screen_height));
     Ok(())
 }
 
@@ -234,10 +235,10 @@ fn get_render_for_position(
     char,
     Option<termion::color::Rgb>,
     Option<termion::color::Rgb>,
-    Option<Vec<tui::TextStyle>>,
+    Option<Vec<tui::general::TextStyle>>,
 ) {
     match c {
-        '\u{263A}'  => ('\u{263A}', Some(termion::color::Rgb(0, 0, 0)), None, Some(vec![tui::TextStyle::Bold])), // wusel, -- smiley, alternatively or w
+        '\u{263A}'  => ('\u{263A}', Some(termion::color::Rgb(0, 0, 0)), None, Some(vec![tui::general::TextStyle::Bold])), // wusel, -- smiley, alternatively or w
         '#'         => ('#', Some(termion::color::Rgb(000, 000, 000)), None, None), // construction, eg. wall
         'm'         => ('m', Some(termion::color::Rgb(99, 67, 14)), None, None), // furniture, eg. chair
         '*'         => ('*', Some(termion::color::Rgb(000, 000, 100)), None, None), // miscellaneous, eg. food
@@ -266,8 +267,8 @@ fn render_field(w: usize, positions: Vec<Vec<(char, usize)>>) {
         let (render_char, render_fg, render_bg, render_styles) = render_data;
 
         /* Draw position symbol. */
-        tui::render_spot(
-            &tui::ScreenPos { x, y },
+        tui::general::render_spot(
+            &tui::general::ScreenPos { x, y },
             render_char,
             render_fg,
             render_bg,
@@ -277,19 +278,19 @@ fn render_field(w: usize, positions: Vec<Vec<(char, usize)>>) {
         );
     }
 
-    tui::render_reset_colours();
+    tui::general::render_reset_colours();
 }
 
-fn render_time(position: &tui::ScreenPos, tick: usize, time: usize) {
-    tui::cursor_to(position);
+fn render_time(position: &tui::general::ScreenPos, tick: usize, time: usize) {
+    tui::general::cursor_to(position);
     print!(
         "{formatted_time}",
         formatted_time = format!("Step Counter: {} => Time: {}", tick, time)
     );
 }
 
-fn render_wusel_tasklist(position: tui::ScreenPos, tasklist: Vec<String>) {
-    tui::cursor_to(&position);
+fn render_wusel_tasklist(position: tui::general::ScreenPos, tasklist: Vec<String>) {
+    tui::general::cursor_to(&position);
     print!("> ");
     for task in tasklist {
         print!("[{task}] ", task = task);
@@ -298,10 +299,10 @@ fn render_wusel_tasklist(position: tui::ScreenPos, tasklist: Vec<String>) {
 
 /** Render a Need Panel. */
 fn render_wusel_need_bar(
-    position: tui::ScreenPos,
+    position: tui::general::ScreenPos,
     panel_width: u16,
     show_percentage: bool,
-    needs: Vec<(life::Need, u32, u32)>,
+    needs: Vec<(life::world::Need, u32, u32)>,
 ) {
     let draw_horizontal = true;
 
@@ -309,10 +310,10 @@ fn render_wusel_need_bar(
 
     for (offset, (need, need_full, need_now)) in needs.iter().enumerate() {
         let offset_u16 = offset as u16;
-        tui::cursor_to(&position.down_by(offset_u16));
+        tui::general::cursor_to(&position.down_by(offset_u16));
         print!("{title:9}", title = need.name());
 
-        tui::render_progres_bar(
+        tui::general::render_progres_bar(
             &bar_start.down_by(offset_u16),
             panel_width,
             show_percentage,
