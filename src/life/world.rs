@@ -6,6 +6,8 @@
 use crate::life::areas;
 use crate::life::tasks;
 use crate::life::wusel;
+use crate::life::objects;
+
 use rand;
 
 pub mod task_manager;
@@ -63,20 +65,20 @@ impl World {
             ],
             actions_effects: vec![
                 (
-                    (ObjectType::Food, "Bibimbap", 0),
+                    (objects::ObjectType::Food, "Bibimbap", 0),
                     0,
                     "View => Inspired.",
                     vec![],
                 ),
                 (
-                    (ObjectType::Food, "Bibimbap", 3),
+                    (objects::ObjectType::Food, "Bibimbap", 3),
                     0,
                     "Consume => Fed.",
                     vec![],
                 ),
-                ((ObjectType::Food, "Bread", 0), 0, "View => Teased.", vec![]),
+                ((objects::ObjectType::Food, "Bread", 0), 0, "View => Teased.", vec![]),
                 (
-                    (ObjectType::Food, "Bread", 0), // object type, subtype, any ID
+                    (objects::ObjectType::Food, "Bread", 0), // object type, subtype, any ID
                     3,                              // action id
                     "Consume => Fed.",              // effect description // placeholder
                     vec![(wusel::Need::WATER, -50), (wusel::Need::FOOD, 200)], // effect
@@ -165,7 +167,7 @@ impl World {
     }
 
     /* World Inventory. */
-    const WORLD_INVENTORY: Where = Where::StoredIn((ObjectType::Miscellaneous, "World-Storage", 0));
+    const WORLD_INVENTORY: Where = Where::StoredIn((objects::ObjectType::Miscellaneous, "World-Storage", 0));
 
     pub const TICKS_PER_DAY: usize = 2880; // 24h by 0.5 minutes
 
@@ -232,12 +234,12 @@ impl World {
     const CHAR_WUSEL: char = '\u{263A}'; // smiley, alternatively or w
 
     /** Get the character representing an object type. */
-    fn objecttype_as_char(t: ObjectType) -> char {
+    fn objecttype_as_char(t: objects::ObjectType) -> char {
         match t {
-            ObjectType::Construction => '#',  // '\u{1f4ba}', // wall
-            ObjectType::Furniture => 'm',     // '\u{1f4ba}', // chair
-            ObjectType::Miscellaneous => '*', // '\u{26ac}', // small circle
-            ObjectType::Food => 'ó',         // '\u{2615}', // hot beverage
+            objects::ObjectType::Construction => '#',  // '\u{1f4ba}', // wall
+            objects::ObjectType::Furniture => 'm',     // '\u{1f4ba}', // chair
+            objects::ObjectType::Miscellaneous => '*', // '\u{26ac}', // small circle
+            objects::ObjectType::Food => 'ó',         // '\u{2615}', // hot beverage
         }
     }
     /** Check all positions.
@@ -274,7 +276,7 @@ impl World {
     }
 
     /** From an object's ID to a grid (representation) ID. */
-    fn objectid_as_gridid(obj_id: &ObjectIdentifer) -> (char, usize) {
+    fn objectid_as_gridid(obj_id: &objects::ObjectIdentifer) -> (char, usize) {
         (Self::objecttype_as_char((*obj_id).0), (*obj_id).2)
     }
 
@@ -290,55 +292,33 @@ impl World {
      * Returns the new object's index for the world's objects. */
     pub fn object_new(
         &mut self,
-        subtyped_object: ObjectWithSubType,
+        subtyped_object: objects::ObjectWithSubType,
         name: String,
         transportable: bool,
         passable: bool,
         consumable_parts: Option<usize>,
         storage_capacity: usize,
-    ) -> (ObjectIdentifer, usize) {
+    ) -> (objects::ObjectIdentifer, usize) {
         let (obj_type, subtype) = subtyped_object;
 
-        /* Which object's counter to increase. */
-        let new_obj_count: usize = match obj_type {
-            ObjectType::Construction => {
-                // TODO (2021-01-21) ... construction such as walls.
-                // self.obj_count_furniture += 1;
-                // self.obj_count_furniture // increase and return.
-                1
-            }
-            ObjectType::Furniture => {
-                self.obj_count_furniture += 1;
-                self.obj_count_furniture // increase and return.
-            }
-            ObjectType::Food => {
-                self.obj_count_food += 1;
-                self.obj_count_food // increase and return.
-            }
-            ObjectType::Miscellaneous => {
-                self.obj_count_misc += 1;
-                self.obj_count_misc // increase and return.
-            }
-        };
-
-        /* Add the new object into the world active objects. */
-        self.objects.push(ExistingObject {
-            object: Box::new(Object {
-                name,
-                object_id: (obj_type, subtype, new_obj_count),
-                transportable,
-                passable,
-                consumable: consumable_parts,
-                storage_capacity,
-            }),
-            position: Self::WORLD_INVENTORY,
-        });
+       // /* Add the new object into the world active objects. */
+       self.objects.push(ExistingObject {
+           object: Box::new(objects::Object::new(
+               name,
+               obj_type, subtype,
+               transportable,
+               passable,
+               consumable_parts,
+               storage_capacity,
+           )),
+           position: Self::WORLD_INVENTORY,
+       });
 
         log::info!("New object created: {:?}", self.objects.last_mut());
 
         /* Return new ID and appended index. */
         (
-            self.objects.last_mut().unwrap().object.object_id,
+            self.objects.last_mut().unwrap().object.get_object_id(),
             self.objects.len() - 1,
         )
     }
@@ -349,9 +329,9 @@ impl World {
      *
      * Placed in a world inventory/storage first, can be placed in world.
      * Returns the new object's index for the world's objects. */
-    pub fn food_new(&mut self, name: ObjectSubtype, bites: usize) -> (ObjectIdentifer, usize) {
+    pub fn food_new(&mut self, name: objects::ObjectSubtype, bites: usize) -> (objects::ObjectIdentifer, usize) {
         self.object_new(
-            (ObjectType::Food, name),
+            (objects::ObjectType::Food, name),
             name.to_string(),
             true,
             true,
@@ -362,7 +342,7 @@ impl World {
 
     /** Duplicate a world object: Use all attributes, but change the ID
      * This will create a new object, currently in world's storage. */
-    pub fn object_duplicate(&mut self, base_index: usize) -> Option<(ObjectIdentifer, usize)> {
+    pub fn object_duplicate(&mut self, base_index: usize) -> Option<(objects::ObjectIdentifer, usize)> {
         /* Duplicate non existing?. */
         if base_index >= self.objects.len() {
             return None;
@@ -370,22 +350,22 @@ impl World {
 
         Some(self.object_new(
             (
-                (*self.objects[base_index].object).object_id.0, // obj type
-                (*self.objects[base_index].object).object_id.1, // obj sub-type
+                (*self.objects[base_index].object).get_object_id().0, // obj type
+                (*self.objects[base_index].object).get_object_id().1, // obj sub-type
             ),
-            (*self.objects[base_index].object).name.clone(),
-            (*self.objects[base_index].object).transportable,
-            (*self.objects[base_index].object).passable,
-            (*self.objects[base_index].object).consumable,
-            (*self.objects[base_index].object).storage_capacity,
+            (*self.objects[base_index].object).get_name(),
+            (*self.objects[base_index].object).is_transportable(),
+            (*self.objects[base_index].object).is_passable(),
+            (*self.objects[base_index].object).get_consumable(),
+            (*self.objects[base_index].object).get_storage_capacity(),
         ))
     }
 
     /** Find the optional index of an object, given by an ID. */
-    fn object_identifier_to_index(&self, object_id: ObjectIdentifer) -> Option<usize> {
+    fn object_identifier_to_index(&self, object_id: objects::ObjectIdentifer) -> Option<usize> {
         self.objects
             .iter()
-            .position(|o| o.object.object_id == object_id)
+            .position(|o| o.object.get_object_id() == object_id)
     }
 
     /** Get the optional position of an object, given by an index.
@@ -403,7 +383,7 @@ impl World {
 
     /** Get the optional position of an object, given by an ID.
      * If the position is held by a storage, get the pos of the storage. */
-    pub fn object_get_position(&self, object_id: ObjectIdentifer) -> Option<areas::Position> {
+    pub fn object_get_position(&self, object_id: objects::ObjectIdentifer) -> Option<areas::Position> {
         if let Some(object_index) = self.object_identifier_to_index(object_id) {
             self.object_index_get_position(object_index)
         } else {
@@ -412,7 +392,7 @@ impl World {
     }
 
     /** Place an object on a new position. */
-    pub fn object_set_position(&mut self, object_id: ObjectIdentifer, pos: areas::Position) {
+    pub fn object_set_position(&mut self, object_id: objects::ObjectIdentifer, pos: areas::Position) {
         if let Some(object_index) = self.object_identifier_to_index(object_id) {
             let position_index = self.position_to_index(pos);
             self.object_set_whereabouts(object_index, Where::AtPosition(position_index));
@@ -430,7 +410,7 @@ impl World {
         }
 
         let object = &self.objects[object_index]; // immutable.
-        let object_id = object.object.object_id;
+        let object_id = object.object.get_object_id();
 
         // positions: CHAR and ID.
         let obj_c = Self::objecttype_as_char(object_id.0); // super type
@@ -467,7 +447,7 @@ impl World {
         /* Remove from grid / positions, if available. */
         if let Where::AtPosition(pos_index) = wherefrom {
             if let Some(i) =
-                self.positions_find_index(*pos_index, &Self::objectid_as_gridid(&(obj.object_id)))
+                self.positions_find_index(*pos_index, &Self::objectid_as_gridid(&(obj.get_object_id())))
             {
                 self.positions[*pos_index].remove(i);
             }
@@ -835,42 +815,15 @@ struct WuselOnPosIdx {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Where {
     AtPosition(usize),         // position index
-    StoredIn(ObjectIdentifer), // storage ID (object ID of the storage)
+    StoredIn(objects::ObjectIdentifer), // storage ID (object ID of the storage)
     HeldBy(usize),             // held by a wusel (index)
 }
 
 /** (Private) Wrapping Objects and where abouts together. */
 #[derive(Debug)]
 struct ExistingObject {
-    object: Box<Object>,
+    object: Box<objects::Object>,
     position: Where,
-}
-
-/** Types of an object. */
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum ObjectType {
-    Construction,
-    Furniture,
-    Miscellaneous,
-    Food,
-}
-
-type ObjectWithSubType = (ObjectType, ObjectSubtype);
-
-/** Identifier type (tuple) for an object. */
-pub type ObjectIdentifer = (ObjectType, ObjectSubtype, usize);
-
-type ObjectSubtype = &'static str; // String doesn't support Copy Trait, what is used for the TaskTag.
-
-/** A world object indicates an object in the world which is not a wusel. */
-#[derive(Debug, Clone)]
-struct Object {
-    name: String,
-    object_id: ObjectIdentifer,
-    transportable: bool, // can be transported by a wusel, will also apply stotable
-    passable: bool,      // if true, wusel can walk over it's occupied place (if at position)
-    consumable: Option<usize>, // if None: cannot be consumed; if Some(bites): number of parts, that can be consumed
-    storage_capacity: usize,   // items that can be stored 0
 }
 
 /** A Recipe is a list of required abilities, consumables or positions

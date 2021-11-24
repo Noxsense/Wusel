@@ -116,7 +116,7 @@ pub fn proceed(world: &mut world::World, task: tasks::Task) {
             let object_index = world
                 .objects
                 .iter()
-                .position(|wo| wo.object.object_id == object_id);
+                .position(|wo| wo.object.get_object_id() == object_id);
 
             // TODO: get index for the given action ID.
             let action_index = if action_id >= world.actions.len() {
@@ -390,7 +390,7 @@ fn let_wusel_use_object(
     }
 
     let obj_where = &world.objects[object_index].position;
-    let obj_id = world.objects[object_index].object.object_id;
+    let obj_id = world.objects[object_index].object.get_object_id();
 
     /* Invalid action index. */
     if action_index >= world.actions.len() {
@@ -453,7 +453,7 @@ fn let_wusel_use_object(
             TASK_PROCEED // if not held, it cannot be dropped, but the wusel will be done, to drop the object.
         }
         "Consume" => {
-            let consumable = world.objects[object_index].object.consumable;
+            let consumable = world.objects[object_index].object.get_consumable();
             if consumable != None {
                 let left_over = consumable.unwrap();
                 log::debug!("Consume a part of the consumable object.");
@@ -463,7 +463,7 @@ fn let_wusel_use_object(
                     log::debug!("Consumable Object fully consumed.");
                     return TASK_PROCEED;
                 }
-                world.objects[object_index].object.consumable = Some(left_over - 1);
+                world.objects[object_index].object.set_consumable(Some(left_over - 1));
 
                 // return TASK_PROCEED;
                 return TASK_HOLD; // ddbug.

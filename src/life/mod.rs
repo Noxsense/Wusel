@@ -2,6 +2,7 @@ pub mod areas;
 pub mod tasks;
 pub mod world;
 pub mod wusel;
+pub mod objects;
 
 const MINUTE: u32 = 2; // ticks
 const HOUR: u32 = 60 * MINUTE; // ticks
