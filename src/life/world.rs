@@ -22,6 +22,7 @@ mod unit_tests;
 pub struct World {
     width: u32,
     depth: u32,
+    height: u32, // in leveln.
 
     area: areas::Area,
     position_upper_bound: usize,
@@ -58,12 +59,14 @@ impl World {
 
     /** Create a new world. */
     pub fn new(width: u32, depth: u32) -> Self {
-        let position_upper_bound: usize = (width * 1 * depth) as usize;
+        let height = 1;
+        let position_upper_bound: usize = (width * depth * height) as usize;
         Self {
             width,
             depth,
+            height,
 
-            area: areas::Area::new(areas::Position::new(0, 0), width, depth),
+            area: areas::Area::new(areas::Position::ROOT, width, depth, height),
             position_upper_bound,
             positions: vec![vec![]; position_upper_bound],
 
@@ -178,9 +181,14 @@ impl World {
         self.width
     }
 
-    /** Get height of the world. */
+    /** Get depth of the world. */
     pub fn get_depth(&self) -> u32 {
         self.depth
+    }
+
+    /** Get height of the world. */
+    pub fn get_height(&self) -> u32 {
+        self.height
     }
 
     pub fn get_dimensions(&self) -> (u32, u32, u32) {
@@ -188,7 +196,7 @@ impl World {
     }
 
     pub fn get_area(&self) -> areas::Area {
-        areas::Area::new(areas::Position::new(0, 0), self.width, self.depth)
+        self.area
     }
 
     /** Get the `positions` index for the requesting position (width, height).
@@ -200,12 +208,11 @@ impl World {
     /** Get the position tuple from the given index in this world. */
     fn position_from_index(&self, position_index: usize) -> Option<areas::Position> {
         if position_index < self.position_upper_bound {
-            Some(
-                areas::Position::new(
-                    position_index as u32 % self.width,
-                    position_index as u32 / self.width
-                    )
-                )
+            Some(areas::Position {
+                x:  position_index as u32 % self.width,
+                y: position_index as u32 / self.width,
+                z: 0
+            })
         } else {
             None
         }
@@ -304,19 +311,6 @@ impl World {
             self.positions[new_position_index].push(placetaker);
         }
 
-    }
-
-    /** Wusel char. */
-    const CHAR_WUSEL: char = '\u{263A}'; // smiley, alternatively or w
-
-    /** Get the character representing an object type. */
-    fn objecttype_as_char(t: objects::ObjectType) -> char {
-        match t {
-            objects::ObjectType::Construction => '#',  // '\u{1f4ba}', // wall
-            objects::ObjectType::Furniture => 'm',     // '\u{1f4ba}', // chair
-            objects::ObjectType::Miscellaneous => '*', // '\u{26ac}', // small circle
-            objects::ObjectType::Food => 'ó',         // '\u{2615}', // hot beverage
-        }
     }
 
     /** Create a new object to exist in this world.
@@ -528,10 +522,7 @@ impl World {
 
     pub fn wusel_new_random(&mut self, wusel_name: String) {
         let wusel_gender = wusel::WuselGender::random();
-        let wusel_position = areas::Position {
-            x: rand::random::<u32>() % self.get_width(),
-            y: rand::random::<u32>() % self.get_depth(),
-        };
+        let wusel_position = self.position_random();
         self.wusel_new(wusel_name, wusel_gender, wusel_position);
     }
 
@@ -576,7 +567,7 @@ impl World {
     fn wusel_set_position_by_index(&mut self, wusel_index: usize, position: areas::Position) {
         if self.check_valid_wusel_index(wusel_index) {
             let placetaker = PlaceTaker::Wusel(self.wusels_index_with_id[wusel_index]);
-            let old_position_index = self.wusels_index_on_position_index[wusel_index].clone();
+            let old_position_index = self.wusels_index_on_position_index[wusel_index];
             let new_position_index = self.position_to_index(position);
 
             self.wusels_index_on_position_index[wusel_index] = new_position_index;

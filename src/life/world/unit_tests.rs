@@ -217,7 +217,7 @@ fn wusel_test_assignment() {
 
     wusel0.assign_to_task(
         init_time,
-        tasks::TaskBuilder::move_to(areas::Position { x: 0, y: 4 }),
+        tasks::TaskBuilder::move_to(areas::Position { x: 0, y: 4 , z: 0}),
     );
     wusel0.assign_to_task(init_time, tasks::TaskBuilder::use_object(food1_id, 1));
     wusel0.assign_to_task(
@@ -232,9 +232,10 @@ fn wusel_test_assignment() {
 
     if let Some(task) = wusel0.peek_ongoing_task() {
         if let tasks::TaskTag::MoveToPos(pos) = task.get_passive_part() {
-            let areas::Position { x, y } = pos;
+            let areas::Position { x, y, z} = pos;
             assert_eq!(x, 0);
             assert_eq!(y, 4);
+            assert_eq!(z, 0);
         } else {
             assert!(false);
         }

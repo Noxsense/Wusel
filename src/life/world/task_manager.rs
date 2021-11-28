@@ -563,7 +563,7 @@ fn let_wusel_walk_to_position(
             return true;
         }
 
-        let goal: areas::Position = areas::Position::new(goal.x, goal.y);
+        let goal: areas::Position = areas::Position{ x: goal.x, y: goal.y, z: 0 };
         let mut closest: areas::Position = neighbours[0];
         let mut closest_distance: f32 = f32::MAX;
 
