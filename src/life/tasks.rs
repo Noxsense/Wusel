@@ -6,7 +6,7 @@
  */
 
 use crate::life::areas;
-use crate::life::world;
+#[allow(unused_imports)] use crate::life::world;
 use crate::life::wusel;
 use crate::life::objects;
 
@@ -50,7 +50,7 @@ impl TaskBuilder {
     }
 
     /** Create a new Task Builder, preset for working on a workbench. */
-    pub fn use_object(object_id: objects::ObjectIdentifer, action_id: ActionId) -> Self {
+    pub fn use_object(object_id: objects::ObjectId, action_id: ActionId) -> Self {
         Self {
             name: format!("Use[{}] Object[{:?}]", action_id, object_id),
             duration: 1,
@@ -118,7 +118,7 @@ pub enum TaskTag {
     WaitLike,
     MoveToPos(areas::Position),
 
-    UseObject(objects::ObjectIdentifer, ActionId), // object_id, and action_id
+    UseObject(objects::ObjectId, ActionId), // object_id, and action_id
 
     MeetWith(wusel::WuselId, bool, bool), // commute with another wusel (ID)
     BeMetFrom(wusel::WuselId),            // be met by another wusel (ID)
@@ -189,7 +189,7 @@ impl Task {
 
 // TODO (2021-11-21) improve type
 pub type ActionAffect = (
-    objects::ObjectIdentifer,  // affected object
+    objects::ObjectId,  // affected object
     usize,            // object subtype
     &'static str,     // name
     Vec<(wusel::Need, i16)>, // affected needs

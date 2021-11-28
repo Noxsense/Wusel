@@ -29,16 +29,16 @@ fn test_consume_bread() {
     /* Create food: transportable, no storage. */
     let food1 = test_world.food_new("Bread", 100);
 
-    let (food1_id, food1_index) = food1;
+    let food1_id = food1;
 
-    log::debug!("Test World's food created, index: {}.", food1_index);
+    log::debug!("Test World's food created, index: {}.", food1_id.1);
 
     let food2 = test_world.object_duplicate(0).unwrap(); // unsafe, but must be true.
 
-    let (food2_id, food2_index) = food2;
+    let food2_id = food2;
     test_world.object_set_position(food2_id, test_world.position_random());
 
-    log::debug!("Test World's food duplicated, index: {}.", food2_index);
+    log::debug!("Test World's food duplicated, index: {}.", food2_id.1);
 
     /* Put a copy into the world. */
     test_world.object_set_position(food1_id, test_world.position_random());

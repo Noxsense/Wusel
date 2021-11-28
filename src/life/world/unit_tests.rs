@@ -5,7 +5,7 @@ extern crate env_logger;
 use crate::life;
 use crate::life::areas;
 use crate::life::tasks;
-use crate::life::world;
+#[allow(unused_imports)] use crate::life::world;
 use crate::life::wusel;
 use crate::life::objects;
 
@@ -213,7 +213,7 @@ fn wusel_test_assignment() {
     let friendly = true;
     let romantically = true;
 
-    let food1_id: objects::ObjectIdentifer = (objects::ObjectType::Food, "Bread", 0); // (ObjectType, ObjectSubtype, 0);
+    let food1_id: objects::ObjectId = (objects::ObjectType::Food, "Bread", 0); // (ObjectType, ObjectSubtype, 0);
 
     wusel0.assign_to_task(
         init_time,

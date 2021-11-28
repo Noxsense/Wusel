@@ -21,7 +21,7 @@ pub fn proceed(world: &mut world::World, task: tasks::Task) {
     /* World proceeds task. */
 
     let actor_id = task.get_active_actor_id();
-    let actor_index = world.wusel_identifier_to_index(actor_id);
+    let actor_index = world.get_wusels_index_by_id(actor_id);
 
     if actor_index == None {
         return; // abort, because actor unavailable
@@ -33,9 +33,7 @@ pub fn proceed(world: &mut world::World, task: tasks::Task) {
         true => task.get_start_time(),
         false => {
             /* Notify the start of the task (for the wusel). */
-            world.wusels_on_pos[actor_id]
-                .wusel
-                .start_ongoing_task(world.clock);
+            world.wusels[actor_id].start_ongoing_task(world.clock);
 
             world.clock // starting now
         }
@@ -48,14 +46,14 @@ pub fn proceed(world: &mut world::World, task: tasks::Task) {
             true
         }
         tasks::TaskTag::BeMetFrom(other_id) => {
-            let other_index = world.wusel_identifier_to_index(other_id);
+            let other_index = world.get_wusels_index_by_id(other_id);
 
             /* Other wusel needs also to exist or still wants to meet.
              * Otherwise pop. */
 
             /* Meeting party is valid, check their ongoing task. */
             if let Some(other_index) = other_index {
-                match world.wusels_on_pos[other_index].wusel.peek_ongoing_task() {
+                match world.wusels[other_index].peek_ongoing_task() {
                     /* => Proceed, since the other party is doing nothing, so no meeting. */
                     None => true,
 
@@ -70,11 +68,11 @@ pub fn proceed(world: &mut world::World, task: tasks::Task) {
             }
         }
         tasks::TaskTag::MeetWith(other_id, nice, romantically) => {
-            let other_index = world.wusel_identifier_to_index(other_id);
+            let other_index = world.get_wusels_index_by_id(other_id);
 
             /* Other wusel needs also to exist. */
             if other_index == None {
-                world.wusels_on_pos[actor_index].wusel.pop_ongoing_task();
+                world.wusels[actor_index].pop_ongoing_task();
                 return; // task can not be done, without target.
             }
 
@@ -95,7 +93,7 @@ pub fn proceed(world: &mut world::World, task: tasks::Task) {
                 // waiting, but don't wait too long.
                 MEET_RESULT_WAITED => {
                     if world.clock - start_time >= tasks::Task::PATIENCE_TO_MEET {
-                        world.wusels_on_pos[actor_index].wusel.pop_ongoing_task();
+                        world.wusels[actor_index].pop_ongoing_task();
                     }
                     false // => do not notify succession
                 }
@@ -105,9 +103,9 @@ pub fn proceed(world: &mut world::World, task: tasks::Task) {
                 _ => false,             // => no process (FOLLOWED, KNOCKED or an unexpected)
             }
         }
-        tasks::TaskTag::MoveToPos(pos) => {
+        tasks::TaskTag::MoveToPos(position) => {
             /* Let the wusel walk; check if they stopped. */
-            let stopped: bool = let_wusel_walk_to_position(world, actor_index, pos);
+            let stopped: bool = let_wusel_walk_to_position(world, actor_index, position);
 
             stopped // true == stop == success.
         }
@@ -116,7 +114,7 @@ pub fn proceed(world: &mut world::World, task: tasks::Task) {
             let object_index = world
                 .objects
                 .iter()
-                .position(|wo| wo.object.get_object_id() == object_id);
+                .position(|wo| wo.get_object_id() == object_id);
 
             // TODO: get index for the given action ID.
             let action_index = if action_id >= world.actions.len() {
@@ -142,9 +140,7 @@ pub fn proceed(world: &mut world::World, task: tasks::Task) {
 
     /* Notify the task succeeded to do a step. */
     if succeeded {
-        world.wusels_on_pos[actor_index]
-            .wusel
-            .increase_ongoing_task_steps();
+        world.wusels[actor_index].increase_ongoing_task_steps();
     }
 }
 
@@ -172,38 +168,46 @@ fn let_two_wusels_meet(
 ) -> i8 {
     log::debug!(
         "Meet with {}, nice: {}.",
-        world.wusels_on_pos[passive_index].wusel.get_name(),
+        world.wusels[passive_index].get_name(),
         intention_good
     );
 
     /* If not close to the other wusel, use this step to get closer,
      * return as not yet ready. */
-    let pos_o = world.wusel_get_position(Some(passive_index));
+    let opt_passive_position_index = world.wusels_index_on_position_index.get(passive_index);
 
-    if pos_o == None {
+    if opt_passive_position_index.is_none() {
         return MEET_RESULT_ERROR; // No position.
     }
 
-    let pos_o = pos_o.unwrap();
+    let &passive_position_index = opt_passive_position_index.unwrap();
 
-    log::debug!("Meet at {:?}", pos_o);
+    let position_passive_wusel = world.position_from_index(passive_position_index);
+
+    if position_passive_wusel == None {
+        return MEET_RESULT_ERROR; // No position.
+    }
+
+    let position_passive_wusel = position_passive_wusel.unwrap();
+
+    log::debug!("Meet at {:?}", position_passive_wusel);
 
     /* If the actor is close enough, do the next steps. */
-    let following = let_wusel_walk_to_position_if_not_close(world, active_index, pos_o, 2.0);
+    let following = let_wusel_walk_to_position_if_not_close(world, active_index, position_passive_wusel, 2.0);
 
     /* Just followed. */
     if !following {
         return MEET_RESULT_FOLLOWED;
     }
 
-    let active_id = world.wusels_on_pos[active_index].wusel.get_id();
-    let passive_id = world.wusels_on_pos[passive_index].wusel.get_id();
+    let active_id = world.wusels[active_index].get_id();
+    let passive_id = world.wusels[passive_index].get_id();
 
     /* Get the passive wusel's current task.
      * If it is being met by the active, succeed a step with the meeting,
      * otherwise see below. */
-    let passives_ongoing_tasktag: Option<tasks::TaskTag> = world.wusels_on_pos[passive_index]
-        .wusel
+    let passives_ongoing_tasktag: Option<tasks::TaskTag>
+        = world.wusels[passive_index]
         .peek_ongoing_task()
         .map(|t| t.get_passive_part());
 
@@ -235,9 +239,8 @@ fn let_two_wusels_meet(
     }
 
     /* Check, if the passive is already waiting (in tasklist). */
-    let passive_is_waiting = world.wusels_on_pos[passive_index]
-        .wusel
-        .has_task_with(active_is_met);
+    let passive_is_waiting
+        = world.wusels[passive_index].has_task_with(active_is_met);
 
     /* Check if they both want an (actively) Meeting each other. */
     let mutuall_meeting_as_actives = matches!(&passives_ongoing_tasktag, Some(tasks::TaskTag::MeetWith(id, _, _)) if *id == active_id);
@@ -255,17 +258,15 @@ fn let_two_wusels_meet(
 
         let already_waiting_index = match 0 {
             _p if passive_is_waiting => passive_index,
-            _a if world.wusels_on_pos[active_index]
-                .wusel
-                .has_task_with(&tasks::TaskTag::BeMetFrom(passive_id)) =>
+            _a if world.wusels[active_index].has_task_with(&tasks::TaskTag::BeMetFrom(passive_id)) =>
             {
                 active_index
             }
-            _ => world.wusels_on_pos.len(),
+            _ => world.wusels.len(),
         };
 
         /* Move already waiting task to active tasks. */
-        if already_waiting_index < world.wusels_on_pos.len() {
+        if already_waiting_index < world.wusels.len() {
             /* What happens:
              * A: [Talk B, tasks::Task A2, tasks::Task A3]
              * B: [Talk A, tasks::Task B3, Listen A] // B already knows.
@@ -273,13 +274,11 @@ fn let_two_wusels_meet(
              * A: [Talk B, tasks::Task A2, tasks::Task A3]
              * B: [Listen A, Talk A, tasks::Task B2, tasks::Task B3] // let B listen first.
              */
-            let waiting_task_index_opt = world.wusels_on_pos[already_waiting_index]
-                .wusel
+            let waiting_task_index_opt = world.wusels[already_waiting_index]
                 .get_next_task_index_with(&|task| task.get_passive_part() == *active_is_met);
 
             if let Some(waiting_task_index) = waiting_task_index_opt {
-                world.wusels_on_pos[already_waiting_index]
-                    .wusel
+                world.wusels[already_waiting_index]
                     .prioritize_task(waiting_task_index);
             }
 
@@ -292,8 +291,8 @@ fn let_two_wusels_meet(
          * (No waiting-to-be-met needs to be deleted.) */
 
         let skill = wusel::Ability::COMMUNICATION;
-        let c0 = world.wusels_on_pos[active_index].wusel.get_ability(skill);
-        let c1 = world.wusels_on_pos[passive_index].wusel.get_ability(skill);
+        let c0 = world.wusels[active_index].get_ability(skill);
+        let c1 = world.wusels[passive_index].get_ability(skill);
 
         let (more_active, more_passive) = match c0 {
             better if better > c1 => (active_index, passive_index),
@@ -351,11 +350,11 @@ fn let_wusel_use_object(
     action_index: usize,
 ) -> bool {
     /* Invalid wusel index. */
-    if wusel_index >= world.wusels_on_pos.len() {
+    if !world.check_valid_wusel_index(wusel_index) {
         return false;
     }
 
-    let wusel_id = world.wusels_on_pos[wusel_index].wusel.get_id();
+    let wusel_id = world.wusels[wusel_index].get_id();
 
     /* Invalid object index. */
     if object_index >= world.objects.len() {
@@ -363,34 +362,45 @@ fn let_wusel_use_object(
         return false;
     }
 
+    let opt_object_id
+        = world.objects
+        .get(object_index)
+        .map(|object| object.get_object_id());
+
+    if opt_object_id.is_none() {
+        log::warn!("No such object.");
+        return false;
+    }
+
+    let object_id = opt_object_id.unwrap();
+
     /* Check where the object is.
-     * If AtPosition(pos) => go to position (pos).
+     * If AtPosition(position) => go to position (position).
      * If StoredIn(storage) => get from storage.
      * If HeldBy(holder_id) => holder_id ==~ wusel_id => ok, else abort. */
-    let obj_pos = world.object_index_get_position(object_index);
+    let object_position = world.object_get_position(object_id);
 
     /* If not close to object, go to it. */
-    let close_enough = if let Some(obj_pos) = obj_pos {
+    let close_enough = if let Some(object_position) = object_position {
         log::debug!("Go to object's position.");
         let_wusel_walk_to_position_if_not_close(
             world,
             wusel_index,
-            obj_pos, // current object position.
+            object_position, // current object position.
             1.2,     // max distance.
         )
     } else {
         false
     };
 
-    let obj_pos = obj_pos.unwrap();
-    let obj_pos_index = world.position_to_index(obj_pos);
+    let object_position = object_position.unwrap();
+    let object_position_index = world.position_to_index(object_position);
 
     if !close_enough {
         return false;
     }
 
-    let obj_where = &world.objects[object_index].position;
-    let obj_id = world.objects[object_index].object.get_object_id();
+    let object_whereabouts = &world.objects_index_with_whereabouts.get(object_index).unwrap_or(&(world::InWorld::Nowhere));
 
     /* Invalid action index. */
     if action_index >= world.actions.len() {
@@ -406,8 +416,8 @@ fn let_wusel_use_object(
 
     /* Get the effect of interacting with the object. */
     let effect = world.actions_effects.iter().find(
-        |((obj_type, obj_subtype, _), act_id, _effect_str, _effect_vec)| {
-            *obj_type == obj_id.0 && *obj_subtype == obj_id.1 && *act_id == action_index
+        |((object_type, object_subtype, _), act_id, _effect_str, _effect_vec)| {
+            *object_type == object_id.0 && *object_subtype == object_id.1 && *act_id == action_index
         },
     );
 
@@ -416,9 +426,7 @@ fn let_wusel_use_object(
         let (_, _, _, effect_vec) = effect;
         for e in effect_vec {
             log::debug!("- Apply effect: {:?}", e);
-            world.wusels_on_pos[wusel_index]
-                .wusel
-                .set_need_relative(e.0, e.1);
+            world.wusels[wusel_index].set_need_relative(e.0, e.1);
         }
     }
 
@@ -430,22 +438,23 @@ fn let_wusel_use_object(
             TASK_PROCEED
         }
         "Take" => {
-            if let world::Where::AtPosition(_) | world::Where::StoredIn(_) = obj_where {
+            // if close, or already holding. => update whereabouts and TASK_PROCEED
+            if let world::InWorld::OnPositionIndex(_) | world::InWorld::InStorageId(_) = object_whereabouts {
                 log::info!("Get it, if possible.");
-                world.object_set_whereabouts(object_index, world::Where::HeldBy(wusel_id));
+                world.object_set_whereabouts(object_index, world::InWorld::HeldByWuselId(wusel_id));
                 return TASK_PROCEED;
             }
             log::warn!("Item is already hold, just look and stop.");
             TASK_PROCEED // if already held, cannot be held, but just stop to do so.
         }
         "Drop" => {
-            if let world::Where::HeldBy(holder_id) = *obj_where {
-                if holder_id == wusel_id {
+            if let world::InWorld::HeldByWuselId(holder_id) = object_whereabouts {
+                if *holder_id == wusel_id {
                     log::info!("Drop it, if held by wusel themself.");
                     world.object_set_whereabouts(
                         object_index,
-                        world::Where::AtPosition(obj_pos_index),
-                    ); // == wusel_pos, as pos of all containers
+                        world::InWorld::OnPositionIndex(object_position_index),
+                    ); // == wusel_position, as position of all containers
                     log::debug!("Object placed, somewhere.");
                     return TASK_PROCEED;
                 }
@@ -453,7 +462,7 @@ fn let_wusel_use_object(
             TASK_PROCEED // if not held, it cannot be dropped, but the wusel will be done, to drop the object.
         }
         "Consume" => {
-            let consumable = world.objects[object_index].object.get_consumable();
+            let consumable = world.objects[object_index].get_consumable();
             if consumable != None {
                 let left_over = consumable.unwrap();
                 log::debug!("Consume a part of the consumable object.");
@@ -463,7 +472,7 @@ fn let_wusel_use_object(
                     log::debug!("Consumable Object fully consumed.");
                     return TASK_PROCEED;
                 }
-                world.objects[object_index].object.set_consumable(Some(left_over - 1));
+                world.objects[object_index].set_consumable(Some(left_over - 1));
 
                 // return TASK_PROCEED;
                 return TASK_HOLD; // ddbug.
@@ -486,15 +495,18 @@ fn let_wusel_walk_to_position_if_not_close(
     goal: areas::Position,
     max_distance: f32,
 ) -> bool {
-    let wpos = world.wusel_get_position(Some(wusel_index));
+    let wusel_position
+        = world.wusels_index_on_position_index.get(wusel_index)
+        .map(|&position_index| world.position_from_index(position_index))
+        .map(|opt_opt_position| opt_opt_position.unwrap());
 
-    if wpos == None {
+    if wusel_position == None {
         return false; // wusel itself has no position.
     }
 
-    let wpos = wpos.unwrap();
+    let wusel_position = wusel_position.unwrap();
 
-    if wpos.distance_to(&goal) > max_distance {
+    if wusel_position.distance_to(&goal) > max_distance {
         let_wusel_walk_to_position(world, wusel_index, goal);
         false // just walked
     } else {
@@ -514,16 +526,21 @@ fn let_wusel_walk_to_position(
     wusel_index: usize,
     goal: areas::Position,
 ) -> bool {
-    let pos = world.wusel_get_position(Some(wusel_index));
 
-    if pos == None {
+    let position
+        = world.wusels_index_on_position_index.get(wusel_index)
+        .map(|&position_index| world.position_from_index(position_index))
+        .map(|opt_opt_position| opt_opt_position.unwrap())
+        ;
+
+    if position == None {
         return true; // couldn't move => stopped walking.
     }
 
-    let pos = pos.unwrap();
+    let position = position.unwrap();
 
     /* Check if the goal is already reached. */
-    if pos.x == goal.x && pos.y == goal.y {
+    if position.x == goal.x && position.y == goal.y {
         log::info!("Reached Goal ({},{}).", goal.x, goal.y);
         return true; // stopped walking.
     }
@@ -539,7 +556,7 @@ fn let_wusel_walk_to_position(
         // XXX easy placeholder walking, ignoring all obstacles.
 
         /* Get the current positions neighbours. */
-        let neighbours = world.position_get_all_neighbours(pos);
+        let neighbours = world.position_get_all_neighbours(position);
 
         if neighbours.is_empty() {
             log::info!("Wusel cannot move, it's enclosed, wait forever");

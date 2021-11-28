@@ -14,76 +14,78 @@ pub mod task_manager;
 mod task_test;
 mod unit_tests;
 
+// TODO (2021-11-25) refactor the way something is stored in the world.
+// TODO (2021-11-25) refactor how to peek into the world.
+// TODO (2021-11-27) handler: life to life manager, positional things by world.
+
 /** The place of existence, time and relations. */
 pub struct World {
     width: u32,
     depth: u32,
-    positions: Vec<Vec<(char, usize)>>, // all positions [height x width] contain a vector of ids and type/set indicators.
+
+    area: areas::Area,
+    position_upper_bound: usize,
+    positions: Vec<Vec<PlaceTaker>>,
 
     clock: usize, // time of the world.
 
-    // wusels the main live force in here
-    wusels_alltime_count: usize, // coount of all ever created wusels
-    wusels_on_pos: Vec<WuselOnPosIdx>, // vector of [ wusels, their positions ]
+    sequential_wusel_id: usize,
 
-    relations: std::collections::BTreeMap<(usize, usize), wusel::Relation>, // vector of wusel relations
+    // all currently living wusel in map.
+    wusels: Vec<wusel::Wusel>,
+    wusels_index_with_id: Vec<usize>,
+    wusels_index_on_position_index: Vec<usize>,
 
-    // wall or furniture or miscellaneous.
-    objects: Vec<ExistingObject>,
-    obj_count_furniture: usize, // all ever created furniture objects
-    obj_count_misc: usize,      // all ever created miscellaneous objects
-    obj_count_food: usize,      // all ever created food objects
+    sequential_object_id: usize,
 
+    // all current object instances in world.
+    objects: Vec<objects::Object>,
+    objects_index_with_id: Vec<objects::ObjectId>,
+    objects_index_with_whereabouts: Vec<InWorld>,
+
+    // actions in this world.
     actions: Vec<String>,                      // actions to do.
     actions_effects: Vec<tasks::ActionAffect>, // how various actions on various objects may influence
+
+    // more world information ...
+
+    dead_wusels: Vec<wusel::Wusel>,
+    relations: std::collections::BTreeMap<(usize, usize), wusel::Relation>, // vector of wusel relations
+
 }
 
 impl World {
+
     /** Create a new world. */
     pub fn new(width: u32, depth: u32) -> Self {
+        let position_upper_bound: usize = (width * 1 * depth) as usize;
         Self {
             width,
             depth,
-            positions: vec![vec![]; width as usize * depth as usize],
+
+            area: areas::Area::new(areas::Position::new(0, 0), width, depth),
+            position_upper_bound,
+            positions: vec![vec![]; position_upper_bound],
 
             clock: 0,
 
-            wusels_alltime_count: 0,
-            wusels_on_pos: vec![],
-            relations: std::collections::BTreeMap::new(),
+            sequential_wusel_id: 0,
+
+            wusels: vec![],
+            wusels_index_with_id: vec![],
+            wusels_index_on_position_index: vec![],
+
+            sequential_object_id: 0,
 
             objects: vec![],
-            obj_count_furniture: 0,
-            obj_count_misc: 0,
-            obj_count_food: 0,
+            objects_index_with_id: vec![],
+            objects_index_with_whereabouts: vec![],
 
-            actions: vec![
-                String::from("View"),
-                String::from("Take"),
-                String::from("Drop"),
-                String::from("Consume"),
-            ],
-            actions_effects: vec![
-                (
-                    (objects::ObjectType::Food, "Bibimbap", 0),
-                    0,
-                    "View => Inspired.",
-                    vec![],
-                ),
-                (
-                    (objects::ObjectType::Food, "Bibimbap", 3),
-                    0,
-                    "Consume => Fed.",
-                    vec![],
-                ),
-                ((objects::ObjectType::Food, "Bread", 0), 0, "View => Teased.", vec![]),
-                (
-                    (objects::ObjectType::Food, "Bread", 0), // object type, subtype, any ID
-                    3,                              // action id
-                    "Consume => Fed.",              // effect description // placeholder
-                    vec![(wusel::Need::WATER, -50), (wusel::Need::FOOD, 200)], // effect
-                ),
-            ],
+            dead_wusels: vec![],
+            relations: std::collections::BTreeMap::new(),
+
+            actions: vec![],
+            actions_effects: vec![],
         }
     }
 
@@ -104,22 +106,22 @@ impl World {
         let mut dying_wusels: Vec<wusel::WuselId> = vec![];
 
         /* Decay on every object and living. */
-        for (i, w) in self.wusels_on_pos.iter_mut().enumerate() {
+        for (i, wusel) in self.wusels.iter_mut().enumerate() {
             /* Watch all tasks, remove tasks, which may be aborted or ran out. */
-            w.wusel.auto_clean_tasks();
+            wusel.auto_clean_tasks();
 
             /* Peek into the ongoing task, and maybe proceed them.
              * This may lead to remove the done task. */
-            if !w.wusel.has_tasklist_empty() {
+            if !wusel.has_tasklist_empty() {
                 some_busy_wusel.push(i);
             } else {
                 /* Wusel is currently not busy. => maybe apply an idle/auto task. */
             }
 
             /* If pregnant: Maybe push out the child => Failure, Early or too late. */
-            if w.wusel.is_pregnant() {
-                let other_parent: Option<usize> = w.wusel.get_other_parent();
-                let pregnancy_days: Option<u8> = w.wusel.get_remaining_pregnancy_days();
+            if wusel.is_pregnant() {
+                let other_parent: Option<usize> = wusel.get_other_parent();
+                let pregnancy_days: Option<u8> = wusel.get_remaining_pregnancy_days();
                 let maybe_now: u8 = rand::random::<u8>() % 100;
                 let possibility: u8 = match pregnancy_days {
                     Some(0) => 90,
@@ -129,13 +131,13 @@ impl World {
                 if (0u8..possibility).contains(&maybe_now) {
                     log::debug!("Pop the baby!");
                     let gender = wusel::WuselGender::random();
-                    new_babies.push((w.wusel.get_id(), other_parent, gender));
+                    new_babies.push((wusel.get_id(), other_parent, gender));
                     // end pregnancy.
-                    w.wusel.set_pregnancy(None, None);
+                    wusel.set_pregnancy(None, None);
                 }
             }
 
-            let alive = w.wusel.wusel_tick(new_day);
+            let alive = wusel.wusel_tick(new_day);
 
             /* The wusel just died. Remove if from active wusels later. */
             if !alive {
@@ -145,7 +147,7 @@ impl World {
 
         /* Execute ongoing tasks, unmutable wusel context.. */
         for w in some_busy_wusel.iter() {
-            if let Some(t) = self.wusels_on_pos[*w].wusel.peek_ongoing_task() {
+            if let Some(t) = self.wusels[*w].peek_ongoing_task() {
                 /* Decide how to progress the command. */
                 let u = (*t).clone();
                 task_manager::proceed(self, u);
@@ -167,7 +169,7 @@ impl World {
     }
 
     /* World Inventory. */
-    const WORLD_INVENTORY: Where = Where::StoredIn((objects::ObjectType::Miscellaneous, "World-Storage", 0));
+    // const WORLD_INVENTORY: Where = InWorld::InStorageId((objects::ObjectType::Miscellaneous, "World-Storage", 0));
 
     pub const TICKS_PER_DAY: usize = 2880; // 24h by 0.5 minutes
 
@@ -181,45 +183,56 @@ impl World {
         self.depth
     }
 
+    pub fn get_dimensions(&self) -> (u32, u32, u32) {
+        (self.width, self.depth, 0)
+    }
+
     pub fn get_area(&self) -> areas::Area {
         areas::Area::new(areas::Position::new(0, 0), self.width, self.depth)
     }
 
-    // self.positions[pos_index].push((Self::CHAR_OBJECT, object_id));
-
     /** Get the `positions` index for the requesting position (width, height).
      * If the position is not in world, this index is not in [0, positions.len()).*/
-    fn position_to_index(&self, pos: areas::Position) -> usize {
-        (pos.x + self.width * pos.y) as usize
+    fn position_to_index(&self, position: areas::Position) -> usize {
+        (position.x + self.width * position.y) as usize
     }
 
     /** Get the position tuple from the given index in this world. */
-    fn position_from_index(&self, idx: usize) -> areas::Position {
-        areas::Position::new(idx as u32 % self.width, idx as u32 / self.width)
+    fn position_from_index(&self, position_index: usize) -> Option<areas::Position> {
+        if position_index < self.position_upper_bound {
+            Some(
+                areas::Position::new(
+                    position_index as u32 % self.width,
+                    position_index as u32 / self.width
+                    )
+                )
+        } else {
+            None
+        }
     }
 
     /** Get a random position in this world. */
     pub fn position_random(&self) -> areas::Position {
-        self.get_area().position_random()
+        self.area.position_random()
     }
 
     /** Get the (valid) neighbours for a position. */
-    pub fn position_get_all_neighbours(&self, pos: areas::Position) -> Vec<areas::Position> {
-        self.get_area().get_all_neighbours(pos)
+    pub fn position_get_all_neighbours(&self, position: areas::Position) -> Vec<areas::Position> {
+        self.area.get_all_neighbours(position)
     }
 
     /** Get the next optional neighbour to the given position within the given box. */
     pub fn position_get_neighbour_on(
         &self,
-        pos: areas::Position,
+        position: areas::Position,
         direction: areas::Way,
     ) -> Option<areas::Position> {
-        self.get_area().get_directed_neighbour(pos, direction)
+        self.area.get_directed_neighbour(position, direction)
     }
 
     /** Check if the position is inside the world bounds. */
-    pub fn position_containing(&self, pos: areas::Position) -> bool {
-        self.get_area().contains_position(&pos)
+    pub fn has_position(&self, position: areas::Position) -> bool {
+        self.area.contains_position(&position)
     }
 
     /** Get the distance between two positions represented by indices in this world. */
@@ -227,7 +240,43 @@ impl World {
     fn positions_indices_distance(&self, a_index: usize, b_index: usize) -> f32 {
         let a = self.position_from_index(a_index);
         let b = self.position_from_index(b_index);
+
+        if a.is_none() || b.is_none() {
+            return f32::INFINITY;
+        }
+
+        let a = a.unwrap();
+        let b = b.unwrap();
+
         a.distance_to(&b)
+    }
+
+    pub fn positions_for_all_placetakers(&self) -> Vec<Vec<PlaceTaker>> {
+        // XXX more effective (maybe not everytime, something needs to render)
+
+        let mut positions = vec![vec![]; self.position_upper_bound];
+
+        // for constructions
+        let constructions_index_on_position_index: Vec<usize> = vec![];
+        for (construction_index, &constructions_position_index) in constructions_index_on_position_index.iter().enumerate() {
+            positions[constructions_position_index].push(PlaceTaker::Construction(0));
+        }
+
+        for (wusel_index, &wusel_position_index) in self.wusels_index_on_position_index.iter().enumerate() {
+            if positions[wusel_position_index].len() < 1 {
+                positions[wusel_position_index].push(PlaceTaker::Wusel(self.wusels_index_with_id[wusel_index]));
+            }
+        }
+
+        for (object_index, object_whereabouts) in self.objects_index_with_whereabouts.iter().enumerate() {
+            if let &(InWorld::OnPositionIndex(object_position_index)) = object_whereabouts {
+                if positions[object_position_index].len() < 1 {
+                    positions[object_position_index].push(PlaceTaker::Object(self.objects_index_with_id[object_index]));
+                }
+            }
+        }
+
+        positions
     }
 
     /** Wusel char. */
@@ -242,50 +291,6 @@ impl World {
             objects::ObjectType::Food => 'ó',         // '\u{2615}', // hot beverage
         }
     }
-    /** Check all positions.
-     * Recalculate all positions, if they really consist what they promised. */
-    #[allow(dead_code)]
-    pub fn positions_recalculate_grid(&mut self) {
-        self.positions = vec![vec![]; self.width as usize * self.depth as usize];
-
-        let valid_index = self.positions.len();
-
-        for (wusel_index, w) in self.wusels_on_pos.iter().enumerate() {
-            let idx = self.wusels_on_pos[wusel_index].position_index;
-
-            /* Add ID to position. */
-            if idx < valid_index {
-                self.positions[idx].push((Self::CHAR_WUSEL, w.wusel.get_id()));
-            }
-        }
-    }
-
-    /** Get the positions of all active wusels. */
-    #[allow(dead_code)]
-    pub fn positions_for_wusels(&self) -> Vec<areas::Position> {
-        let mut positions = vec![];
-        for w in self.wusels_on_pos.iter() {
-            positions.push(self.position_from_index((*w).position_index)); // usize -> Position
-        }
-        positions
-    }
-
-    /** Get all the positions as they are. */
-    pub fn positions_for_grid(&self) -> Vec<Vec<(char, usize)>> {
-        self.positions.clone()
-    }
-
-    /** From an object's ID to a grid (representation) ID. */
-    fn objectid_as_gridid(obj_id: &objects::ObjectIdentifer) -> (char, usize) {
-        (Self::objecttype_as_char((*obj_id).0), (*obj_id).2)
-    }
-
-    /** Find a given thing (given by `ID`), placed on a certain position (given by `position_index`). */
-    fn positions_find_index(&self, position_index: usize, id: &(char, usize)) -> Option<usize> {
-        self.positions[position_index]
-            .iter()
-            .position(|obj_id| obj_id == id)
-    }
 
     /** Create a new object to exist in this world.
      * Placed in a world inventory/storage first, can be placed in world.
@@ -298,29 +303,35 @@ impl World {
         passable: bool,
         consumable_parts: Option<usize>,
         storage_capacity: usize,
-    ) -> (objects::ObjectIdentifer, usize) {
-        let (obj_type, subtype) = subtyped_object;
+        ) -> objects::ObjectId {
+        let (object_type, subtype) = subtyped_object;
 
-       // /* Add the new object into the world active objects. */
-       self.objects.push(ExistingObject {
-           object: Box::new(objects::Object::new(
-               name,
-               obj_type, subtype,
-               transportable,
-               passable,
-               consumable_parts,
-               storage_capacity,
-           )),
-           position: Self::WORLD_INVENTORY,
-       });
+        // /* Add the new object into the world active objects. */
+        self.objects.push(
+            objects::Object::new(
+                name,
+                object_type, subtype,
+                transportable,
+                passable,
+                consumable_parts,
+                storage_capacity,
+                ));
+
+        let object_id: objects::ObjectId = (
+            self.objects.last_mut().unwrap().get_object_id().0,
+            self.objects.last_mut().unwrap().get_object_id().1,
+            self.sequential_object_id,
+        );
+
+        self.objects_index_with_whereabouts.push(InWorld::Nowhere);
+        self.objects_index_with_id.push(object_id);
 
         log::info!("New object created: {:?}", self.objects.last_mut());
 
+        self.sequential_object_id += 1;
+
         /* Return new ID and appended index. */
-        (
-            self.objects.last_mut().unwrap().object.get_object_id(),
-            self.objects.len() - 1,
-        )
+        object_id
     }
 
     /** Create a new food (an object) to exist in this world.
@@ -329,7 +340,7 @@ impl World {
      *
      * Placed in a world inventory/storage first, can be placed in world.
      * Returns the new object's index for the world's objects. */
-    pub fn food_new(&mut self, name: objects::ObjectSubtype, bites: usize) -> (objects::ObjectIdentifer, usize) {
+    pub fn food_new(&mut self, name: objects::ObjectSubtype, bites: usize) -> objects::ObjectId {
         self.object_new(
             (objects::ObjectType::Food, name),
             name.to_string(),
@@ -342,7 +353,7 @@ impl World {
 
     /** Duplicate a world object: Use all attributes, but change the ID
      * This will create a new object, currently in world's storage. */
-    pub fn object_duplicate(&mut self, base_index: usize) -> Option<(objects::ObjectIdentifer, usize)> {
+    pub fn object_duplicate(&mut self, base_index: usize) -> Option<objects::ObjectId> {
         /* Duplicate non existing?. */
         if base_index >= self.objects.len() {
             return None;
@@ -350,52 +361,88 @@ impl World {
 
         Some(self.object_new(
             (
-                (*self.objects[base_index].object).get_object_id().0, // obj type
-                (*self.objects[base_index].object).get_object_id().1, // obj sub-type
+                (self.objects[base_index]).get_object_id().0, // object type
+                (self.objects[base_index]).get_object_id().1, // object sub-type
             ),
-            (*self.objects[base_index].object).get_name(),
-            (*self.objects[base_index].object).is_transportable(),
-            (*self.objects[base_index].object).is_passable(),
-            (*self.objects[base_index].object).get_consumable(),
-            (*self.objects[base_index].object).get_storage_capacity(),
+            (self.objects[base_index]).get_name(),
+            (self.objects[base_index]).is_transportable(),
+            (self.objects[base_index]).is_passable(),
+            (self.objects[base_index]).get_consumable(),
+            (self.objects[base_index]).get_storage_capacity(),
         ))
     }
 
-    /** Find the optional index of an object, given by an ID. */
-    fn object_identifier_to_index(&self, object_id: objects::ObjectIdentifer) -> Option<usize> {
-        self.objects
-            .iter()
-            .position(|o| o.object.get_object_id() == object_id)
+    fn get_objects_index_by_id(&self, object_id: objects::ObjectId) -> Option<usize> {
+        self.objects_index_with_id.iter().position(|id| *id == object_id)
     }
 
-    /** Get the optional position of an object, given by an index.
-     * If the position is held by a storage, get the pos of the storage. */
-    fn object_index_get_position(&self, object_index: usize) -> Option<areas::Position> {
-        match self.objects[object_index].position {
-            Where::AtPosition(pos_index) => Some(self.position_from_index(pos_index)),
-            // get nested position.
-            Where::HeldBy(wusel_id) => {
-                self.wusel_get_position(self.wusel_identifier_to_index(wusel_id))
-            }
-            Where::StoredIn(storage_obj_id) => self.object_get_position(storage_obj_id),
-        }
-    }
-
-    /** Get the optional position of an object, given by an ID.
-     * If the position is held by a storage, get the pos of the storage. */
-    pub fn object_get_position(&self, object_id: objects::ObjectIdentifer) -> Option<areas::Position> {
-        if let Some(object_index) = self.object_identifier_to_index(object_id) {
-            self.object_index_get_position(object_index)
+    fn get_object_whereabouts_by_id(&self, object_id: objects::ObjectId) -> Option<&InWorld> {
+        if let Some(object_index) = self.get_objects_index_by_id(object_id) {
+            self.objects_index_with_whereabouts.get(object_index)
         } else {
             None
         }
     }
 
-    /** Place an object on a new position. */
-    pub fn object_set_position(&mut self, object_id: objects::ObjectIdentifer, pos: areas::Position) {
-        if let Some(object_index) = self.object_identifier_to_index(object_id) {
-            let position_index = self.position_to_index(pos);
-            self.object_set_whereabouts(object_index, Where::AtPosition(position_index));
+    /** Find the optional index of an object, given by an ID. */
+    fn object_id_to_index(&self, object_id: objects::ObjectId) -> Option<usize> {
+        self.objects
+            .iter()
+            .position(|o| o.get_object_id() == object_id)
+    }
+
+    /** Get the optional position of an object, given by an index.
+     * If the position is held by a storage, get the position of the storage. */
+    fn objects_index_get_position(&self, object_index: usize) -> Option<areas::Position> {
+        match self.objects_index_with_whereabouts.get(object_index) {
+            Some(InWorld::OnPositionIndex(position_index)) => {
+                self.position_from_index(*position_index)
+            },
+            Some(InWorld::HeldByWuselId(wusel_id)) => {
+                // get nested position of holder.
+                self.get_wusels_index_by_id(*wusel_id)
+                    .map(|holder_index| self.wusels_index_on_position_index[holder_index])
+                    .map(|wusel_position_index| self.position_from_index(wusel_position_index))
+                    .map(|opt_opt_position| opt_opt_position.unwrap())
+
+            },
+            Some(InWorld::InStorageId(storage_object_id)) => {
+                // get nested position (of storage).
+                self.object_get_position(*storage_object_id)
+            },
+            _ => None
+        }
+    }
+
+    /** Get the optional position of an object, given by an ID.
+     * If the position is held by a storage, get the position of the storage. */
+    pub fn object_get_position(&self, object_id: objects::ObjectId) -> Option<areas::Position> {
+        if let Some(object_index) = self.object_id_to_index(object_id) {
+            self.objects_index_get_position(object_index)
+        } else {
+            None
+        }
+    }
+
+    /** Get the positions of all InWorld::OnPositionIndex objects. */
+    #[allow(dead_code)]
+    pub fn positions_for_objects(&self) -> Vec<areas::Position> {
+        // unique positions.
+        self.objects_index_with_whereabouts
+            .iter()
+            .filter(|whereabout| matches!(whereabout, InWorld::OnPositionIndex(_)))
+            .map(|on_position_index| if let InWorld::OnPositionIndex(position_index) = on_position_index { self.position_from_index(*position_index) } else { None })
+            .flatten()
+            .collect()
+    }
+
+
+    /** Place an object on a new position (in world).
+     * If the object was held or stored before, it is now not anymore. */
+    pub fn object_set_position(&mut self, object_id: objects::ObjectId, position: areas::Position) {
+        if let Some(object_index) = self.object_id_to_index(object_id) {
+            let position_index = self.position_to_index(position);
+            self.object_set_whereabouts(object_index, InWorld::OnPositionIndex(position_index));
         }
     }
 
@@ -403,34 +450,14 @@ impl World {
      * The object is given by an (vector) index of all currently active objects.
      * If the object is removed from a world position, this will remove the object from the old
      * position.  */
-    fn object_set_whereabouts(&mut self, object_index: usize, whereto: Where) {
+    fn object_set_whereabouts(&mut self, object_index: usize, whereto: InWorld) {
         /* Invalid index. => Abort. */
         if object_index >= self.objects.len() {
             return;
         }
 
-        let object = &self.objects[object_index]; // immutable.
-        let object_id = object.object.get_object_id();
-
-        // positions: CHAR and ID.
-        let obj_c = Self::objecttype_as_char(object_id.0); // super type
-        let obj_i = object_id.2; // index
-
-        if let Where::AtPosition(old_pos_index) = &object.position {
-            /* Remove from old position. */
-            if let Some(i) = self.positions_find_index(*old_pos_index, &(obj_c, obj_i)) {
-                self.positions[*old_pos_index].remove(i);
-            }
-        }
-
-        /* Update new where. */
-        let object = &mut self.objects[object_index]; // now mutable.
-        object.position = whereto;
-
-        if let Where::AtPosition(new_pos_index) = self.objects[object_index].position {
-            /* Change and update self.positions. */
-            self.positions[new_pos_index].push((obj_c, obj_i));
-        }
+        // just update.
+        self.objects_index_with_whereabouts[object_index] = whereto;
     }
 
     /** Destroy an object given by a certain all-active-object's index. */
@@ -439,51 +466,28 @@ impl World {
             return;
         }
 
-        let ExistingObject {
-            object: obj,
-            position: wherefrom,
-        } = &self.objects[object_index];
-
-        /* Remove from grid / positions, if available. */
-        if let Where::AtPosition(pos_index) = wherefrom {
-            if let Some(i) =
-                self.positions_find_index(*pos_index, &Self::objectid_as_gridid(&(obj.get_object_id())))
-            {
-                self.positions[*pos_index].remove(i);
-            }
-        }
-
-        /* Finally remove. */
         self.objects.remove(object_index);
-    }
-
-    /** Get an index for the wusel with the requesting index.
-     * Return LEN, if none is found. */
-    pub fn wusel_identifier_to_index(&self, id: usize) -> Option<usize> {
-        self.wusels_on_pos
-            .iter()
-            .position(|w| w.wusel.get_id() == id)
+        self.objects_index_with_whereabouts.remove(object_index);
+        self.objects_index_with_id.remove(object_index);
     }
 
     /** Add a wusel to the world.
      * ID is the current wusel count.
      * TODO (2020-11-20) what is about dead wusels and decreasing length? */
-    pub fn wusel_new(&mut self, name: String, gender: wusel::WuselGender, pos: areas::Position) {
-        let id = self.wusels_alltime_count; // almost identifier (for a long time unique)
-        let w = wusel::Wusel::new(id, name, gender); // new wusel at (pos)
+    pub fn wusel_new(&mut self, name: String, gender: wusel::WuselGender, position: areas::Position) {
+        let new_wusel_id = self.sequential_wusel_id; // almost id (for a long time unique)
+        let new_wusel = wusel::Wusel::new(new_wusel_id, name, gender); // new wusel at (position)
 
-        /* Add wusel to positions, start at (pos). */
-        let pos_index = self.position_to_index(pos);
-        if pos_index < self.positions.len() {
-            self.positions[pos_index].push((Self::CHAR_WUSEL, w.get_id()));
-        }
+        /* Add wusel to positions, start at (position). */
+        let position_index = self.position_to_index(position);
 
-        self.wusels_on_pos.push(WuselOnPosIdx {
-            wusel: w,
-            position_index: pos_index,
-        }); // wusel on position (by index)
-            // self.wusels_positions.push(pos_index); // index.
-        self.wusels_alltime_count += 1;
+        // XXX put new wusel on position.
+        self.wusels.push(new_wusel);
+        self.wusels_index_with_id.push(new_wusel_id); // fast access id.
+        self.wusels_index_on_position_index.push(position_index); // access position.
+
+        // self.wusels_positions.push(position_index); // index.
+        self.sequential_wusel_id += 1;
     }
 
     pub fn wusel_new_random(&mut self, wusel_name: String) {
@@ -497,59 +501,57 @@ impl World {
 
     /** Count how many wusels are currently active. */
     pub fn wusel_count(&self) -> usize {
-        self.wusels_on_pos.len()
+        self.wusels.len()
     }
 
-    /** Get the position of the indexed wusel. */
-    pub fn wusel_get_position(&self, wusel_index: Option<usize>) -> Option<areas::Position> {
-        if let Some(wusel_index) = wusel_index {
-            if wusel_index < self.wusels_on_pos.len() {
-                Some(self.position_from_index(self.wusels_on_pos[wusel_index].position_index))
-            } else {
-                None // outside the map.
-            }
+    fn check_valid_wusel_index(&self, wusel_index: usize) -> bool {
+        wusel_index < self.wusels.len()
+    }
+
+    fn get_wusels_index_by_id(&self, wusel_id: usize) -> Option<usize> {
+        self.wusels_index_with_id.iter().position(|id| *id == wusel_id)
+    }
+
+    fn get_wusel_position_index_by_id(&self, wusel_id: usize) -> Option<&usize> {
+        if let Some(wusel_index) = self.get_wusels_index_by_id(wusel_id) {
+            self.wusels_index_on_position_index.get(wusel_index)
         } else {
             None
         }
     }
 
+    pub fn wusel_get_position(&self, wusel_id: usize) -> Option<areas::Position> {
+        self.get_wusel_position_index_by_id(wusel_id)
+            .map(|&position_index| self.position_from_index(position_index))
+            .map(|opt_position| opt_position.unwrap())
+    }
+
+
     /** Set the position of the indexed wusel to the nearest valid position
      * If the position may land out of the grid, put it to the nearest border. */
-    pub fn wusel_set_position(&mut self, wusel_index: usize, pos: areas::Position) {
-        if wusel_index < self.wusels_on_pos.len() {
-            let id = self.wusels_on_pos[wusel_index].wusel.get_id();
-
-            /* Update the self.positions. */
-            let old_pos_index = self.wusels_on_pos[wusel_index].position_index;
-
-            let new_pos =
-                areas::Position::new(u32::min(pos.x, self.width), u32::min(pos.y, self.depth));
-            let new_pos_index = self.position_to_index(new_pos);
-
-            /* Set the new position. */
-            self.wusels_on_pos[wusel_index].position_index = new_pos_index;
-
-            /* Representation in positions. */
-            let wusel_indicator = (Self::CHAR_WUSEL, id);
-
-            /* Remove from old positions[idx]. */
-            for i in 0..self.positions[old_pos_index].len() {
-                if self.positions[old_pos_index][i] == wusel_indicator {
-                    self.positions[old_pos_index].remove(i);
-                    break;
-                }
-            }
-
-            /* Add to new positions[idx]. */
-            self.positions[new_pos_index].push(wusel_indicator);
+    fn wusel_set_position(&mut self, wusel_index: usize, position: areas::Position) {
+        if self.check_valid_wusel_index(wusel_index) {
+            let position_index = self.position_to_index(position);
+            self.wusels_index_on_position_index[wusel_index] = position_index;
         }
+    }
+
+    /** Get the positions of all active wusels. */
+    #[allow(dead_code)]
+    pub fn positions_for_wusels(&self) -> Vec<areas::Position> {
+        // unique positions.
+        self.wusels_index_on_position_index
+            .iter()
+            .map(|&position_index| self.position_from_index(position_index))
+            .flatten()
+            .collect()
     }
 
     /** Get the indices of all wusels, which are alive. */
     pub fn wusel_get_all_alive(&self) -> Vec<usize> {
         let mut alive: Vec<usize> = vec![];
-        for i in 0..self.wusels_on_pos.len() {
-            if self.wusels_on_pos[i].wusel.is_alive() {
+        for i in 0..self.wusels.len() {
+            if self.wusels[i].is_alive() {
                 alive.push(i);
             }
         }
@@ -559,8 +561,8 @@ impl World {
     /** Get the indices of all wusels, which are currently having no tasks to do. */
     pub fn wusel_get_all_unbusy(&self) -> Vec<usize> {
         let mut unbusy: Vec<usize> = vec![];
-        for i in 0..self.wusels_on_pos.len() {
-            if self.wusels_on_pos[i].wusel.has_tasklist_empty() {
+        for i in 0..self.wusels.len() {
+            if self.wusels[i].has_tasklist_empty() {
                 unbusy.push(i);
             }
         }
@@ -568,52 +570,52 @@ impl World {
     }
 
     pub fn wusel_is_alive(&self, wusel_id: wusel::WuselId) -> Option<bool> {
-        self.wusel_identifier_to_index(wusel_id)
-            .map(|index| self.wusels_on_pos[index].wusel.is_alive())
+        self.get_wusels_index_by_id(wusel_id)
+            .map(|index| self.wusels[index].is_alive())
     }
 
     pub fn wusel_get_lived_days(&self, wusel_id: wusel::WuselId) -> Option<u32> {
-        self.wusel_identifier_to_index(wusel_id)
-            .map(|index| self.wusels_on_pos[index].wusel.get_lived_days())
+        self.get_wusels_index_by_id(wusel_id)
+            .map(|index| self.wusels[index].get_lived_days())
     }
 
     pub fn wusel_set_life_state(&mut self, wusel_id: wusel::WuselId, life_state: wusel::Life) {
-        if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
-            self.wusels_on_pos[index].wusel.set_life_state(life_state);
+        if let Some(index) = self.get_wusels_index_by_id(wusel_id) {
+            self.wusels[index].set_life_state(life_state);
         }
     }
 
     pub fn wusel_get_name(&self, wusel_id: wusel::WuselId) -> Option<String> {
-        self.wusel_identifier_to_index(wusel_id)
-            .map(|index| self.wusels_on_pos[index].wusel.get_name())
+        self.get_wusels_index_by_id(wusel_id)
+            .map(|index| self.wusels[index].get_name())
     }
 
     pub fn wusel_set_name(&mut self, wusel_id: wusel::WuselId, new_name: String) {
-        if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
-            self.wusels_on_pos[index].wusel.set_name(new_name);
+        if let Some(index) = self.get_wusels_index_by_id(wusel_id) {
+            self.wusels[index].set_name(new_name);
         }
     }
 
     pub fn wusel_get_gender(&self, wusel_id: wusel::WuselId) -> Option<wusel::WuselGender> {
-        self.wusel_identifier_to_index(wusel_id)
-            .map(|index| self.wusels_on_pos[index].wusel.get_gender())
+        self.get_wusels_index_by_id(wusel_id)
+            .map(|index| self.wusels[index].get_gender())
     }
 
     pub fn wusel_set_gender(&mut self, wusel_id: wusel::WuselId, new_gender: wusel::WuselGender) {
-        if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
-            self.wusels_on_pos[index].wusel.set_gender(new_gender);
+        if let Some(index) = self.get_wusels_index_by_id(wusel_id) {
+            self.wusels[index].set_gender(new_gender);
         }
     }
 
     pub fn wusel_get_need(&mut self, wusel_id: wusel::WuselId, need: wusel::Need) -> u32 {
-        self.wusel_identifier_to_index(wusel_id)
-            .map(|index| self.wusels_on_pos[index].wusel.get_need(need))
+        self.get_wusels_index_by_id(wusel_id)
+            .map(|index| self.wusels[index].get_need(need))
             .unwrap_or(0u32)
     }
 
     pub fn wusel_set_need(&mut self, wusel_id: wusel::WuselId, need: &wusel::Need, new_value: u32) {
-        if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
-            self.wusels_on_pos[index].wusel.set_need(*need, new_value);
+        if let Some(index) = self.get_wusels_index_by_id(wusel_id) {
+            self.wusels[index].set_need(*need, new_value);
         }
     }
 
@@ -623,9 +625,8 @@ impl World {
         need: &wusel::Need,
         relative: i16,
     ) {
-        if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
-            self.wusels_on_pos[index]
-                .wusel
+        if let Some(index) = self.get_wusels_index_by_id(wusel_id) {
+            self.wusels[index]
                 .set_need_relative(*need, relative);
         }
     }
@@ -635,8 +636,8 @@ impl World {
         wusel_id: wusel::WuselId,
         ability: wusel::Ability,
     ) -> Option<u32> {
-        self.wusel_identifier_to_index(wusel_id)
-            .map(|index| self.wusels_on_pos[index].wusel.get_ability(ability))
+        self.get_wusels_index_by_id(wusel_id)
+            .map(|index| self.wusels[index].get_ability(ability))
     }
 
     pub fn wusel_set_ability(
@@ -645,32 +646,31 @@ impl World {
         ability: wusel::Ability,
         new_value: u32,
     ) {
-        if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
-            self.wusels_on_pos[index]
-                .wusel
+        if let Some(index) = self.get_wusels_index_by_id(wusel_id) {
+            self.wusels[index]
                 .set_ability(ability, new_value);
         }
     }
 
     pub fn wusel_improve(&mut self, wusel_id: wusel::WuselId, ability: wusel::Ability) {
-        if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
-            self.wusels_on_pos[index].wusel.improve(ability);
+        if let Some(index) = self.get_wusels_index_by_id(wusel_id) {
+            self.wusels[index].improve(ability);
         }
     }
 
     pub fn wusel_has_tasklist_empty(&self, wusel_id: wusel::WuselId) -> Option<bool> {
-        self.wusel_identifier_to_index(wusel_id)
-            .map(|index| self.wusels_on_pos[index].wusel.has_tasklist_empty())
+        self.get_wusels_index_by_id(wusel_id)
+            .map(|index| self.wusels[index].has_tasklist_empty())
     }
 
     pub fn wusel_get_tasklist_len(&self, wusel_id: wusel::WuselId) -> Option<usize> {
-        self.wusel_identifier_to_index(wusel_id)
-            .map(|index| self.wusels_on_pos[index].wusel.get_tasklist_len())
+        self.get_wusels_index_by_id(wusel_id)
+            .map(|index| self.wusels[index].get_tasklist_len())
     }
 
     pub fn wusel_get_tasklist_names(&mut self, wusel_id: wusel::WuselId) -> Vec<String> {
-        if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
-            self.wusels_on_pos[index].wusel.get_tasklist_names()
+        if let Some(index) = self.get_wusels_index_by_id(wusel_id) {
+            self.wusels[index].get_tasklist_names()
         } else {
             vec![]
         }
@@ -678,32 +678,30 @@ impl World {
 
     /** Give an available wusel (by index) a new task. */
     pub fn wusel_assign_to_task(&mut self, wusel_index: usize, taskb: tasks::TaskBuilder) {
-        if wusel_index < self.wusels_on_pos.len() {
+        if let Some(wusel) = self.wusels.get_mut(wusel_index) {
             /* Task apply wusel[index] as actor. */
-            self.wusels_on_pos[wusel_index]
-                .wusel
-                .assign_to_task(self.clock, taskb);
+            wusel.assign_to_task(self.clock, taskb);
             log::debug!("task successfully assigned")
         }
     }
 
     pub fn wusel_abort_task(&mut self, wusel_id: wusel::WuselId, task_index: usize) {
-        if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
-            self.wusels_on_pos[index].wusel.abort_task(task_index);
+        if let Some(index) = self.get_wusels_index_by_id(wusel_id) {
+            self.wusels[index].abort_task(task_index);
         }
     }
 
     pub fn wusel_peek_ongoing_task(&self, wusel_id: wusel::WuselId) -> Option<&tasks::Task> {
-        if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
-            self.wusels_on_pos[index].wusel.peek_ongoing_task()
+        if let Some(index) = self.get_wusels_index_by_id(wusel_id) {
+            self.wusels[index].peek_ongoing_task()
         } else {
             None
         }
     }
 
     pub fn wusel_is_pregnant(&self, wusel_id: wusel::WuselId) -> Option<bool> {
-        self.wusel_identifier_to_index(wusel_id)
-            .map(|index| self.wusels_on_pos[index].wusel.is_pregnant())
+        self.get_wusels_index_by_id(wusel_id)
+            .map(|index| self.wusels[index].is_pregnant())
     }
     pub fn wusel_set_pregnancy(
         &mut self,
@@ -711,23 +709,20 @@ impl World {
         other_parent: Option<usize>,
         remaining_days: Option<u8>,
     ) {
-        if let Some(index) = self.wusel_identifier_to_index(wusel_id) {
-            self.wusels_on_pos[index]
-                .wusel
+        if let Some(index) = self.get_wusels_index_by_id(wusel_id) {
+            self.wusels[index]
                 .set_pregnancy(other_parent, remaining_days);
         }
     }
     pub fn wusel_get_other_parent(&self, wusel_id: wusel::WuselId) -> Option<usize> {
-        self.wusel_identifier_to_index(wusel_id)
-            .map(|index| self.wusels_on_pos[index].wusel.get_other_parent())
+        self.get_wusels_index_by_id(wusel_id)
+            .map(|index| self.wusels[index].get_other_parent())
             .unwrap_or(None)
     }
     pub fn wusel_get_remaining_pregnancy_days(&self, wusel_id: wusel::WuselId) -> Option<u8> {
-        self.wusel_identifier_to_index(wusel_id)
+        self.get_wusels_index_by_id(wusel_id)
             .map(|index| {
-                self.wusels_on_pos[index]
-                    .wusel
-                    .get_remaining_pregnancy_days()
+                self.wusels[index].get_remaining_pregnancy_days()
             })
             .unwrap_or(None)
     }
@@ -735,16 +730,16 @@ impl World {
     /** Show all relations for a wusel, given by index.
      * Prints directly to std::out. */
     pub fn wusel_show_relations(&self, wusel_index: usize) {
-        if wusel_index >= self.wusels_on_pos.len() {
+        if wusel_index >= self.wusels.len() {
             println!("There is no wusel to show.");
             return;
         }
 
-        let wusel_id = self.wusels_on_pos[wusel_index].wusel.get_id();
+        let wusel_id = self.wusels[wusel_index].get_id();
 
         print!(
             "Relations with {}: ",
-            self.wusels_on_pos[wusel_index].wusel.get_name()
+            self.wusels[wusel_index].get_name()
         );
 
         let mut has_relations: bool = false;
@@ -762,7 +757,7 @@ impl World {
                 continue;
             } // not in relation
 
-            let other_name = self.wusels_on_pos[other_id].wusel.get_name();
+            let other_name = self.wusels[other_id].get_name();
 
             /* Print Relation. */
             print!("[{:?}: {}]", other_name, relation.show());
@@ -805,32 +800,26 @@ impl World {
     }
 }
 
-/** (Private) Wrapping Wusels and positions together. */
-struct WuselOnPosIdx {
-    wusel: wusel::Wusel,
-    position_index: usize,
+#[derive(Clone, Copy, PartialEq)]
+enum InWorld {
+    OnPositionIndex(usize),
+    InStorageId(objects::ObjectId),
+    HeldByWuselId(usize),
+    Nowhere,
 }
 
-/** Where the object is stored / placed. */
-#[derive(Debug, Clone, PartialEq)]
-pub enum Where {
-    AtPosition(usize),         // position index
-    StoredIn(objects::ObjectIdentifer), // storage ID (object ID of the storage)
-    HeldBy(usize),             // held by a wusel (index)
+#[derive(Clone, Copy, PartialEq)]
+pub enum PlaceTaker {
+    Construction(usize),
+    Wusel(usize),
+    Object(objects::ObjectId),
 }
 
-/** (Private) Wrapping Objects and where abouts together. */
-#[derive(Debug)]
-struct ExistingObject {
-    object: Box<objects::Object>,
-    position: Where,
-}
-
-/** A Recipe is a list of required abilities, consumables or positions
+/** A Blueprint is a list of required abilities, consumables or positions
  * to create a certain product after a certain time.
- * Recipe: [ components, Workstation ] + Time => Product. */
+ * Blueprint: [ components, Workstation ] + Time => Product. */
 #[allow(dead_code)]
-struct Recipe {
+struct Blueprint {
     id: usize,
     product: usize,
     components: Vec<usize>, // needed components: such as tools (desk) or ingredients (pen, paper).

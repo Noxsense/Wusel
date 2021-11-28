@@ -7,18 +7,21 @@ pub enum ObjectType {
     Food,
 }
 
-pub type ObjectWithSubType = (ObjectType, ObjectSubtype);
+pub type ObjectWithSubType
+    = (ObjectType, ObjectSubtype);
 
 /** Identifier type (tuple) for an object. */
-pub type ObjectIdentifer = (ObjectType, ObjectSubtype, usize);
+pub type ObjectId
+    = (ObjectType, ObjectSubtype, usize);
 
-pub type ObjectSubtype = &'static str; // String doesn't support Copy Trait, what is used for the TaskTag.
+pub type ObjectSubtype
+    = &'static str; // String doesn't support Copy Trait, what is used for the TaskTag.
 
 /** A world object indicates an object in the world which is not a wusel. */
 #[derive(Debug, Clone)]
 pub struct Object {
     name: String,
-    object_id: ObjectIdentifer,
+    object_id: ObjectId,
     transportable: bool, // can be transported by a wusel, will also apply stotable
     passable: bool,      // if true, wusel can walk over it's occupied place (if at position)
     consumable: Option<usize>, // if None: cannot be consumed; if Some(bites): number of parts, that can be consumed
@@ -80,7 +83,7 @@ impl Object {
         self.name = name;
     }
 
-    pub fn get_object_id(&self) -> ObjectIdentifer {
+    pub fn get_object_id(&self) -> ObjectId {
         self.object_id
     }
 

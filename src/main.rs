@@ -68,7 +68,7 @@ fn main() -> Result<(), std::io::Error> {
 
     /* Transportable bibimbap (korean food) */
     let bibimbap = world.food_new("Bibimbap", 10);
-    let (bibimbap_id, _bibimbap_index) = bibimbap;
+    let bibimbap_id = bibimbap;
 
     /* Position. */
     world.object_set_position(bibimbap_id, world.position_random());
@@ -126,7 +126,7 @@ fn main() -> Result<(), std::io::Error> {
     for i in 0usize..iterations {
         if render {
             // world.positions_recalculate_grid();
-            tui::world_view::render_field(w, world.positions_for_grid());
+            tui::world_view::render_field(w, world.positions_for_all_placetakers());
 
             /* Tick the world, show time. */
             tui::world_view::render_time(time_position, i, world.get_time());
