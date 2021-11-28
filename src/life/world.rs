@@ -252,31 +252,58 @@ impl World {
     }
 
     pub fn positions_for_all_placetakers(&self) -> Vec<Vec<PlaceTaker>> {
-        // XXX more effective (maybe not everytime, something needs to render)
+        self.positions.clone()
+    }
 
-        let mut positions = vec![vec![]; self.position_upper_bound];
+    pub fn recalculate_positions_for_all_placetakers(&mut self) {
+        // clear old positions.
+        for placetakers in self.positions.iter_mut() {
+            placetakers.clear();
+        }
 
         // for constructions
         let constructions_index_on_position_index: Vec<usize> = vec![];
         for (construction_index, &constructions_position_index) in constructions_index_on_position_index.iter().enumerate() {
-            positions[constructions_position_index].push(PlaceTaker::Construction(0));
+
+            self.positions[constructions_position_index].push(PlaceTaker::Construction(construction_index));
+
         }
 
         for (wusel_index, &wusel_position_index) in self.wusels_index_on_position_index.iter().enumerate() {
-            if positions[wusel_position_index].len() < 1 {
-                positions[wusel_position_index].push(PlaceTaker::Wusel(self.wusels_index_with_id[wusel_index]));
-            }
+
+            self.positions[wusel_position_index].push(PlaceTaker::Wusel(self.wusels_index_with_id[wusel_index]));
+
         }
 
         for (object_index, object_whereabouts) in self.objects_index_with_whereabouts.iter().enumerate() {
-            if let &(InWorld::OnPositionIndex(object_position_index)) = object_whereabouts {
-                if positions[object_position_index].len() < 1 {
-                    positions[object_position_index].push(PlaceTaker::Object(self.objects_index_with_id[object_index]));
-                }
+            if let InWorld::OnPositionIndex(object_position_index) = *object_whereabouts {
+
+                self.positions[object_position_index].push(PlaceTaker::Object(self.objects_index_with_id[object_index]));
+
+            }
+        }
+    }
+
+    fn update_positions(&mut self, placetaker: PlaceTaker, old_position_index: usize, new_position_index: usize) {
+        // not if both position indices are invalid / higher / "not given", it just does nothing.
+        // this also can remove a place taker from the map, or put it there on the first place.
+
+        // remove from old position if given.
+        if old_position_index < self.position_upper_bound {
+            let opt_placetaker_index: Option<usize>
+                = self.positions[old_position_index].iter()
+                .position(|&p| p == placetaker);
+
+            if let Some(placetaker_index) = opt_placetaker_index {
+                self.positions[old_position_index].remove(placetaker_index);
             }
         }
 
-        positions
+        // put on new position if given.
+        if new_position_index < self.position_upper_bound {
+            self.positions[new_position_index].push(placetaker);
+        }
+
     }
 
     /** Wusel char. */
@@ -441,8 +468,17 @@ impl World {
      * If the object was held or stored before, it is now not anymore. */
     pub fn object_set_position(&mut self, object_id: objects::ObjectId, position: areas::Position) {
         if let Some(object_index) = self.object_id_to_index(object_id) {
-            let position_index = self.position_to_index(position);
-            self.object_set_whereabouts(object_index, InWorld::OnPositionIndex(position_index));
+            let placetaker = PlaceTaker::Object(object_id);
+            let old_position_index
+                = match self.objects_index_with_whereabouts[object_index] {
+                    InWorld::OnPositionIndex(old_position_index) => old_position_index,
+                    _ => self.position_upper_bound, // none (out of world).
+                };
+            let new_position_index = self.position_to_index(position);
+
+            self.object_set_whereabouts(object_index, InWorld::OnPositionIndex(new_position_index));
+
+            self.update_positions(placetaker, old_position_index, new_position_index);
         }
     }
 
@@ -529,10 +565,23 @@ impl World {
 
     /** Set the position of the indexed wusel to the nearest valid position
      * If the position may land out of the grid, put it to the nearest border. */
-    fn wusel_set_position(&mut self, wusel_index: usize, position: areas::Position) {
+    pub fn wusel_set_position(&mut self, wusel_id: usize, position: areas::Position) {
+        if let Some(&wusel_index) = self.get_wusel_position_index_by_id(wusel_id) {
+            self.wusel_set_position_by_index(wusel_index, position);
+        }
+    }
+
+    /** Set the position of the indexed wusel to the nearest valid position
+     * If the position may land out of the grid, put it to the nearest border. */
+    fn wusel_set_position_by_index(&mut self, wusel_index: usize, position: areas::Position) {
         if self.check_valid_wusel_index(wusel_index) {
-            let position_index = self.position_to_index(position);
-            self.wusels_index_on_position_index[wusel_index] = position_index;
+            let placetaker = PlaceTaker::Wusel(self.wusels_index_with_id[wusel_index]);
+            let old_position_index = self.wusels_index_on_position_index[wusel_index].clone();
+            let new_position_index = self.position_to_index(position);
+
+            self.wusels_index_on_position_index[wusel_index] = new_position_index;
+
+            self.update_positions(placetaker, old_position_index, new_position_index);
         }
     }
 

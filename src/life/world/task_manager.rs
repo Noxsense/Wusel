@@ -578,7 +578,7 @@ fn let_wusel_walk_to_position(
         }
 
         /* move to closest position. */
-        world.wusel_set_position(wusel_index, closest);
+        world.wusel_set_position_by_index(wusel_index, closest);
         false // still walking.
     } else {
         /* Calculate the path and go it next time. */
