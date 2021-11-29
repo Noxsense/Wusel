@@ -183,13 +183,7 @@ impl Wusel {
     }
 
     pub fn prioritize_task(&mut self, task_index: usize) -> bool {
-        println!(
-            "Priorize Task: {}, Tasks #{}",
-            task_index,
-            self.tasklist.len()
-        );
         if task_index < self.tasklist.len() {
-            println!(" ... doing.");
             let task = self.tasklist.remove(task_index);
             self.tasklist.push(task); // push to end (which is next in row)
             true

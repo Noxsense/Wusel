@@ -2,11 +2,10 @@
  * - This module contains actuall all game world and life logics and mechanics.
  * @author Nox
  * @version 2021.0.1 */
-
 use crate::life::areas;
+use crate::life::objects;
 use crate::life::tasks;
 use crate::life::wusel;
-use crate::life::objects;
 
 use rand;
 
@@ -49,14 +48,11 @@ pub struct World {
     actions_effects: Vec<tasks::ActionAffect>, // how various actions on various objects may influence
 
     // more world information ...
-
     dead_wusels: Vec<wusel::Wusel>,
     relations: std::collections::BTreeMap<(usize, usize), wusel::Relation>, // vector of wusel relations
-
 }
 
 impl World {
-
     /** Create a new world. */
     pub fn new(width: u32, depth: u32) -> Self {
         let height = 1;
@@ -209,9 +205,9 @@ impl World {
     fn position_from_index(&self, position_index: usize) -> Option<areas::Position> {
         if position_index < self.position_upper_bound {
             Some(areas::Position {
-                x:  position_index as u32 % self.width,
+                x: position_index as u32 % self.width,
                 y: position_index as u32 / self.width,
-                z: 0
+                z: 0,
             })
         } else {
             None
@@ -270,35 +266,44 @@ impl World {
 
         // for constructions
         let constructions_index_on_position_index: Vec<usize> = vec![];
-        for (construction_index, &constructions_position_index) in constructions_index_on_position_index.iter().enumerate() {
-
-            self.positions[constructions_position_index].push(PlaceTaker::Construction(construction_index));
-
+        for (construction_index, &constructions_position_index) in
+            constructions_index_on_position_index.iter().enumerate()
+        {
+            self.positions[constructions_position_index]
+                .push(PlaceTaker::Construction(construction_index));
         }
 
-        for (wusel_index, &wusel_position_index) in self.wusels_index_on_position_index.iter().enumerate() {
-
-            self.positions[wusel_position_index].push(PlaceTaker::Wusel(self.wusels_index_with_id[wusel_index]));
-
+        for (wusel_index, &wusel_position_index) in
+            self.wusels_index_on_position_index.iter().enumerate()
+        {
+            self.positions[wusel_position_index]
+                .push(PlaceTaker::Wusel(self.wusels_index_with_id[wusel_index]));
         }
 
-        for (object_index, object_whereabouts) in self.objects_index_with_whereabouts.iter().enumerate() {
+        for (object_index, object_whereabouts) in
+            self.objects_index_with_whereabouts.iter().enumerate()
+        {
             if let InWorld::OnPositionIndex(object_position_index) = *object_whereabouts {
-
-                self.positions[object_position_index].push(PlaceTaker::Object(self.objects_index_with_id[object_index]));
-
+                self.positions[object_position_index]
+                    .push(PlaceTaker::Object(self.objects_index_with_id[object_index]));
             }
         }
     }
 
-    fn update_positions(&mut self, placetaker: PlaceTaker, old_position_index: usize, new_position_index: usize) {
+    fn update_positions(
+        &mut self,
+        placetaker: PlaceTaker,
+        old_position_index: usize,
+        new_position_index: usize,
+    ) {
         // not if both position indices are invalid / higher / "not given", it just does nothing.
         // this also can remove a place taker from the map, or put it there on the first place.
 
         // remove from old position if given.
         if old_position_index < self.position_upper_bound {
             let opt_placetaker_index: Option<usize>
-                = self.positions[old_position_index].iter()
+                = self.positions[old_position_index]
+                .iter()
                 .position(|&p| p == placetaker);
 
             if let Some(placetaker_index) = opt_placetaker_index {
@@ -310,7 +315,6 @@ impl World {
         if new_position_index < self.position_upper_bound {
             self.positions[new_position_index].push(placetaker);
         }
-
     }
 
     /** Create a new object to exist in this world.
@@ -324,19 +328,19 @@ impl World {
         passable: bool,
         consumable_parts: Option<usize>,
         storage_capacity: usize,
-        ) -> objects::ObjectId {
+    ) -> objects::ObjectId {
         let (object_type, subtype) = subtyped_object;
 
         // /* Add the new object into the world active objects. */
-        self.objects.push(
-            objects::Object::new(
-                name,
-                object_type, subtype,
-                transportable,
-                passable,
-                consumable_parts,
-                storage_capacity,
-                ));
+        self.objects.push(objects::Object::new(
+            name,
+            object_type,
+            subtype,
+            transportable,
+            passable,
+            consumable_parts,
+            storage_capacity,
+        ));
 
         let object_id: objects::ObjectId = (
             self.objects.last_mut().unwrap().get_object_id().0,
@@ -394,7 +398,9 @@ impl World {
     }
 
     fn get_objects_index_by_id(&self, object_id: objects::ObjectId) -> Option<usize> {
-        self.objects_index_with_id.iter().position(|id| *id == object_id)
+        self.objects_index_with_id
+            .iter()
+            .position(|id| *id == object_id)
     }
 
     fn get_object_whereabouts_by_id(&self, object_id: objects::ObjectId) -> Option<&InWorld> {
@@ -418,20 +424,19 @@ impl World {
         match self.objects_index_with_whereabouts.get(object_index) {
             Some(InWorld::OnPositionIndex(position_index)) => {
                 self.position_from_index(*position_index)
-            },
+            }
             Some(InWorld::HeldByWuselId(wusel_id)) => {
                 // get nested position of holder.
                 self.get_wusels_index_by_id(*wusel_id)
                     .map(|holder_index| self.wusels_index_on_position_index[holder_index])
                     .map(|wusel_position_index| self.position_from_index(wusel_position_index))
                     .map(|opt_opt_position| opt_opt_position.unwrap())
-
-            },
+            }
             Some(InWorld::InStorageId(storage_object_id)) => {
                 // get nested position (of storage).
                 self.object_get_position(*storage_object_id)
-            },
-            _ => None
+            }
+            _ => None,
         }
     }
 
@@ -452,22 +457,26 @@ impl World {
         self.objects_index_with_whereabouts
             .iter()
             .filter(|whereabout| matches!(whereabout, InWorld::OnPositionIndex(_)))
-            .map(|on_position_index| if let InWorld::OnPositionIndex(position_index) = on_position_index { self.position_from_index(*position_index) } else { None })
+            .map(|on_position_index| {
+                if let InWorld::OnPositionIndex(position_index) = on_position_index {
+                    self.position_from_index(*position_index)
+                } else {
+                    None
+                }
+            })
             .flatten()
             .collect()
     }
-
 
     /** Place an object on a new position (in world).
      * If the object was held or stored before, it is now not anymore. */
     pub fn object_set_position(&mut self, object_id: objects::ObjectId, position: areas::Position) {
         if let Some(object_index) = self.object_id_to_index(object_id) {
             let placetaker = PlaceTaker::Object(object_id);
-            let old_position_index
-                = match self.objects_index_with_whereabouts[object_index] {
-                    InWorld::OnPositionIndex(old_position_index) => old_position_index,
-                    _ => self.position_upper_bound, // none (out of world).
-                };
+            let old_position_index = match self.objects_index_with_whereabouts[object_index] {
+                InWorld::OnPositionIndex(old_position_index) => old_position_index,
+                _ => self.position_upper_bound, // none (out of world).
+            };
             let new_position_index = self.position_to_index(position);
 
             self.object_set_whereabouts(object_index, InWorld::OnPositionIndex(new_position_index));
@@ -504,7 +513,12 @@ impl World {
     /** Add a wusel to the world.
      * ID is the current wusel count.
      * TODO (2020-11-20) what is about dead wusels and decreasing length? */
-    pub fn wusel_new(&mut self, name: String, gender: wusel::WuselGender, position: areas::Position) {
+    pub fn wusel_new(
+        &mut self,
+        name: String,
+        gender: wusel::WuselGender,
+        position: areas::Position,
+    ) {
         let new_wusel_id = self.sequential_wusel_id; // almost id (for a long time unique)
         let new_wusel = wusel::Wusel::new(new_wusel_id, name, gender); // new wusel at (position)
 
@@ -536,7 +550,9 @@ impl World {
     }
 
     fn get_wusels_index_by_id(&self, wusel_id: usize) -> Option<usize> {
-        self.wusels_index_with_id.iter().position(|id| *id == wusel_id)
+        self.wusels_index_with_id
+            .iter()
+            .position(|id| *id == wusel_id)
     }
 
     fn get_wusel_position_index_by_id(&self, wusel_id: usize) -> Option<&usize> {
@@ -552,7 +568,6 @@ impl World {
             .map(|&position_index| self.position_from_index(position_index))
             .map(|opt_position| opt_position.unwrap())
     }
-
 
     /** Set the position of the indexed wusel to the nearest valid position
      * If the position may land out of the grid, put it to the nearest border. */
@@ -666,8 +681,7 @@ impl World {
         relative: i16,
     ) {
         if let Some(index) = self.get_wusels_index_by_id(wusel_id) {
-            self.wusels[index]
-                .set_need_relative(*need, relative);
+            self.wusels[index].set_need_relative(*need, relative);
         }
     }
 
@@ -687,8 +701,7 @@ impl World {
         new_value: u32,
     ) {
         if let Some(index) = self.get_wusels_index_by_id(wusel_id) {
-            self.wusels[index]
-                .set_ability(ability, new_value);
+            self.wusels[index].set_ability(ability, new_value);
         }
     }
 
@@ -750,8 +763,7 @@ impl World {
         remaining_days: Option<u8>,
     ) {
         if let Some(index) = self.get_wusels_index_by_id(wusel_id) {
-            self.wusels[index]
-                .set_pregnancy(other_parent, remaining_days);
+            self.wusels[index].set_pregnancy(other_parent, remaining_days);
         }
     }
     pub fn wusel_get_other_parent(&self, wusel_id: wusel::WuselId) -> Option<usize> {
@@ -761,9 +773,7 @@ impl World {
     }
     pub fn wusel_get_remaining_pregnancy_days(&self, wusel_id: wusel::WuselId) -> Option<u8> {
         self.get_wusels_index_by_id(wusel_id)
-            .map(|index| {
-                self.wusels[index].get_remaining_pregnancy_days()
-            })
+            .map(|index| self.wusels[index].get_remaining_pregnancy_days())
             .unwrap_or(None)
     }
 
@@ -777,10 +787,7 @@ impl World {
 
         let wusel_id = self.wusels[wusel_index].get_id();
 
-        print!(
-            "Relations with {}: ",
-            self.wusels[wusel_index].get_name()
-        );
+        print!("Relations with {}: ", self.wusels[wusel_index].get_name());
 
         let mut has_relations: bool = false;
 

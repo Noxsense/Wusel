@@ -134,7 +134,7 @@ pub struct Task {
     done_steps: usize,
 
     active_actor_id: wusel::WuselId, // wusel ID.
-    passive_part: TaskTag,  // position | object-to-be | object | wusel | nothing.
+    passive_part: TaskTag,           // position | object-to-be | object | wusel | nothing.
 }
 
 impl Task {
@@ -189,8 +189,8 @@ impl Task {
 
 // TODO (2021-11-21) improve type
 pub type ActionAffect = (
-    objects::ObjectId,  // affected object
-    usize,            // object subtype
-    &'static str,     // name
+    objects::ObjectId,       // affected object
+    usize,                   // object subtype
+    &'static str,            // name
     Vec<(wusel::Need, i16)>, // affected needs
 );

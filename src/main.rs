@@ -8,7 +8,6 @@
  * @author Nox
  * @version 2021.0.1
  */
-
 // use rand;
 // use std;
 // use termion;
@@ -142,7 +141,7 @@ fn main() -> Result<(), std::io::Error> {
 
             /* Draw selected wusel's needs (right position below field). */
 
-            for (wusel_offset, wusel_id) in world.wusel_get_all_alive().iter().enumerate() {
+            for (wusel_offset, &wusel_id) in world.wusel_get_all_alive().iter().enumerate() {
                 // TODO
 
                 let x_offset = wusel_offset as u16 * 23;
@@ -150,18 +149,18 @@ fn main() -> Result<(), std::io::Error> {
                 if need_panel_position.x + x_offset + 20 < screen_width {
                     tui::core::cursor_to(&need_panel_position.right_by(x_offset).up_by(2));
                     print!(
-                        "{} ({})",
+                        "| {} ({})",
                         world
-                            .wusel_get_name(*wusel_id as usize)
+                            .wusel_get_name(wusel_id as usize)
                             .unwrap_or_else(|| "No Name".to_string()),
                         world
-                            .wusel_get_gender(*wusel_id as usize)
+                            .wusel_get_gender(wusel_id as usize)
                             .unwrap_or(life::wusel::WuselGender::Female)
                             .to_char(),
                     );
                     // tui::world_view::render_wusel_tasklist(
                     //    need_panel_position.right_by(x_offset).up_by(2),
-                    //     world.wusel_get_tasklist(*wusel_id as usize),
+                    //     world.wusel_get_tasklist(wusel_id as usize),
                     // );
 
                     let needs: Vec<(life::wusel::Need, u32, u32)> = life::wusel::Need::VALUES
@@ -170,7 +169,7 @@ fn main() -> Result<(), std::io::Error> {
                             (
                                 *need,
                                 need.get_full(),
-                                world.wusel_get_need(*wusel_id, *need),
+                                world.wusel_get_need(wusel_id, *need),
                             )
                         })
                         .collect();

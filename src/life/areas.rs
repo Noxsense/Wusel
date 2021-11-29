@@ -20,7 +20,7 @@ impl Position {
 
     /** Simple constructor. */
     pub fn new(x: u32, y: u32, z: u32) -> Self {
-        Self { x, y , z}
+        Self { x, y, z }
     }
 
     /** Get the distance between two positions. */
@@ -58,7 +58,11 @@ impl Area {
         let (min_z, max_z) = (<u32>::min(a.z, b.z), <u32>::max(a.z, b.z));
 
         Area {
-            anchor: Position{ x: min_x, y: min_y, z: min_z },
+            anchor: Position {
+                x: min_x,
+                y: min_y,
+                z: min_z,
+            },
             /* If only one position is spanned: width/depth: 1. */
             width: <u32>::max(1, max_x - min_x),
             depth: <u32>::max(1, max_y - min_y),

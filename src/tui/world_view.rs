@@ -1,3 +1,4 @@
+use crate::life;
 /**
  * module tui::world_view.
  * - Here, functions to tui::render the world view.
@@ -5,10 +6,9 @@
  * @version 2021.0.1
  */
 use crate::tui::core;
-use crate::life;
 
 fn get_render_for_position(
-    c: Option<&life::world::PlaceTaker>
+    c: Option<&life::world::PlaceTaker>,
 ) -> (
     char,
     Option<core::Rgb>,
@@ -67,9 +67,17 @@ pub fn render_time(position: &core::ScreenPos, tick: usize, time: usize) {
 
 pub fn render_wusel_tasklist(position: core::ScreenPos, tasklist: Vec<String>) {
     core::cursor_to(&position);
-    print!("> ");
+    print!("{:23}", ""); // clear field.
+    core::cursor_to(&position);
+    print!("|> ");
+
+    let mut length = 3;
+
     for task in tasklist {
-        print!("[{task}] ", task = task);
+        length += task.chars().count() + 2;
+        if length < 23 {
+            print!("[{task}] ", task = task);
+        }
     }
 }
 

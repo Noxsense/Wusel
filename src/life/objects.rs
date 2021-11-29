@@ -29,7 +29,6 @@ pub struct Object {
 }
 
 impl Object {
-
     // /* Which object's counter to increase. */
     // let new_obj_count: usize = match obj_type {
     //     objects::ObjectType::Construction => {
@@ -57,14 +56,14 @@ impl Object {
     }
 
     pub fn new(
-            name: String,
-            obj_type: ObjectType,
-            subtype: ObjectSubtype,
-            transportable: bool,
-            passable: bool,
-            consumable_parts: Option<usize>,
-            storage_capacity: usize,
-        ) -> Self {
+        name: String,
+        obj_type: ObjectType,
+        subtype: ObjectSubtype,
+        transportable: bool,
+        passable: bool,
+        consumable_parts: Option<usize>,
+        storage_capacity: usize,
+    ) -> Self {
         Self {
             name,
             object_id: (obj_type, subtype, Self::get_items_created()),

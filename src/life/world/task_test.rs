@@ -17,13 +17,13 @@ fn test_consume_bread() {
     test_world.wusel_new(
         "Eater".to_string(),
         super::wusel::WuselGender::Female,
-        super::areas::Position{ x: 1, y: 0, z: 0 },
+        super::areas::Position { x: 1, y: 0, z: 0 },
     );
 
     test_world.wusel_new(
         "Starver".to_string(),
         super::wusel::WuselGender::Male,
-        super::areas::Position{ x: 2, y: 0, z: 0 },
+        super::areas::Position { x: 2, y: 0, z: 0 },
     );
 
     log::debug!("Test World's wusels created.");
@@ -63,7 +63,11 @@ fn test_consume_bread() {
     /* Let the other wusel wait, than it's tries to get the food as well, and consume it. */
     test_world.wusel_assign_to_task(
         0,
-        super::tasks::TaskBuilder::move_to(super::areas::Position{ x: test_world.get_width() - 1, y: test_world.get_depth() - 1, z: 0}),
+        super::tasks::TaskBuilder::move_to(super::areas::Position {
+            x: test_world.get_width() - 1,
+            y: test_world.get_depth() - 1,
+            z: 0,
+        }),
     );
     test_world.wusel_assign_to_task(0, super::tasks::TaskBuilder::use_object(food1_id, 1)); // take as well.
     test_world.wusel_assign_to_task(
@@ -190,7 +194,7 @@ fn test_create_bread() {
  * 1st meets 2nd; 4th is not meeting 1st anymore. No tasks left.
  */
 #[test]
-fn test_mutal_meeting() {
+fn test_mutual_meeting() {
     // TODO refactor test.
 
     println!("[test] Mutual Meeting, causes for circular deadlocks.");
@@ -202,24 +206,24 @@ fn test_mutal_meeting() {
     test_world.wusel_new(
         "1st".to_string(),
         super::wusel::WuselGender::Female,
-        super::areas::Position { x: 1, y: 0 , z: 0},
+        super::areas::Position { x: 1, y: 0, z: 0 },
     );
 
     test_world.wusel_new(
         "2nd".to_string(),
         super::wusel::WuselGender::Female,
-        super::areas::Position { x: 3, y: 0, z: 0},
+        super::areas::Position { x: 3, y: 0, z: 0 },
     );
     test_world.wusel_new(
         "3rd".to_string(),
         super::wusel::WuselGender::Male,
-        super::areas::Position { x: 5, y: 0 , z: 0},
+        super::areas::Position { x: 5, y: 0, z: 0 },
     );
 
     test_world.wusel_new(
         "4th".to_string(),
         super::wusel::WuselGender::Male,
-        super::areas::Position { x: 9, y: 0 , z: 0},
+        super::areas::Position { x: 9, y: 0, z: 0 },
     );
 
     // 4 wusels created.
