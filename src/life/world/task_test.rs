@@ -3,6 +3,122 @@
 use super::wusel;
 
 #[test]
+fn test_walking() {
+
+    let width: u32 = 20;
+    let depth: u32 = 30;
+
+    let mut test_world: super::World = super::World::new(width, depth); // small world.
+
+    // indices
+    let wusel_on_x: usize = 0;
+    let wusel_on_y: usize = 1;
+    let wusel_wild: usize = 2;
+
+    test_world.wusel_new(
+        "on_x".to_string(),
+        super::wusel::WuselGender::Female,
+        super::areas::Position { x: 0, y: 0, z: 0 },
+    );
+
+    test_world.wusel_new(
+        "on_y".to_string(),
+        super::wusel::WuselGender::Male,
+        super::areas::Position { x: 2, y: 2, z: 0 },
+    );
+
+    test_world.wusel_new(
+        "random".to_string(),
+        super::wusel::WuselGender::Male,
+        super::areas::Position { x: 3, y: 4, z: 0 },
+    );
+
+    let repetition: usize = 1000;
+    let bad_behaviour_acceptance = 3;
+
+    let mut last_x_position = test_world.wusel_get_position(wusel_on_x).unwrap();
+    let mut last_y_position = test_world.wusel_get_position(wusel_on_y).unwrap();
+    let mut wuselr_pos = test_world.wusel_get_position(wusel_wild).unwrap();
+
+    let mut wuselx_left = false;
+    let mut wusely_tofront = false;
+    let mut wuselr_direction = 0;
+
+    let mut wuselx_bad_count_in_row = 0;
+    let mut wusely_bad_count_in_row = 0;
+    let mut wuselr_bad_count_in_row = 0;
+
+    let mut goal_x: u32 = 0;
+    let mut goal_y: u32 = 0;
+    let mut goal_rand: super::areas::Position = super::areas::Position::ROOT;
+
+    for i in 0..repetition {
+        // assign random walking (x axis).
+        if test_world.wusel_get_tasklist_len(wusel_on_x) == Some(0) {
+            goal_x = (rand::random::<u32>() + 1 + goal_x) % width;
+            wuselx_left = goal_x < last_x_position.x;
+            println!("{:03}$ Wusel x goal to ({:2}, 0, 0)", i, goal_x);
+            test_world.wusel_assign_to_task(wusel_on_x, super::tasks::TaskBuilder::move_to(super::areas::Position { x: goal_x, y: 0, z: 0 }));
+        }
+
+        // assign random walking (y axis).
+        if test_world.wusel_get_tasklist_len(wusel_on_y) == Some(0) {
+            goal_y = (rand::random::<u32>() + 1 + goal_y) % depth;
+            wusely_tofront = goal_y < last_y_position.y;
+            println!("{:03}$ Wusel y goal to ( 0, {:2}, 0)", i, goal_y);
+            test_world.wusel_assign_to_task(wusel_on_y, super::tasks::TaskBuilder::move_to(super::areas::Position { x: 0, y: goal_y, z: 0 }));
+        }
+
+        // assign random walking (x-y plane).
+        if test_world.wusel_get_tasklist_len(wusel_wild) == Some(0) {
+            goal_rand = test_world.position_random();
+            println!("{:03}$ Wusel ? goal to ({:2},{:2}, 0)", i, goal_rand.x, goal_rand.y);
+            test_world.wusel_assign_to_task(wusel_wild, super::tasks::TaskBuilder::move_to(goal_rand));
+        }
+
+        test_world.tick();
+
+        if let Some(p) = test_world.wusel_get_position(wusel_on_x) {
+            println!("{:03}> Wusel x on  ({:2},{:2},{:2}) => ({:2},{:2},{:2}) {}", i, last_x_position.x, last_x_position.y, last_x_position.z, p.x, p.y, p.z, if wuselx_left { "left" } else { "right" });
+
+            let expected_x = if wuselx_left { last_x_position.x.saturating_sub(1) } else { last_x_position.x.saturating_add(1)};
+            let well_behaved = expected_x == p.x || p.x == goal_x;
+
+            if !well_behaved {
+                wuselx_bad_count_in_row += 1;
+            } else {
+                wuselx_bad_count_in_row = 0;
+            }
+
+            assert!(well_behaved || wuselx_bad_count_in_row < bad_behaviour_acceptance);
+
+            last_x_position = p;
+        }
+
+        if let Some(p) = test_world.wusel_get_position(wusel_on_y) {
+            println!("{:03}> Wusel y on  ({:2},{:2},{:2}) => ({:2},{:2},{:2}) {}", i, last_y_position.x, last_y_position.y, last_y_position.z, p.x, p.y, p.z, if wusely_tofront { "to front" } else { "to back" });
+
+            let expected_y = if wusely_tofront { last_y_position.y.saturating_sub(1) } else { last_y_position.y.saturating_add(1)};
+            let well_behaved = expected_y == p.y || p.y == goal_y;
+
+            if !well_behaved {
+                wusely_bad_count_in_row += 1;
+            } else {
+                wusely_bad_count_in_row = 0;
+            }
+
+            assert!(well_behaved || wusely_bad_count_in_row < bad_behaviour_acceptance);
+
+            last_y_position = p;
+        }
+
+        if let Some(p) = test_world.wusel_get_position(wusel_wild) {
+            println!("{:03}> Wusel ? on ({:2},{:2},{:2})", i, p.x, p.y, p.z);
+        }
+    }
+}
+
+#[test]
 fn test_consume_bread() {
     // TODO refactor test.
 

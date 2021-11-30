@@ -9,7 +9,7 @@ use crate::life::wusel;
 
 use rand;
 
-pub mod task_manager;
+mod task_manager;
 mod task_test;
 mod unit_tests;
 
