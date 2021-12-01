@@ -37,16 +37,19 @@ pub struct Area {
     width: u32,  // left to right
     depth: u32,  // front to back
     height: u32, // bottom to top
+    position_index_bound: usize,
     iterator_index: u32,
 }
 
 impl Area {
     pub fn new(anchor: Position, width: u32, depth: u32, height: u32) -> Self {
+        let position_index_bound = (width as usize) * (depth as usize) * (height as usize);
         Self {
             anchor,
             width,
             depth,
             height,
+            position_index_bound,
             iterator_index: 0,
         }
     }
@@ -57,18 +60,14 @@ impl Area {
         let (min_y, max_y) = (<u32>::min(a.y, b.y), <u32>::max(a.y, b.y));
         let (min_z, max_z) = (<u32>::min(a.z, b.z), <u32>::max(a.z, b.z));
 
-        Area {
-            anchor: Position {
-                x: min_x,
-                y: min_y,
-                z: min_z,
-            },
-            /* If only one position is spanned: width/depth: 1. */
-            width: <u32>::max(1, max_x - min_x),
-            depth: <u32>::max(1, max_y - min_y),
-            height: <u32>::max(1, max_z - min_z),
-            iterator_index: 0,
-        }
+        let width = <u32>::max(1, max_x - min_x);
+        let depth = <u32>::max(1, max_y - min_y);
+        let height = <u32>::max(1, max_z - min_z);
+
+        Area::new(
+            Position { x: min_x, y: min_y, z: min_z },
+            width, depth, height
+            )
     }
 
     /** Check, if the position is in the area. */
@@ -88,12 +87,12 @@ impl Area {
     }
 
     /** Get all valid neighbours of a position within the area. */
-    pub fn get_all_neighbours(&self, pos: Position) -> Vec<Position> {
+    pub fn get_all_neighbours_xy(&self, pos: Position) -> Vec<Position> {
         // TODO (maka a storage, to not calculate it every time. )
         let mut neighbours: Vec<Position> = vec![];
 
         /* Get all the valid neighbours. */
-        for d in Way::NEIGHBOURING.iter() {
+        for d in Direction::DIRECTION_LIST_XY.iter() {
             if let Some(n) = self.get_directed_neighbour(pos, *d) {
                 neighbours.push(n);
             }
@@ -102,8 +101,8 @@ impl Area {
     }
 
     /** Get a requested neighbour of a given position within this area. */
-    pub fn get_directed_neighbour(&self, pos: Position, direction: Way) -> Option<Position> {
-        let change = direction.as_direction_tuple();
+    pub fn get_directed_neighbour(&self, pos: Position, direction: Direction) -> Option<Position> {
+        let change = direction.as_offset_tuple();
 
         let box_width = self.anchor.x + self.width;
         let box_depth = self.anchor.y + self.depth;
@@ -130,19 +129,19 @@ impl Area {
         }
 
         /* On south border => No south neighbours. (None) */
-        if pos.z < 1 && change.1 < 0 {
+        if pos.z < 1 && change.2 < 0 {
             return None;
         }
 
         /* On north border => No north neighbours. (None) */
-        if pos.z >= box_height && change.1 > 0 {
+        if pos.z >= box_height && change.2 > 0 {
             return None;
         }
 
         Some(Position::new(
             (pos.x as i64 + change.0 as i64) as u32,
             (pos.y as i64 + change.1 as i64) as u32,
-            (pos.z as i64 + change.1 as i64) as u32,
+            (pos.z as i64 + change.2 as i64) as u32,
         ))
     }
 
@@ -171,46 +170,121 @@ impl Iterator for Area {
     }
 }
 
-/** Way in the world. */
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum Way {
-    NW,
-    N,
-    NE,
-    W,
-    E,
-    SW,
-    S,
-    SE,
+#[derive(Debug, PartialEq, Clone, Copy, Eq, Hash)]
+pub struct Direction {
+    pub x: Step,
+    pub y: Step,
+    pub z: Step,
 }
 
-impl Way {
-    pub const NEIGHBOURING: [Self; 8] = [
-        Self::NW,
-        Self::N,
-        Self::NE, // north
-        Self::W,
-        Self::E, // same longitude
-        Self::SW,
-        Self::S,
-        Self::SE, // south
+impl Direction {
+    // width x depth slice.
+    const DIRECTION_LIST_XY: [Self; 8 ] = [
+        Self { x: Step::Backward,  y: Step::Backward, z: Step::Stay },
+        Self { x: Step::Stay,      y: Step::Backward, z: Step::Stay },
+        Self { x: Step::Forward,   y: Step::Backward, z: Step::Stay },
+        // y change
+        Self { x: Step::Backward,  y: Step::Stay,     z: Step::Stay },
+        // Stay Stay Stay => No actual direction.
+        Self { x: Step::Forward,   y: Step::Stay,     z: Step::Stay },
+        // y change
+        Self { x: Step::Backward,  y: Step::Forward,  z: Step::Stay },
+        Self { x: Step::Stay,      y: Step::Forward,  z: Step::Stay },
+        Self { x: Step::Forward,   y: Step::Forward,  z: Step::Stay },
     ];
-    /** Get the offsets to walk, to get to the way point. */
-    pub fn as_direction_tuple(&self) -> (i8, i8) {
+
+    // depth x height slice.
+    #[allow(dead_code)]
+    const DIRECTION_LIST_YZ: [Self; 8 ] = [
+        Self { x: Step::Stay, y: Step::Backward,  z: Step::Backward, },
+        Self { x: Step::Stay, y: Step::Stay,      z: Step::Backward, },
+        Self { x: Step::Stay, y: Step::Forward,   z: Step::Backward, },
+        // z change
+        Self { x: Step::Stay, y: Step::Backward,  z: Step::Stay,     },
+        // Stay Stay Stay => No actual direction.
+        Self { x: Step::Stay, y: Step::Forward,   z: Step::Stay,     },
+        // z change
+        Self { x: Step::Stay, y: Step::Backward,  z: Step::Forward,  },
+        Self { x: Step::Stay, y: Step::Stay,      z: Step::Forward,  },
+        Self { x: Step::Stay, y: Step::Forward,   z: Step::Forward,  },
+    ];
+
+    // width x height slice.
+    #[allow(dead_code)]
+    const DIRECTION_LIST_XZ: [Self; 8 ] = [
+        Self { x: Step::Backward, y: Step::Stay, z: Step::Backward },
+        Self { x: Step::Stay,     y: Step::Stay, z: Step::Backward },
+        Self { x: Step::Forward,  y: Step::Stay, z: Step::Backward },
+        // z change
+        Self { x: Step::Backward, y: Step::Stay, z: Step::Stay },
+        // Stay Stay Stay => No actual direction.
+        Self { x: Step::Forward,  y: Step::Stay, z: Step::Stay },
+        // z change
+        Self { x: Step::Backward, y: Step::Stay, z: Step::Forward },
+        Self { x: Step::Stay,     y: Step::Stay, z: Step::Forward },
+        Self { x: Step::Forward,  y: Step::Stay, z: Step::Forward },
+    ];
+
+    // all directions 3D.
+    #[allow(dead_code)]
+    const DIRECTION_LIST_XYZ: [Self; 26 ] = [
+        Self { x: Step::Backward, y: Step::Backward, z: Step::Backward },
+        Self { x: Step::Stay,     y: Step::Backward, z: Step::Backward },
+        Self { x: Step::Forward,  y: Step::Backward, z: Step::Backward },
+        // y change
+        Self { x: Step::Backward, y: Step::Stay, z: Step::Backward },
+        Self { x: Step::Stay,     y: Step::Stay, z: Step::Backward },
+        Self { x: Step::Forward,  y: Step::Stay, z: Step::Backward },
+        // y change
+        Self { x: Step::Backward, y: Step::Forward, z: Step::Backward },
+        Self { x: Step::Stay,     y: Step::Forward, z: Step::Backward },
+        Self { x: Step::Forward,  y: Step::Forward, z: Step::Backward },
+        //
+        // z change
+        Self { x: Step::Backward, y: Step::Backward, z: Step::Stay },
+        Self { x: Step::Stay,     y: Step::Backward, z: Step::Stay },
+        Self { x: Step::Forward,  y: Step::Backward, z: Step::Stay },
+        // y change
+        Self { x: Step::Backward, y: Step::Stay, z: Step::Stay },
+        // Stay Stay Stay => No actual direction.
+        Self { x: Step::Forward,  y: Step::Stay, z: Step::Stay },
+        // y change
+        Self { x: Step::Backward, y: Step::Forward, z: Step::Stay },
+        Self { x: Step::Stay,     y: Step::Forward, z: Step::Stay },
+        Self { x: Step::Forward,  y: Step::Forward, z: Step::Stay },
+        //
+        // z change
+        Self { x: Step::Backward, y: Step::Backward, z: Step::Forward },
+        Self { x: Step::Stay,     y: Step::Backward, z: Step::Forward },
+        Self { x: Step::Forward,  y: Step::Backward, z: Step::Forward },
+        // y change
+        Self { x: Step::Backward, y: Step::Stay, z: Step::Forward },
+        Self { x: Step::Stay,     y: Step::Stay, z: Step::Forward },
+        Self { x: Step::Forward,  y: Step::Stay, z: Step::Forward },
+        // y change
+        Self { x: Step::Backward, y: Step::Forward, z: Step::Forward },
+        Self { x: Step::Stay,     y: Step::Forward, z: Step::Forward },
+        Self { x: Step::Forward,  y: Step::Forward, z: Step::Forward },
+    ];
+
+    pub fn as_offset_tuple(&self) -> (i8, i8, i8) {
+        (self.x.as_offset(), self.y.as_offset(), self.z.as_offset())
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Copy, Eq, Hash)]
+pub enum Step {
+    Backward,
+    Stay,
+    Forward,
+}
+
+impl Step {
+    pub fn as_offset(&self) -> i8 {
         match self {
-            /* Go north. */
-            Way::NW => (-1, 1),
-            Way::N => (0, 1),
-            Way::NE => (1, 1),
-
-            /* Stay on longitude. */
-            Way::W => (-1, 0),
-            Way::E => (1, 0),
-
-            /* Go south. */
-            Way::SW => (-1, -1),
-            Way::S => (0, -1),
-            Way::SE => (1, -1),
+            Self::Backward => -1,
+            Self::Stay => 0,
+            Self::Forward => 1,
         }
     }
 }

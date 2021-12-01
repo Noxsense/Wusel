@@ -532,21 +532,21 @@ fn let_wusel_walk_to_position(
     wusel_index: usize,
     goal: areas::Position,
 ) -> bool {
-    let position = world
+    let opt_wusel_position = world
         .wusels_index_on_position_index
         .get(wusel_index)
         .map(|&position_index| world.position_from_index(position_index))
         .map(|opt_opt_position| opt_opt_position.unwrap());
 
-    if position == None {
+    if opt_wusel_position == None {
         return true; // couldn't move => stopped walking.
     }
 
-    let position = position.unwrap();
+    let wusel_position = opt_wusel_position.unwrap();
 
     /* Check if the goal is already reached. */
-    if position.x == goal.x && position.y == goal.y {
-        log::info!("Reached Goal ({},{}).", goal.x, goal.y);
+    if wusel_position.x == goal.x && wusel_position.y == goal.y  && wusel_position.z == goal.z {
+        log::info!("Reached Goal ({},{},{}).", goal.x, goal.y, goal.z);
         return true; // stopped walking.
     }
 
@@ -561,18 +561,13 @@ fn let_wusel_walk_to_position(
         // XXX easy placeholder walking, ignoring all obstacles.
 
         /* Get the current positions neighbours. */
-        let neighbours = world.position_get_all_neighbours(position);
+        let neighbours = world.position_get_all_neighbours(wusel_position);
 
         if neighbours.is_empty() {
             log::info!("Wusel cannot move, it's enclosed, wait forever");
             return true;
         }
 
-        let goal: areas::Position = areas::Position {
-            x: goal.x,
-            y: goal.y,
-            z: 0,
-        };
         let mut closest: areas::Position = neighbours[0];
         let mut closest_distance: f32 = f32::MAX;
 

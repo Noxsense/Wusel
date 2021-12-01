@@ -221,16 +221,7 @@ impl World {
 
     /** Get the (valid) neighbours for a position. */
     pub fn position_get_all_neighbours(&self, position: areas::Position) -> Vec<areas::Position> {
-        self.area.get_all_neighbours(position)
-    }
-
-    /** Get the next optional neighbour to the given position within the given box. */
-    pub fn position_get_neighbour_on(
-        &self,
-        position: areas::Position,
-        direction: areas::Way,
-    ) -> Option<areas::Position> {
-        self.area.get_directed_neighbour(position, direction)
+        self.area.get_all_neighbours_xy(position)
     }
 
     /** Check if the position is inside the world bounds. */
