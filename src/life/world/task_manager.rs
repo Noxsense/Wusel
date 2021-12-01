@@ -545,7 +545,7 @@ fn let_wusel_walk_to_position(
     let wusel_position = opt_wusel_position.unwrap();
 
     /* Check if the goal is already reached. */
-    if wusel_position.x == goal.x && wusel_position.y == goal.y  && wusel_position.z == goal.z {
+    if wusel_position.x == goal.x && wusel_position.y == goal.y && wusel_position.z == goal.z {
         log::info!("Reached Goal ({},{},{}).", goal.x, goal.y, goal.z);
         return true; // stopped walking.
     }

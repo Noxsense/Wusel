@@ -31,9 +31,12 @@ fn main() -> Result<(), std::io::Error> {
         None => 8,
     };
 
-    let render = true;
+    let render: bool = match args.get(3) {
+        Some(arg_str) => arg_str != "no-render",
+        None => true,
+    };
 
-    let clear_on_exit: bool = match args.get(3) {
+    let clear_on_exit: bool = match args.get(4) {
         Some(arg_str) => arg_str == "clear",
         None => false,
     };
@@ -96,31 +99,33 @@ fn main() -> Result<(), std::io::Error> {
     tui::core::render_clear_all();
 
     // frame game field
-    tui::core::render_rectangle(
-        &tui::core::ScreenPos { x: 1, y: 1 },
-        &tui::core::ScreenPos {
-            x: w as u16 + 2,
-            y: h as u16 + 2,
-        },
-        &format!("{}-", termion::color::Fg(termion::color::Rgb(0, 0, 255))),
-        &format!("{}|", termion::color::Fg(termion::color::Rgb(0, 255, 0))),
-        &format!("{}+", termion::color::Fg(termion::color::Rgb(255, 0, 0))),
-    );
+    if render {
+        tui::core::render_rectangle(
+            &tui::core::ScreenPos { x: 1, y: 1 },
+            &tui::core::ScreenPos {
+                x: w as u16 + 2,
+                y: h as u16 + 2,
+            },
+            &format!("{}-", termion::color::Fg(termion::color::Rgb(0, 0, 255))),
+            &format!("{}|", termion::color::Fg(termion::color::Rgb(0, 255, 0))),
+            &format!("{}+", termion::color::Fg(termion::color::Rgb(255, 0, 0))),
+        );
 
-    // frame need panel
-    tui::core::render_rectangle(
-        &tui::core::ScreenPos {
-            x: need_panel_position.x - 1,
-            y: need_panel_position.y - 1,
-        },
-        &tui::core::ScreenPos {
-            x: need_panel_position.x + 9 + need_bar_width,
-            y: need_panel_position.y + 7,
-        },
-        &format!("{}-", termion::color::Fg(termion::color::Rgb(255, 255, 0))),
-        &format!("{}|", termion::color::Fg(termion::color::Rgb(255, 255, 0))),
-        &format!("{}+", termion::color::Fg(termion::color::Rgb(255, 255, 0))),
-    );
+        // frame need panel
+        tui::core::render_rectangle(
+            &tui::core::ScreenPos {
+                x: need_panel_position.x - 1,
+                y: need_panel_position.y - 1,
+            },
+            &tui::core::ScreenPos {
+                x: need_panel_position.x + 9 + need_bar_width,
+                y: need_panel_position.y + 7,
+            },
+            &format!("{}-", termion::color::Fg(termion::color::Rgb(255, 255, 0))),
+            &format!("{}|", termion::color::Fg(termion::color::Rgb(255, 255, 0))),
+            &format!("{}+", termion::color::Fg(termion::color::Rgb(255, 255, 0))),
+        );
+    }
 
     for i in 0usize..iterations {
         if render {
@@ -158,10 +163,11 @@ fn main() -> Result<(), std::io::Error> {
                             .unwrap_or(life::wusel::WuselGender::Female)
                             .to_char(),
                     );
-                    // tui::world_view::render_wusel_tasklist(
-                    //    need_panel_position.right_by(x_offset).up_by(2),
-                    //     world.wusel_get_tasklist(wusel_id as usize),
-                    // );
+
+                    tui::world_view::render_wusel_tasklist(
+                        need_panel_position.right_by(x_offset).up_by(1),
+                        world.wusel_get_tasklist_names(wusel_id as usize),
+                    );
 
                     let needs: Vec<(life::wusel::Need, u32, u32)> = life::wusel::Need::VALUES
                         .iter()

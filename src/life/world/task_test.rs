@@ -4,7 +4,6 @@ use super::wusel;
 
 #[test]
 fn test_walking() {
-
     let width: u32 = 20;
     let depth: u32 = 30;
 
@@ -58,7 +57,14 @@ fn test_walking() {
             goal_x = (rand::random::<u32>() + 1 + goal_x) % width;
             wuselx_left = goal_x < last_x_position.x;
             println!("{:03}$ Wusel x goal to ({:2}, 0, 0)", i, goal_x);
-            test_world.wusel_assign_to_task(wusel_on_x, super::tasks::TaskBuilder::move_to(super::areas::Position { x: goal_x, y: 0, z: 0 }));
+            test_world.wusel_assign_to_task(
+                wusel_on_x,
+                super::tasks::TaskBuilder::move_to(super::areas::Position {
+                    x: goal_x,
+                    y: 0,
+                    z: 0,
+                }),
+            );
         }
 
         // assign random walking (y axis).
@@ -66,22 +72,47 @@ fn test_walking() {
             goal_y = (rand::random::<u32>() + 1 + goal_y) % depth;
             wusely_tofront = goal_y < last_y_position.y;
             println!("{:03}$ Wusel y goal to ( 0, {:2}, 0)", i, goal_y);
-            test_world.wusel_assign_to_task(wusel_on_y, super::tasks::TaskBuilder::move_to(super::areas::Position { x: 0, y: goal_y, z: 0 }));
+            test_world.wusel_assign_to_task(
+                wusel_on_y,
+                super::tasks::TaskBuilder::move_to(super::areas::Position {
+                    x: 0,
+                    y: goal_y,
+                    z: 0,
+                }),
+            );
         }
 
         // assign random walking (x-y plane).
         if test_world.wusel_get_tasklist_len(wusel_wild) == Some(0) {
             goal_rand = test_world.position_random();
-            println!("{:03}$ Wusel ? goal to ({:2},{:2}, 0)", i, goal_rand.x, goal_rand.y);
-            test_world.wusel_assign_to_task(wusel_wild, super::tasks::TaskBuilder::move_to(goal_rand));
+            println!(
+                "{:03}$ Wusel ? goal to ({:2},{:2}, 0)",
+                i, goal_rand.x, goal_rand.y
+            );
+            test_world
+                .wusel_assign_to_task(wusel_wild, super::tasks::TaskBuilder::move_to(goal_rand));
         }
 
         test_world.tick();
 
         if let Some(p) = test_world.wusel_get_position(wusel_on_x) {
-            println!("{:03}> Wusel x on  ({:2},{:2},{:2}) => ({:2},{:2},{:2}) {}", i, last_x_position.x, last_x_position.y, last_x_position.z, p.x, p.y, p.z, if wuselx_left { "left" } else { "right" });
+            println!(
+                "{:03}> Wusel x on  ({:2},{:2},{:2}) => ({:2},{:2},{:2}) {}",
+                i,
+                last_x_position.x,
+                last_x_position.y,
+                last_x_position.z,
+                p.x,
+                p.y,
+                p.z,
+                if wuselx_left { "left" } else { "right" }
+            );
 
-            let expected_x = if wuselx_left { last_x_position.x.saturating_sub(1) } else { last_x_position.x.saturating_add(1)};
+            let expected_x = if wuselx_left {
+                last_x_position.x.saturating_sub(1)
+            } else {
+                last_x_position.x.saturating_add(1)
+            };
             let well_behaved = expected_x == p.x || p.x == goal_x;
 
             if !well_behaved {
@@ -96,9 +127,27 @@ fn test_walking() {
         }
 
         if let Some(p) = test_world.wusel_get_position(wusel_on_y) {
-            println!("{:03}> Wusel y on  ({:2},{:2},{:2}) => ({:2},{:2},{:2}) {}", i, last_y_position.x, last_y_position.y, last_y_position.z, p.x, p.y, p.z, if wusely_tofront { "to front" } else { "to back" });
+            println!(
+                "{:03}> Wusel y on  ({:2},{:2},{:2}) => ({:2},{:2},{:2}) {}",
+                i,
+                last_y_position.x,
+                last_y_position.y,
+                last_y_position.z,
+                p.x,
+                p.y,
+                p.z,
+                if wusely_tofront {
+                    "to front"
+                } else {
+                    "to back"
+                }
+            );
 
-            let expected_y = if wusely_tofront { last_y_position.y.saturating_sub(1) } else { last_y_position.y.saturating_add(1)};
+            let expected_y = if wusely_tofront {
+                last_y_position.y.saturating_sub(1)
+            } else {
+                last_y_position.y.saturating_add(1)
+            };
             let well_behaved = expected_y == p.y || p.y == goal_y;
 
             if !well_behaved {
