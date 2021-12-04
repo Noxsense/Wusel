@@ -361,8 +361,7 @@ fn let_wusel_use_object(
         return false;
     }
 
-    let opt_object_id
-        = world
+    let opt_object_id = world
         .objects
         .get(object_index)
         .map(|object| object.get_object_id());
@@ -373,6 +372,7 @@ fn let_wusel_use_object(
     }
 
     let object_id = opt_object_id.unwrap();
+    let object_type = world.objects_index_with_type[object_index];
 
     /* Check where the object is.
      * If AtPosition(position) => go to position (position).
@@ -418,11 +418,13 @@ fn let_wusel_use_object(
     );
 
     /* Get the effect of interacting with the object. */
-    let effect = world.actions_effects.iter().find(
-        |((object_type, object_subtype, _), act_id, _effect_str, _effect_vec)| {
-            *object_type == object_id.0 && *object_subtype == object_id.1 && *act_id == action_index
-        },
-    );
+    let effect = world
+        .actions_effects
+        .iter()
+        .find(|(obj_id, act_id, _effect_str, _effect_vec)| {
+            matches!(world.get_object_type_by_id(*obj_id), Some(object_type))
+                && *act_id == action_index
+        });
 
     if let Some(effect) = effect {
         log::debug!("Using the object has the following effect: {:?}", effect);
@@ -468,16 +470,17 @@ fn let_wusel_use_object(
         }
         "Consume" => {
             let consumable = world.objects[object_index].get_consumable();
-            if consumable != None {
-                let left_over = consumable.unwrap();
+            if consumable != 0 {
+                let left_over = world.objects[object_index].get_consumable_left();
+                // TODO als interact with wusel.
                 log::debug!("Consume a part of the consumable object.");
 
-                if left_over <= 1usize {
+                if left_over <= 1 {
                     world.object_destroy(object_index); // delete from world.
                     log::debug!("Consumable Object fully consumed.");
                     return TASK_PROCEED;
                 }
-                world.objects[object_index].set_consumable(Some(left_over - 1));
+                world.objects[object_index].set_consumable_left(left_over - 1);
 
                 // return TASK_PROCEED;
                 return TASK_HOLD; // ddbug.

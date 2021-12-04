@@ -18,9 +18,9 @@ fn get_render_for_position(
     match c {
        Some(life::world::PlaceTaker::Wusel(_))                                                 => ('O', Some(core::Rgb(0, 0, 0)), None, Some(vec![core::TextStyle::Bold])), // wusel, -- smiley, alternatively or w
        Some(life::world::PlaceTaker::Construction(_))                                          => ('#', Some(core::Rgb(000, 000, 000)), None, None), // construction, eg. wall
-       Some(life::world::PlaceTaker::Object((life::objects::ObjectType::Furniture, _, _)))     => ('m', Some(core::Rgb(99, 67, 14)), None, None), // furniture, eg. chair
-       Some(life::world::PlaceTaker::Object((life::objects::ObjectType::Miscellaneous, _, _))) => ('*', Some(core::Rgb(000, 000, 100)), None, None), // miscellaneous, eg. food
-       Some(life::world::PlaceTaker::Object((life::objects::ObjectType::Food, _, _)))          => ('ó', Some(core::Rgb(200, 000, 000)), None, None), // food
+       Some(life::world::PlaceTaker::Object(_, life::objects::ObjectType::Furniture(_)))     => ('m', Some(core::Rgb(99, 67, 14)), None, None), // furniture, eg. chair
+       Some(life::world::PlaceTaker::Object(_, life::objects::ObjectType::Miscellaneous(_))) => ('*', Some(core::Rgb(000, 000, 100)), None, None), // miscellaneous, eg. food
+       Some(life::world::PlaceTaker::Object(_, life::objects::ObjectType::Food(_)))          => ('ó', Some(core::Rgb(200, 000, 000)), None, None), // food
         _                                                                                      => (' ', Some(core::Rgb(000, 100, 000)), Some(core::Rgb(222, 255, 222)), None), // empty
     }
 }
@@ -108,3 +108,4 @@ pub fn render_wusel_need_bar(
         );
     }
 }
+

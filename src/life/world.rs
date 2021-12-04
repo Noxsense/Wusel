@@ -1,7 +1,8 @@
-/** module Life.
- * - This module contains actuall all game world and life logics and mechanics.
- * @author Nox
- * @version 2021.0.1 */
+///  module Life.
+/// - This module contains actuall all game world and life logics and mechanics.
+/// @author Nox
+/// @version 2021.0.1 */
+
 use crate::life::areas;
 use crate::life::objects;
 use crate::life::tasks;
@@ -41,6 +42,7 @@ pub struct World {
     // all current object instances in world.
     objects: Vec<objects::Object>,
     objects_index_with_id: Vec<objects::ObjectId>,
+    objects_index_with_type: Vec<objects::ObjectType>,
     objects_index_with_whereabouts: Vec<InWorld>,
 
     // actions in this world.
@@ -48,7 +50,11 @@ pub struct World {
     actions_effects: Vec<tasks::ActionAffect>, // how various actions on various objects may influence
 
     // more world information ...
+
+    #[allow(dead_code)]
     dead_wusels: Vec<wusel::Wusel>,
+
+    #[allow(dead_code)]
     relations: std::collections::BTreeMap<(usize, usize), wusel::Relation>, // vector of wusel relations
 }
 
@@ -78,6 +84,7 @@ impl World {
 
             objects: vec![],
             objects_index_with_id: vec![],
+            objects_index_with_type: vec![],
             objects_index_with_whereabouts: vec![],
 
             dead_wusels: vec![],
@@ -275,8 +282,10 @@ impl World {
             self.objects_index_with_whereabouts.iter().enumerate()
         {
             if let InWorld::OnPositionIndex(object_position_index) = *object_whereabouts {
+                let object_type = self.objects_index_with_type[object_index];
+                let object_id = self.objects_index_with_id[object_index];
                 self.positions[object_position_index]
-                    .push(PlaceTaker::Object(self.objects_index_with_id[object_index]));
+                    .push(PlaceTaker::Object(object_id, object_type));
             }
         }
     }
@@ -313,34 +322,30 @@ impl World {
      * Returns the new object's index for the world's objects. */
     pub fn object_new(
         &mut self,
-        subtyped_object: objects::ObjectWithSubType,
+        object_type: objects::ObjectType,
         name: String,
         transportable: bool,
         passable: bool,
-        consumable_parts: Option<usize>,
-        storage_capacity: usize,
+        consumable_parts: u16,
+        storage_capacity: u16,
     ) -> objects::ObjectId {
-        let (object_type, subtype) = subtyped_object;
 
         // /* Add the new object into the world active objects. */
         self.objects.push(objects::Object::new(
             name,
             object_type,
-            subtype,
-            transportable,
             passable,
+            false, // stackable
+            transportable,
             consumable_parts,
             storage_capacity,
         ));
 
-        let object_id: objects::ObjectId = (
-            self.objects.last_mut().unwrap().get_object_id().0,
-            self.objects.last_mut().unwrap().get_object_id().1,
-            self.sequential_object_id,
-        );
+        let object_id: objects::ObjectId = self.sequential_object_id;
 
         self.objects_index_with_whereabouts.push(InWorld::Nowhere);
         self.objects_index_with_id.push(object_id);
+        self.objects_index_with_type.push(object_type);
 
         log::info!("New object created: {:?}", self.objects.last_mut());
 
@@ -356,13 +361,13 @@ impl World {
      *
      * Placed in a world inventory/storage first, can be placed in world.
      * Returns the new object's index for the world's objects. */
-    pub fn food_new(&mut self, name: objects::ObjectSubtype, bites: usize) -> objects::ObjectId {
+    pub fn food_new(&mut self, name: objects::ObjectSubtype, bites: u16) -> objects::ObjectId {
         self.object_new(
-            (objects::ObjectType::Food, name),
+            objects::ObjectType::Food(name),
             name.to_string(),
             true,
             true,
-            Some(bites),
+            bites,
             0,
         )
     }
@@ -375,17 +380,18 @@ impl World {
             return None;
         }
 
-        Some(self.object_new(
-            (
-                (self.objects[base_index]).get_object_id().0, // object type
-                (self.objects[base_index]).get_object_id().1, // object sub-type
-            ),
-            (self.objects[base_index]).get_name(),
-            (self.objects[base_index]).is_transportable(),
-            (self.objects[base_index]).is_passable(),
-            (self.objects[base_index]).get_consumable(),
-            (self.objects[base_index]).get_storage_capacity(),
-        ))
+        let fresh_object = objects::Object::clone_as_new(&(self.objects[base_index]));
+        let fresh_object_id = fresh_object.get_object_id();
+        let fresh_object_type = fresh_object.get_object_type();
+
+        self.objects.push(fresh_object);
+        self.objects_index_with_whereabouts.push(InWorld::Nowhere);
+        self.objects_index_with_id.push(fresh_object_id);
+        self.objects_index_with_type.push(fresh_object_type);
+
+        self.sequential_object_id += 1;
+
+        Some(fresh_object_id)
     }
 
     fn get_objects_index_by_id(&self, object_id: objects::ObjectId) -> Option<usize> {
@@ -397,6 +403,14 @@ impl World {
     fn get_object_whereabouts_by_id(&self, object_id: objects::ObjectId) -> Option<&InWorld> {
         if let Some(object_index) = self.get_objects_index_by_id(object_id) {
             self.objects_index_with_whereabouts.get(object_index)
+        } else {
+            None
+        }
+    }
+
+    fn get_object_type_by_id(&self, object_id: objects::ObjectId) -> Option<objects::ObjectType> {
+        if let Some(object_index) = self.get_objects_index_by_id(object_id) {
+            self.objects_index_with_type.get(object_index).copied()
         } else {
             None
         }
@@ -463,7 +477,10 @@ impl World {
      * If the object was held or stored before, it is now not anymore. */
     pub fn object_set_position(&mut self, object_id: objects::ObjectId, position: areas::Position) {
         if let Some(object_index) = self.object_id_to_index(object_id) {
-            let placetaker = PlaceTaker::Object(object_id);
+            let object_type = *self.objects_index_with_type.get(object_index).unwrap();
+
+            let placetaker = PlaceTaker::Object(object_id, object_type);
+
             let old_position_index = match self.objects_index_with_whereabouts[object_index] {
                 InWorld::OnPositionIndex(old_position_index) => old_position_index,
                 _ => self.position_upper_bound, // none (out of world).
@@ -841,6 +858,7 @@ impl World {
 #[derive(Clone, Copy, PartialEq)]
 enum InWorld {
     OnPositionIndex(usize),
+    #[allow(dead_code)]
     InStorageId(objects::ObjectId),
     HeldByWuselId(usize),
     Nowhere,
@@ -849,8 +867,8 @@ enum InWorld {
 #[derive(Clone, Copy, PartialEq)]
 pub enum PlaceTaker {
     Construction(usize),
-    Wusel(usize),
-    Object(objects::ObjectId),
+    Wusel(wusel::WuselId),
+    Object(objects::ObjectId, objects::ObjectType),
 }
 
 /** A Blueprint is a list of required abilities, consumables or positions
@@ -881,3 +899,4 @@ pub struct Consumable {
     /* While consuming it, one part (1/size) while change the needs as following. */
     need_change: std::collections::HashMap<wusel::Need, i16>,
 }
+

@@ -213,7 +213,8 @@ fn wusel_test_assignment() {
     let friendly = true;
     let romantically = true;
 
-    let food1_id: objects::ObjectId = (objects::ObjectType::Food, "Bread", 0); // (ObjectType, ObjectSubtype, 0);
+    // let food1_id: objects::ObjectId = (objects::ObjectType::Food("Bread"), 0); // (ObjectType, ObjectSubtype, 0);
+    let food1_id: objects::ObjectId = 0;
 
     wusel0.assign_to_task(
         init_time,

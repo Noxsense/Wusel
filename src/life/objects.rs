@@ -1,55 +1,42 @@
+/// module Life.
+///  - This module contains actuall all game world and life logics and mechanics.
+///  @author Nox
+///  @version 2021.0.1 */
+
 /** Types of an object. */
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ObjectType {
-    Construction,
-    Furniture,
-    Miscellaneous,
-    Food,
+    Furniture(ObjectSubtype),
+    Miscellaneous(ObjectSubtype),
+    Food(ObjectSubtype),
 }
-
-pub type ObjectWithSubType
-    = (ObjectType, ObjectSubtype);
-
-/** Identifier type (tuple) for an object. */
-pub type ObjectId
-    = (ObjectType, ObjectSubtype, usize);
 
 pub type ObjectSubtype
     = &'static str; // String doesn't support Copy Trait, what is used for the TaskTag.
+
+/** Identifier type (tuple) for an object. */
+pub type ObjectId
+    = usize;
 
 /** A world object indicates an object in the world which is not a wusel. */
 #[derive(Debug, Clone)]
 pub struct Object {
     name: String,
-    object_id: ObjectId,
-    transportable: bool, // can be transported by a wusel, will also apply stotable
-    passable: bool,      // if true, wusel can walk over it's occupied place (if at position)
-    consumable: Option<usize>, // if None: cannot be consumed; if Some(bites): number of parts, that can be consumed
-    storage_capacity: usize,   // items that can be stored 0
+    id: usize,
+    object_type: ObjectType,
+    object_attributes: u8,
+    consumable_bites: u16,
+    storage_capacity: u16,   // items that can be stored 0
+
+    consumable_bites_left: u16,
+    storage_capacity_left: u16,
 }
 
 impl Object {
-    // /* Which object's counter to increase. */
-    // let new_obj_count: usize = match obj_type {
-    //     objects::ObjectType::Construction => {
-    //         // TODO (2021-01-21) ... construction such as walls.
-    //         // self.obj_count_furniture += 1;
-    //         // self.obj_count_furniture // increase and return.
-    //         1
-    //     }
-    //     objects::ObjectType::Furniture => {
-    //         self.obj_count_furniture += 1;
-    //         self.obj_count_furniture // increase and return.
-    //     }
-    //     objects::ObjectType::Food => {
-    //         self.obj_count_food += 1;
-    //         self.obj_count_food // increase and return.
-    //     }
-    //     objects::ObjectType::Miscellaneous => {
-    //         self.obj_count_misc += 1;
-    //         self.obj_count_misc // increase and return.
-    //     }
-    // };
+
+    pub const OBJECT_IS_BLOCKING: u8  = 0b001; // not passable, will block the way.
+    pub const OBJECT_IS_STACKABLE: u8 = 0b010; // can be under or on top of another object.
+    pub const OBJECT_IS_PORTABLE: u8  = 0b100; // can be carried or stored.
 
     fn get_items_created() -> usize {
         0
@@ -57,21 +44,45 @@ impl Object {
 
     pub fn new(
         name: String,
-        obj_type: ObjectType,
-        subtype: ObjectSubtype,
-        transportable: bool,
-        passable: bool,
-        consumable_parts: Option<usize>,
-        storage_capacity: usize,
+        object_type: ObjectType,
+        is_solid: bool,
+        is_stackable:bool,
+        is_portable: bool,
+        consumable_bites: u16,
+        storage_capacity: u16,
     ) -> Self {
         Self {
             name,
-            object_id: (obj_type, subtype, Self::get_items_created()),
-            transportable,
-            passable,
-            consumable: consumable_parts,
+            object_type,
+            id: Self::get_items_created(),
+            object_attributes: Self::to_object_attributes(is_solid, is_stackable, is_portable),
+            consumable_bites,
             storage_capacity,
+            consumable_bites_left: consumable_bites,
+            storage_capacity_left: storage_capacity,
         }
+    }
+
+    /* Initiate new object (but as new) like the given. New Object: Not consumed and empty. */
+    pub fn clone_as_new(other: &Self) -> Self {
+        Self {
+            name: other.name.clone(),
+            object_type: other.object_type,
+            id: Self::get_items_created(), // new
+            object_attributes: other.object_attributes,
+            consumable_bites: other.consumable_bites,
+            storage_capacity: other.storage_capacity,
+            consumable_bites_left: other.consumable_bites,
+            storage_capacity_left: other.storage_capacity,
+        }
+    }
+
+    pub fn get_object_id(&self) -> usize {
+        self.id
+    }
+
+    pub fn get_object_type(&self) -> ObjectType {
+        self.object_type
     }
 
     pub fn get_name(&self) -> String {
@@ -82,39 +93,54 @@ impl Object {
         self.name = name;
     }
 
-    pub fn get_object_id(&self) -> ObjectId {
-        self.object_id
+    pub fn to_object_attributes(
+        is_blocking: bool,
+        is_stackable:bool,
+        is_portable: bool
+    ) -> u8 {
+        (if is_blocking { Self::OBJECT_IS_BLOCKING } else { 0u8 })
+        + if is_stackable { Self::OBJECT_IS_STACKABLE } else { 0u8 }
+        + if is_portable { Self::OBJECT_IS_PORTABLE } else { 0u8 }
     }
 
-    pub fn is_transportable(&self) -> bool {
-        self.transportable
+    pub fn is_blocking_stackable_portable(&self) -> (bool, bool, bool) {
+        (self.is_blocking(), self.is_stackable(), self.is_portable())
     }
 
-    pub fn set_transportable(&mut self, transportable: bool) {
-        self.transportable = transportable;
+    pub fn is_blocking(&self) -> bool {
+        (self.object_attributes & Self::OBJECT_IS_BLOCKING) != 0
     }
 
-    pub fn is_passable(&self) -> bool {
-        self.passable
+    pub fn is_stackable(&self) -> bool {
+        (self.object_attributes & Self::OBJECT_IS_STACKABLE) != 0
     }
 
-    pub fn set_passable(&mut self, passable: bool) {
-        self.passable = passable;
+    pub fn is_portable(&self) -> bool {
+        (self.object_attributes & Self::OBJECT_IS_PORTABLE) != 0
     }
 
-    pub fn get_consumable(&self) -> Option<usize> {
-        self.consumable
+    pub fn get_consumable(&self) -> u16 {
+        self.consumable_bites
     }
 
-    pub fn set_consumable(&mut self, consumable: Option<usize>) {
-        self.consumable = consumable;
+    pub fn get_consumable_left(&self) -> u16 {
+        self.consumable_bites_left
     }
 
-    pub fn get_storage_capacity(&self) -> usize {
+    pub fn set_consumable_left(&mut self, consumable_bites_left: u16) {
+        self.consumable_bites_left = consumable_bites_left;
+    }
+
+    pub fn get_storage_capacity(&self) -> u16 {
         self.storage_capacity
     }
 
-    pub fn set_storage_capacity(&mut self, storage_capacity: usize) {
-        self.storage_capacity = storage_capacity;
+    pub fn get_storage_capacity_left(&self) -> u16 {
+        self.storage_capacity_left
+    }
+
+    pub fn set_storage_capacity_left(&mut self, storage_capacity_left: u16) {
+        self.storage_capacity_left = storage_capacity_left;
     }
 }
+

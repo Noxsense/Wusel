@@ -37,19 +37,19 @@ fn test_walking() {
 
     let mut last_x_position = test_world.wusel_get_position(wusel_on_x).unwrap();
     let mut last_y_position = test_world.wusel_get_position(wusel_on_y).unwrap();
-    let mut wuselr_pos = test_world.wusel_get_position(wusel_wild).unwrap();
+    // let mut wuselr_pos = test_world.wusel_get_position(wusel_wild).unwrap();
 
     let mut wuselx_left = false;
     let mut wusely_tofront = false;
-    let mut wuselr_direction = 0;
+    // let mut wuselr_direction = 0;
 
     let mut wuselx_bad_count_in_row = 0;
     let mut wusely_bad_count_in_row = 0;
-    let mut wuselr_bad_count_in_row = 0;
+    // let mut wuselr_bad_count_in_row = 0;
 
     let mut goal_x: u32 = 0;
     let mut goal_y: u32 = 0;
-    let mut goal_rand: super::areas::Position = super::areas::Position::ROOT;
+    let mut goal_rand: super::areas::Position;
 
     for i in 0..repetition {
         // assign random walking (x axis).
@@ -198,14 +198,14 @@ fn test_consume_bread() {
 
     let food1_id = food1;
 
-    log::debug!("Test World's food created, index: {}.", food1_id.1);
+    log::debug!("Test World's food created, index: {}.", food1_id);
 
     let food2 = test_world.object_duplicate(0).unwrap(); // unsafe, but must be true.
 
     let food2_id = food2;
     test_world.object_set_position(food2_id, test_world.position_random());
 
-    log::debug!("Test World's food duplicated, index: {}.", food2_id.1);
+    log::debug!("Test World's food duplicated, index: {}.", food2_id);
 
     /* Put a copy into the world. */
     test_world.object_set_position(food1_id, test_world.position_random());
@@ -430,3 +430,4 @@ fn test_mutual_meeting() {
         // for w in 0..4 { test_world.wusel_show_tasklist(w); }
     }
 }
+
