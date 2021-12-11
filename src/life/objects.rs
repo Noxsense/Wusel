@@ -1,6 +1,6 @@
 //! # Objects
 //!
-//! An object is a non-living but intractable part of the world
+//! An object is a non-living but intractable part of the world.
 //! They can store other objects (or be put into the storages).
 //! Also they can be consumed and used up or created, or just put into the world.
 //!
