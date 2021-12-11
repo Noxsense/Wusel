@@ -1,16 +1,17 @@
-/**
- * Module Wusel ( and gender, lifestates, needs, abilities,).
- *
- * @author Nox
- * @version 2021.0.1
- */
+//! # Wusel
+//!
+//! ... and gender, lifestates, needs, abilities.
+//!
+//! ## Author
+//! Ngoc (Nox) Le <noxsense@gmail.com>
+
 use crate::life;
 use crate::life::tasks;
 
 pub type WuselId = usize;
 
-/** Wusel.
- * Bundle of information on a certain position and abilities. */
+/// Wusel.
+/// Bundle of information on a certain position and abilities.
 pub struct Wusel {
     id: WuselId,
     name: String,
@@ -77,17 +78,17 @@ impl Wusel {
         self.gender = new_gender;
     }
 
-    /** Tick one unit.
-     * Reduce the satisfaction of each needs by default values.
-     * Maybe let it age one day.
-     * @return if the wusel is still alive in the end. */
+    /// Tick one unit.
+    /// Reduce the satisfaction of each needs by default values.
+    /// Maybe let it age one day.
+    /// @return if the wusel is still alive in the end.
     pub fn wusel_tick(&mut self, add_day: bool) -> bool {
         let is_ill = false;
         let in_cold_environment = false;
 
         let mut life_state = Life::ALIVE;
 
-        /* Decrease every value by DEFAULT_NEED_DECAY_PER_MINUTE * minutes. */
+        // Decrease every value by DEFAULT_NEED_DECAY_PER_MINUTE * minutes.
         for (need, value) in self.needs.iter_mut() {
             let mut decay = need.get_default_decay();
 
@@ -137,15 +138,15 @@ impl Wusel {
         *self.needs.get(&need).unwrap_or(&0u32)
     }
 
-    /** Set the value for a need.
-     * This may append the needs with the new given value. */
+    /// Set the value for a need.
+    /// This may append the needs with the new given value.
     pub fn set_need(&mut self, need: Need, new_value: u32) -> u32 {
         self.needs.insert(need, new_value).unwrap_or(0u32)
     }
 
-    /** Change the value for a need relatively.
-     * This may create a new value, with default input changed by the change value.
-     * @return the new value.*/
+    /// Change the value for a need relatively.
+    /// This may create a new value, with default input changed by the change value.
+    /// @return the new value.
     pub fn set_need_relative(&mut self, need: Need, change_value: i16) -> u32 {
         let current: i64 = self.get_need(need) as i64; // get current value (or default)
         let changed: i64 = i64::max(0, current.saturating_add(change_value as i64));
@@ -198,24 +199,20 @@ impl Wusel {
         }
     }
 
-    /**
-     * Check if tasklist contains a task with a given passive part.
-     * (supportive, not for the user.)
-     */
+    /// * Check if tasklist contains a task with a given passive part.
+    /// (supportive, not for the user.)
     pub fn has_task_with(&self, task_tag: &tasks::TaskTag) -> bool {
         let index = self
             .get_next_task_index_with(&|task: &tasks::Task| task.get_passive_part() == *task_tag);
         index.is_some()
     }
 
-    /**
-     * Check if tasklist contains a matching the given expression.
-     * (supportive, not for the user.)
-     */
+    /// * Check if tasklist contains a matching the given expression.
+    /// (supportive, not for the user.)
     pub fn get_next_task_index_with(
         &self,
         task_matcher: &dyn Fn(&tasks::Task) -> bool,
-    ) -> Option<usize> {
+        ) -> Option<usize> {
         self.tasklist
             .iter()
             .rev()
@@ -227,11 +224,10 @@ impl Wusel {
         self.tasklist.last()
     }
 
-    /** Start the ongoing task.
-     * This may set the started flag to true, if not yet set and maybe
-     * updates the starting time.
-     * (supportive, not for the user.)
-     */
+    /// Start the ongoing task.
+    /// This may set the started flag to true, if not yet set and maybe
+    /// updates the starting time.
+    /// (supportive, not for the user.)
     pub fn start_ongoing_task(&mut self, start_time: usize) {
         if let Some(t) = self.tasklist.last_mut() {
             if !t.has_started() {
@@ -241,30 +237,26 @@ impl Wusel {
         }
     }
 
-    /** Notify the ongoing task, that its done steps are increased
-     * This increases the optional ongoing tasks [done_steps](tasks::Task.done_steps).
-     * (supportive, not for the user.)
-     * */
+    /// Notify the ongoing task, that its done steps are increased
+    /// This increases the optional ongoing tasks [done_steps](tasks::Task.done_steps).
+    /// (supportive, not for the user.)
     pub fn increase_ongoing_task_steps(&mut self) {
         if let Some(ongoing) = self.tasklist.last_mut() {
             ongoing.increase_done_steps();
         }
     }
 
-    /**
-     * Drop last task.
-     * (supportive, not for the user.)
-     */
+    /// * Drop last task.
+    /// (supportive, not for the user.)
     pub fn pop_ongoing_task(&mut self) -> Option<tasks::Task> {
         self.tasklist.pop()
     }
 
-    /** Clean task list.
-     * Remove ongoing tasks if there are no steps left.
-     * (supportive, not for the user.)
-     */
+    /// Clean task list.
+    /// Remove ongoing tasks if there are no steps left.
+    /// (supportive, not for the user.)
     pub fn auto_clean_tasks(&mut self) {
-        /* Remove ongoing task, if it is done. */
+        // Remove ongoing task, if it is done.
         while let Some(ongoing) = self.peek_ongoing_task() {
             if ongoing.get_rest_time() < 1 {
                 self.tasklist.pop();
@@ -310,8 +302,8 @@ impl Wusel {
     }
 }
 
-/** Life state of a Wusel.
- * All but alive leads to a not living state, though a ghost may wander and interact. */
+/// Life state of a Wusel.
+/// All but alive leads to a not living state, though a ghost may wander and interact.
 #[derive(Copy, Clone, PartialEq)]
 pub enum Life {
     ALIVE,
@@ -321,10 +313,13 @@ pub enum Life {
     GHOST,
 }
 
+/// A non-binary gender type for a Wusel
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum WuselGender {
     Female,
     Male,
+    // TODO (2021-12-11) Though it is still discrete.
+    // Make something like: can carry / can impregnate (not mutually exclusive, independent from gender identification
 }
 
 impl WuselGender {
@@ -349,7 +344,7 @@ impl WuselGender {
     }
 }
 
-/** A need, the Wusel needs to satisfy to survive. */
+/// A need, the Wusel needs to satisfy to survive.
 #[derive(Debug, Copy, Clone, Eq, Hash, PartialEq, PartialOrd)]
 pub enum Need {
     WATER,
@@ -392,10 +387,9 @@ impl Need {
         }
     }
 
-    /** From full to 0:
-     * How many ticks does it need, when it's only normally decreasing.
-     * This is adapted to nromal human life.
-     */
+    /// From full to 0:
+    /// How many ticks does it need, when it's only normally decreasing.
+    /// This is adapted to nromal human life.
     pub fn get_full(&self) -> u32 {
         match self {
             Need::WARMTH => life::HOUR * 8, // 8 hours until freeze to death.
@@ -408,10 +402,9 @@ impl Need {
         }
     }
 
-    /** From full to 0:
-     * How many ticks does it need, when it's only normally decreasing.
-     * This is adapted to nromal human life.
-     */
+    /// From full to 0:
+    /// How many ticks does it need, when it's only normally decreasing.
+    /// This is adapted to nromal human life.
     pub fn is_fatal(&self) -> bool {
         match self {
             Self::WATER | Self::FOOD | Self::WARMTH | Self::HEALTH => true,
@@ -420,7 +413,7 @@ impl Need {
     }
 }
 
-/** An ability, the Wusel can learn to improve their lifestyle. */
+/// An ability, the Wusel can learn to improve their lifestyle.
 #[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub enum Ability {
     COOKING,
@@ -447,6 +440,9 @@ impl Ability {
     }
 }
 
+/// Relation Direction
+///
+/// Any Relation can be romantically, non-romantically, etc.
 pub enum RelationType {
     Romance,
     Friendship,
@@ -469,7 +465,7 @@ impl RelationType {
     }
 }
 
-/** Pair of Wusels which may have a relation. */
+/// Pair of Wusels which may have a relation.
 #[derive(Clone, Debug)]
 pub struct Relation {
     officially: String,    // officially known state (Friends, Spouse, etc..)

@@ -1,12 +1,14 @@
-/**
- * module tui::core.
- * - Here, functions to render on the terminal user interface are provided.
- * @author Nox
- * @version 2021.0.1
- */
+//! # TUI Core
+//!
+//! Here, functions to render on the terminal user interface are provided.
+//!
+//! ## Author
+//! Ngoc (Nox) Le <noxsense@gmail.com>
+
 use termion;
 pub use termion::color::Rgb;
 
+/// Transform a colour given as `#0066ff` to as Rgb(0, 102, 255) type.
 pub fn hash_color_to_rgb(color_hash: u32) -> Rgb {
     let r: u8 = (color_hash >> 4) as u8;
     let g: u8 = ((color_hash >> 2) % 256) as u8;
@@ -14,6 +16,8 @@ pub fn hash_color_to_rgb(color_hash: u32) -> Rgb {
     Rgb(r, g, b)
 }
 
+/// Darken a colour value.
+/// Decreasing all fields value with the same amount.
 pub fn darken_rgb(colour: Rgb, darker_value: u8) -> Rgb {
     let Rgb(r, g, b) = colour;
 
@@ -23,6 +27,7 @@ pub fn darken_rgb(colour: Rgb, darker_value: u8) -> Rgb {
     Rgb(r1, g1, b1)
 }
 
+/// Position on the Screen.
 pub struct ScreenPos {
     pub x: u16,
     pub y: u16,
@@ -83,6 +88,7 @@ impl ScreenPos {
     }
 }
 
+/// Wrapping TextStyle simulating termion Screen Styles.
 #[derive(Debug, PartialEq, Clone, Copy, Eq)]
 pub enum TextStyle {
     Blink,      // blinking text (not widely supported)
@@ -94,31 +100,40 @@ pub enum TextStyle {
     Underline,  // Underlined text.
 }
 
+/// Put the cursor on the given position,
+/// see [Goto](termion::cursor_to::Goto).
 fn cursor_to_u16(x: u16, y: u16) {
     print!("{}", termion::cursor::Goto(x, y));
 }
 
+/// Put the cursor on the given position given by a ScreenPos,
+/// see [Goto](termion::cursor_to::Goto).
 pub fn cursor_to(position: &ScreenPos) {
     cursor_to_u16(position.x, position.y);
 }
 
+/// Clear everything after the cursor and also unset the colours from there on.
 pub fn render_reset(end_position: &ScreenPos) {
-    /* Position to below field, clear everything below. */
+    // Position to below field, clear everything below.
     cursor_to(end_position);
     render_reset_colours();
     print!("{}", termion::clear::AfterCursor);
     cursor_to(end_position);
 }
 
+/// Make a blank screen.
 pub fn render_clear_all() {
     print!("{}{}", termion::clear::All, termion::cursor::Hide);
 }
 
+/// Reset the style, keep going un-styled from then.
 pub fn render_reset_style() {
     // also uncolours.
     print!("{}", termion::style::Reset);
+    // TODO (2021-12-11) reset only style not color stack.
 }
 
+/// Reset color, keep going with default terminal colours.
 pub fn render_reset_colours() {
     print!(
         "{}{}",
@@ -127,6 +142,7 @@ pub fn render_reset_colours() {
     );
 }
 
+/// Render on the given position a given char with styles, and colours.
 pub fn render_spot(
     postion: &ScreenPos,
     character: char,
@@ -184,7 +200,7 @@ pub fn render_spot(
     }
 }
 
-/** Draw a rectangle between the spanning postions, do not fill/overwrite the area. */
+/// Draw a rectangle between the spanning postions, do not fill/overwrite the area.
 pub fn render_rectangle(
     a: &ScreenPos,
     b: &ScreenPos,
@@ -195,7 +211,7 @@ pub fn render_rectangle(
     let (x0, y0): (u16, u16) = (u16::min(a.x, b.x), u16::min(a.y, b.y)); // top left
     let (x1, y1): (u16, u16) = (u16::max(a.x, b.x), u16::max(a.y, b.y)); // bottom right
 
-    /* Draw horizontal lines. */
+    // Draw horizontal lines.
     for x in (x0 + 1)..(x1) {
         cursor_to_u16(x, y0);
         print!("{}", horizontal_border_symbol);
@@ -204,7 +220,7 @@ pub fn render_rectangle(
         print!("{}", horizontal_border_symbol);
     }
 
-    /* Draw vertical lines. */
+    // Draw vertical lines.
     for y in (y0 + 1)..(y1) {
         cursor_to_u16(x0, y);
         print!("{}", vertical_border_symbol);
@@ -213,7 +229,7 @@ pub fn render_rectangle(
         print!("{}", vertical_border_symbol);
     }
 
-    /* Draw Corners. */
+    // Draw Corners.
     for x in [x0, x1] {
         for y in [y0, y1] {
             cursor_to_u16(x, y);
@@ -224,7 +240,7 @@ pub fn render_rectangle(
     render_reset_colours();
 }
 
-/** Draw a rectangle between the spanning positions, filling the area. */
+/// Draw a rectangle between the spanning positions, filling the area.
 pub fn render_rectangle_filled(a: &ScreenPos, b: &ScreenPos, fill: &str) {
     let (x0, y0): (u16, u16) = (u16::min(a.x, b.x), u16::min(a.y, b.y)); // top left
     let (x1, y1): (u16, u16) = (u16::max(a.x, b.x), u16::max(a.y, b.y)); // bottom right
@@ -239,6 +255,7 @@ pub fn render_rectangle_filled(a: &ScreenPos, b: &ScreenPos, fill: &str) {
     render_reset_colours();
 }
 
+/// Render a progress bar, with the value set by a percentage value.
 pub fn render_progres_bar_from_percent(
     position: &ScreenPos,
     panel_size: u16,
@@ -266,7 +283,7 @@ pub fn render_progres_bar_from_percent(
     let mut bar_character: char;
 
     if draw_horizontal {
-        /* Draw something like: [#######----] */
+        // Draw something like: [#######----]
 
         // start bar border.
         render_spot(position, '[', None, None, None, false, false);
@@ -327,7 +344,7 @@ pub fn render_progres_bar_from_percent(
             false,
         );
     } else {
-        /* Draw vertical bar (down to up). */
+        // Draw vertical bar (down to up).
         render_spot(position, '^', None, None, None, false, false);
 
         if let Some((full_color, rest_color)) = optipnal_colors {
@@ -376,8 +393,8 @@ pub fn render_progres_bar_from_percent(
     render_reset_colours();
 }
 
-/** Render a bar at a given position.
- * If min value is not null, try to balance the zero value in the center. */
+/// Render a bar at a given position.
+/// If min value is not null, try to balance the zero value in the center.
 pub fn render_progres_bar(
     position: &ScreenPos,
     panel_size: u16,
@@ -386,7 +403,7 @@ pub fn render_progres_bar(
     current_value: u32,
     optipnal_colors: Option<(Rgb, Rgb)>,
     draw_horizontal: bool,
-) -> f32 {
+    ) -> f32 {
     let percentage_pre: f32 = current_value as f32 / max_value as f32 * 100f32;
     let percentage: f32 = f32::min(100.0, f32::max(0.0, percentage_pre));
 
