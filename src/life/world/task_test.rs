@@ -18,19 +18,19 @@ fn test_walking() {
         "on_x".to_string(),
         super::wusel::WuselGender::Female,
         super::areas::Position { x: 0, y: 0, z: 0 },
-    );
+        );
 
     test_world.wusel_new(
         "on_y".to_string(),
         super::wusel::WuselGender::Male,
         super::areas::Position { x: 2, y: 2, z: 0 },
-    );
+        );
 
     test_world.wusel_new(
         "random".to_string(),
         super::wusel::WuselGender::Male,
         super::areas::Position { x: 3, y: 4, z: 0 },
-    );
+        );
 
     let repetition: usize = 1000;
     let bad_behaviour_acceptance = 3;
@@ -64,7 +64,7 @@ fn test_walking() {
                     y: 0,
                     z: 0,
                 }),
-            );
+                );
         }
 
         // assign random walking (y axis).
@@ -79,7 +79,7 @@ fn test_walking() {
                     y: goal_y,
                     z: 0,
                 }),
-            );
+                );
         }
 
         // assign random walking (x-y plane).
@@ -88,7 +88,7 @@ fn test_walking() {
             println!(
                 "{:03}$ Wusel ? goal to ({:2},{:2}, 0)",
                 i, goal_rand.x, goal_rand.y
-            );
+                );
             test_world
                 .wusel_assign_to_task(wusel_wild, super::tasks::TaskBuilder::move_to(goal_rand));
         }
@@ -106,7 +106,7 @@ fn test_walking() {
                 p.y,
                 p.z,
                 if wuselx_left { "left" } else { "right" }
-            );
+                );
 
             let expected_x = if wuselx_left {
                 last_x_position.x.saturating_sub(1)
@@ -141,7 +141,7 @@ fn test_walking() {
                 } else {
                     "to back"
                 }
-            );
+                );
 
             let expected_y = if wusely_tofront {
                 last_y_position.y.saturating_sub(1)
@@ -175,7 +175,7 @@ fn test_consume_bread() {
     let mut test_world: super::World = super::World::new(20, 5); // small world.
     log::debug!("Test World created");
 
-    /* Empty test_world tick. */
+    // Empty test_world tick.
     test_world.tick();
     log::debug!("Test World ticked");
 
@@ -183,17 +183,17 @@ fn test_consume_bread() {
         "Eater".to_string(),
         super::wusel::WuselGender::Female,
         super::areas::Position { x: 1, y: 0, z: 0 },
-    );
+        );
 
     test_world.wusel_new(
         "Starver".to_string(),
         super::wusel::WuselGender::Male,
         super::areas::Position { x: 2, y: 0, z: 0 },
-    );
+        );
 
     log::debug!("Test World's wusels created.");
 
-    /* Create food: transportable, no storage. */
+    // Create food: transportable, no storage.
     let food1 = test_world.food_new("Bread", 100);
 
     let food1_id = food1;
@@ -207,25 +207,25 @@ fn test_consume_bread() {
 
     log::debug!("Test World's food duplicated, index: {}.", food2_id);
 
-    /* Put a copy into the world. */
+    // Put a copy into the world.
     test_world.object_set_position(food1_id, test_world.position_random());
 
     log::debug!("Test World's food put onto a position.");
 
-    /* Get the food and transport it somewhere else. */
+    // Get the food and transport it somewhere else.
     test_world.wusel_assign_to_task(1, super::tasks::TaskBuilder::use_object(food1_id, 1)); // take
     test_world.wusel_assign_to_task(
         1,
         super::tasks::TaskBuilder::move_to(test_world.position_random()),
-    );
+        );
     test_world.wusel_assign_to_task(1, super::tasks::TaskBuilder::use_object(food1_id, 2)); // drop
     test_world.wusel_assign_to_task(
         1,
         super::tasks::TaskBuilder::move_to(test_world.position_random()),
-    );
+        );
     test_world.wusel_assign_to_task(1, super::tasks::TaskBuilder::use_object(food1_id, 1)); // take not exisiting?
 
-    /* Let the other wusel wait, than it's tries to get the food as well, and consume it. */
+    // Let the other wusel wait, than it's tries to get the food as well, and consume it.
     test_world.wusel_assign_to_task(
         0,
         super::tasks::TaskBuilder::move_to(super::areas::Position {
@@ -233,21 +233,21 @@ fn test_consume_bread() {
             y: test_world.get_depth() - 1,
             z: 0,
         }),
-    );
+        );
     test_world.wusel_assign_to_task(0, super::tasks::TaskBuilder::use_object(food1_id, 1)); // take as well.
     test_world.wusel_assign_to_task(
         0,
         super::tasks::TaskBuilder::move_to(test_world.position_random()),
-    );
+        );
     test_world.wusel_assign_to_task(0, super::tasks::TaskBuilder::use_object(food1_id, 3)); // consume.
     test_world.wusel_assign_to_task(
         0,
         super::tasks::TaskBuilder::move_to(test_world.position_random()),
-    );
+        );
     test_world.wusel_assign_to_task(
         0,
         super::tasks::TaskBuilder::move_to(test_world.position_random()),
-    );
+        );
     log::debug!("Test World's task to work at the workbench assigned.");
 
     // show everyone's stats.
@@ -259,17 +259,18 @@ fn test_consume_bread() {
     }
     log::debug!("Test World's wusels' needs artificially reduced.");
 
-    /* Show the grid.. */
+    // Show the grid..
     let (_w, _h): (usize, usize) = (
         test_world.get_width() as usize,
         test_world.get_depth() as usize,
-    );
+        );
 
+    // clear the test screen
     println!(
         "{clear}{hide}",
         clear = termion::clear::All,
         hide = termion::cursor::Hide
-    ); // clear the test screen
+        );
 
     for _ in 0..300 {
         // render_field(_w, _h, test_world.positions_for_grid());
@@ -277,7 +278,7 @@ fn test_consume_bread() {
         log::debug!(
             "Test World's current grid, time: {}.",
             test_world.get_time()
-        );
+            );
 
         test_world.tick(); // progress time.
 
@@ -288,7 +289,7 @@ fn test_consume_bread() {
     }
 }
 
-/** Test doing tasks. */
+/// Test doing tasks.
 #[test]
 fn test_create_bread() {
     // TODO refactor test.
@@ -307,9 +308,8 @@ fn test_create_bread() {
     // Knife dull and then .. gone
     // Couch is sit broken after several times?
 
-    /* Cook a meal, that needs a working station, tomatoes, a knife and pot.
-     * Or knife and Pot as part of the station.
-     * Cut a meal, boil the meal => consumes tomatoes, creates tomato soup. */
+    // Or knife and Pot as part of the station.
+    // Cut a meal, boil the meal => consumes tomatoes, creates tomato soup.
 
     // abort if difficulty is too high
     // walk to station.position, wait until free, block
@@ -323,41 +323,40 @@ fn test_create_bread() {
     // * doing sports uses energy and water and fills sportivité abilities.
 }
 
-/** Test mutually meeting, which may cause deadlocks.
- * -----
- * 1at: [Read, Meet 2nd].
- * 2nd: [Meet 3rd]
- * 3rd: [Meet 4th]
- * 4th: [Meet 1st]
- * -----
- * 1at: [Read, Meet 2nd] + [Met by 4th]
- * 2nd: [Meet 3rd]
- * 3rd: [Meet 4th] + [Met by 2nd]
- * 4th: [Meet 1st] + [Met by 3rd]
- * -----
- * 1st done with reading and wants to meet 2nd.
- * -----
- * 1at: [Meet 2nd, Met by 4th]
- * 2nd: [Meet 3rd] + [Met by 1st]
- * 3rd: [Meet 4th, Met by 2nd]
- * 4th: [Meet 1st, Met by 3rd]
- * -----
- * Nothing happens, since everyone waits for the other to be done.
- * 2nd, 3rd and 4th stop meeting. (they waited too long)
- * -----
- * 1at: [Meet 2nd, Met by 4th]
- * 2nd: [Met by 1st]
- * 3rd: [Met by 2nd]
- * 4th: [Met by 3rd]
- * -----
- * The active meeter, they were about to be met by is gone, stop being met.
- * 1at: [Meet 2nd, Met by 4th]
- * 2nd: [Met by 1st]
- * 3rd: []
- * 4th: []
- * -----
- * 1st meets 2nd; 4th is not meeting 1st anymore. No tasks left.
- */
+/// Test mutually meeting, which may cause deadlocks.
+/// -----
+/// 1at: [Read, Meet 2nd].
+/// 2nd: [Meet 3rd]
+/// 3rd: [Meet 4th]
+/// 4th: [Meet 1st]
+/// -----
+/// 1at: [Read, Meet 2nd] + [Met by 4th]
+/// 2nd: [Meet 3rd]
+/// 3rd: [Meet 4th] + [Met by 2nd]
+/// 4th: [Meet 1st] + [Met by 3rd]
+/// -----
+/// 1st done with reading and wants to meet 2nd.
+/// -----
+/// 1at: [Meet 2nd, Met by 4th]
+/// 2nd: [Meet 3rd] + [Met by 1st]
+/// 3rd: [Meet 4th, Met by 2nd]
+/// 4th: [Meet 1st, Met by 3rd]
+/// -----
+/// Nothing happens, since everyone waits for the other to be done.
+/// 2nd, 3rd and 4th stop meeting. (they waited too long)
+/// -----
+/// 1at: [Meet 2nd, Met by 4th]
+/// 2nd: [Met by 1st]
+/// 3rd: [Met by 2nd]
+/// 4th: [Met by 3rd]
+/// -----
+/// The active meeter, they were about to be met by is gone, stop being met.
+/// 1at: [Meet 2nd, Met by 4th]
+/// 2nd: [Met by 1st]
+/// 3rd: []
+/// 4th: []
+/// -----
+/// 1st meets 2nd; 4th is not meeting 1st anymore. No tasks left.
 #[test]
 fn test_mutual_meeting() {
     // TODO refactor test.
@@ -365,40 +364,39 @@ fn test_mutual_meeting() {
     println!("[test] Mutual Meeting, causes for circular deadlocks.");
     let mut test_world: super::World = super::World::new(80, 30);
 
-    /* Empty test_world tick. */
+    // Empty test_world tick.
     test_world.tick();
 
     test_world.wusel_new(
         "1st".to_string(),
         super::wusel::WuselGender::Female,
         super::areas::Position { x: 1, y: 0, z: 0 },
-    );
+        );
 
     test_world.wusel_new(
         "2nd".to_string(),
         super::wusel::WuselGender::Female,
         super::areas::Position { x: 3, y: 0, z: 0 },
-    );
+        );
     test_world.wusel_new(
         "3rd".to_string(),
         super::wusel::WuselGender::Male,
         super::areas::Position { x: 5, y: 0, z: 0 },
-    );
+        );
 
     test_world.wusel_new(
         "4th".to_string(),
         super::wusel::WuselGender::Male,
         super::areas::Position { x: 9, y: 0, z: 0 },
-    );
+        );
 
     // 4 wusels created.
     assert_eq!(4, test_world.wusel_count());
 
-    /* Create an easy talk, without any preconditions.
-     * => no preconditions.
-     * => does 'nothing' for ticks steps. */
+    // => no preconditions.
+    // => does 'nothing' for ticks steps.
     let reading: super::tasks::TaskBuilder =
-        super::tasks::TaskBuilder::new(String::from("Reading")).set_duration(5 /*ticks*/);
+        super::tasks::TaskBuilder::new(String::from("Reading")).set_duration(5); // ticks
 
     test_world.tick();
 
@@ -406,24 +404,28 @@ fn test_mutual_meeting() {
     test_world.wusel_assign_to_task(0, reading.clone()); // do reading.
 
     // scenario: everyone wants too meet the next one.
+    // mutual meeting.
     test_world.wusel_assign_to_task(
         0,
         super::tasks::TaskBuilder::meet_with(1, true, false).set_duration(7),
-    ); // mutual meeting.
+        );
+    // mutual meeting.
     test_world.wusel_assign_to_task(
         1,
         super::tasks::TaskBuilder::meet_with(2, true, false).set_duration(7),
-    ); // mutual meeting.
+        );
+    // mutual meeting.
     test_world.wusel_assign_to_task(
         2,
         super::tasks::TaskBuilder::meet_with(3, true, false).set_duration(7),
-    ); // mutual meeting.
+        );
+    // mutual meeting.
     test_world.wusel_assign_to_task(
         3,
         super::tasks::TaskBuilder::meet_with(0, true, false).set_duration(7),
-    ); // mutual meeting.
+        );
 
-    /* 90 ticks later. */
+    // 90 ticks later.
     for _ in 0..90 {
         test_world.tick();
         // println!("\nTasks at time {}:", test_world.get_time());

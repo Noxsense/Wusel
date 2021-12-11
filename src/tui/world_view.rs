@@ -1,12 +1,14 @@
+//! # TUI: World Rendering
+//!
+//! Here, functions to tui::render the world view.
+//!
+//! ## Author
+//! Ngoc (Nox) Le <noxsense@gmail.com>
+
 use crate::life;
-/**
- * module tui::world_view.
- * - Here, functions to tui::render the world view.
- * @author Nox
- * @version 2021.0.1
- */
 use crate::tui::core;
 
+/// Get a styled char for a placeholder in the world.
 fn get_render_for_position(
     c: Option<&life::world::PlaceTaker>,
 ) -> (
@@ -16,23 +18,23 @@ fn get_render_for_position(
     Option<Vec<core::TextStyle>>,
 ) {
     match c {
-       Some(life::world::PlaceTaker::Wusel(_))                                                 => ('O', Some(core::Rgb(0, 0, 0)), None, Some(vec![core::TextStyle::Bold])), // wusel, -- smiley, alternatively or w
-       Some(life::world::PlaceTaker::Construction(_))                                          => ('#', Some(core::Rgb(000, 000, 000)), None, None), // construction, eg. wall
+       Some(life::world::PlaceTaker::Wusel(_))                                               => ('O', Some(core::Rgb(0, 0, 0)), None, Some(vec![core::TextStyle::Bold])), // wusel, -- smiley, alternatively or w
+       Some(life::world::PlaceTaker::Construction(_))                                        => ('#', Some(core::Rgb(000, 000, 000)), None, None), // construction, eg. wall
        Some(life::world::PlaceTaker::Object(_, life::objects::ObjectType::Furniture(_)))     => ('m', Some(core::Rgb(99, 67, 14)), None, None), // furniture, eg. chair
        Some(life::world::PlaceTaker::Object(_, life::objects::ObjectType::Miscellaneous(_))) => ('*', Some(core::Rgb(000, 000, 100)), None, None), // miscellaneous, eg. food
        Some(life::world::PlaceTaker::Object(_, life::objects::ObjectType::Food(_)))          => ('ó', Some(core::Rgb(200, 000, 000)), None, None), // food
-        _                                                                                      => (' ', Some(core::Rgb(000, 100, 000)), Some(core::Rgb(222, 255, 222)), None), // empty
+        _                                                                                    => (' ', Some(core::Rgb(000, 100, 000)), Some(core::Rgb(222, 255, 222)), None), // empty
     }
 }
 
-/** Clean he view and draw the field, put the cursor, two lines below the field, to write there. */
+/// Clean he view and draw the field, put the cursor, two lines below the field, to write there.
 pub fn render_field(w: usize, positions: Vec<Vec<life::world::PlaceTaker>>) {
-    /* Draw field. */
+    // Draw field.
     let reset_color_after_draw = false;
     let reset_style_after_draw = true;
 
     for (p, on_pos) in positions.iter().enumerate() {
-        /* All things on this position. */
+        // All things on this position.
 
         let (x, y): (u16, u16);
         x = (p % w) as u16 + 2;
@@ -42,7 +44,7 @@ pub fn render_field(w: usize, positions: Vec<Vec<life::world::PlaceTaker>>) {
 
         let (render_char, render_fg, render_bg, render_styles) = render_data;
 
-        /* Draw position symbol. */
+        // Draw position symbol.
         core::render_spot(
             &core::ScreenPos { x, y },
             render_char,
@@ -57,6 +59,9 @@ pub fn render_field(w: usize, positions: Vec<Vec<life::world::PlaceTaker>>) {
     core::render_reset_colours();
 }
 
+/// Show time
+/// tick .. time units the session is running
+/// time .. time of the world.
 pub fn render_time(position: &core::ScreenPos, tick: usize, time: usize) {
     core::cursor_to(position);
     print!(
@@ -65,6 +70,8 @@ pub fn render_time(position: &core::ScreenPos, tick: usize, time: usize) {
     );
 }
 
+/// Render the task list of a wusel, given by string names.
+/// This also crops longer texts.
 pub fn render_wusel_tasklist(position: core::ScreenPos, tasklist: Vec<String>) {
     core::cursor_to(&position);
     print!("{:23}", ""); // clear field.
@@ -81,7 +88,7 @@ pub fn render_wusel_tasklist(position: core::ScreenPos, tasklist: Vec<String>) {
     }
 }
 
-/** Render a Need Panel. */
+/// Render a Need Panel.
 pub fn render_wusel_need_bar(
     position: core::ScreenPos,
     panel_width: u16,

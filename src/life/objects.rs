@@ -1,9 +1,13 @@
-/// module Life.
-///  - This module contains actuall all game world and life logics and mechanics.
-///  @author Nox
-///  @version 2021.0.1 */
+//! # Objects
+//!
+//! An object is a non-living but intractable part of the world
+//! They can store other objects (or be put into the storages).
+//! Also they can be consumed and used up or created, or just put into the world.
+//!
+//! ## Author
+//! Ngoc (Nox) Le <noxsense@gmail.com>
 
-/** Types of an object. */
+/// Types of an object.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ObjectType {
     Furniture(ObjectSubtype),
@@ -11,14 +15,15 @@ pub enum ObjectType {
     Food(ObjectSubtype),
 }
 
+/// Subtype or Subcategory of an Object
 pub type ObjectSubtype
     = &'static str; // String doesn't support Copy Trait, what is used for the TaskTag.
 
-/** Identifier type (tuple) for an object. */
+/// Identifier type (tuple) for an object.
 pub type ObjectId
     = usize;
 
-/** A world object indicates an object in the world which is not a wusel. */
+/// A world object indicates an object in the world which is not a wusel.
 #[derive(Debug, Clone)]
 pub struct Object {
     name: String,
@@ -63,7 +68,7 @@ impl Object {
         }
     }
 
-    /* Initiate new object (but as new) like the given. New Object: Not consumed and empty. */
+    /// Initiate new object (but as new) like the given. New Object: Not consumed and empty.
     pub fn clone_as_new(other: &Self) -> Self {
         Self {
             name: other.name.clone(),
@@ -143,4 +148,3 @@ impl Object {
         self.storage_capacity_left = storage_capacity_left;
     }
 }
-

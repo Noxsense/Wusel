@@ -1,19 +1,21 @@
-/**
- * Module tasks.
- *
- * @author Nox
- * @version 2021.0.1
- */
+//! # Tasks
+//!
+//! Module to manage and create tasks.
+//!
+//! ## Author
+//! Ngoc (Nox) Le <noxsense@gmail.com>
 
 use crate::life::areas;
 #[allow(unused_imports)] use crate::life::world;
 use crate::life::wusel;
 use crate::life::objects;
 
+/// Id Type of an Action
 pub type ActionId = usize;
 
-/** TaskBuilder, to create a Task for a Wusel.
- * Name, Target, duration and conditions are set with the builder. */
+/// TaskBuilder, to create a Task for a Wusel.
+/// a up
+/// Name, Target, duration and conditions are set with the builder.
 #[derive(Debug, Clone)]
 pub struct TaskBuilder {
     name: String,
@@ -22,7 +24,7 @@ pub struct TaskBuilder {
 }
 
 impl TaskBuilder {
-    /** Create a new Task Builder. */
+    /// Create a new Task Builder.
     pub fn new(name: String) -> Self {
         Self {
             name,
@@ -31,7 +33,7 @@ impl TaskBuilder {
         }
     }
 
-    /** Create a new Task Builder, preset for moving. */
+    /// Create a new Task Builder, preset for moving.
     pub fn move_to(pos: areas::Position) -> Self {
         Self {
             name: "Moving".to_string(),
@@ -40,7 +42,7 @@ impl TaskBuilder {
         }
     }
 
-    /** Create a new Task Builder, preset for meeting. */
+    /// Create a new Task Builder, preset for meeting.
     pub fn meet_with(passive: wusel::WuselId, friendly: bool, romantically: bool) -> Self {
         Self {
             name: "Meeting".to_string(),
@@ -49,7 +51,7 @@ impl TaskBuilder {
         }
     }
 
-    /** Create a new Task Builder, preset for working on a workbench. */
+    /// Create a new Task Builder, preset for working on a workbench.
     pub fn use_object(object_id: objects::ObjectId, action_id: ActionId) -> Self {
         Self {
             name: format!("Use[{}] Object[{:?}]", action_id, object_id),
@@ -58,7 +60,7 @@ impl TaskBuilder {
         }
     }
 
-    /** Create a new Task Builder, preset for being met. */
+    /// Create a new Task Builder, preset for being met.
     pub fn be_met_from(active: wusel::WuselId) -> Self {
         Self {
             name: "Being Met".to_string(),
@@ -67,38 +69,38 @@ impl TaskBuilder {
         }
     }
 
-    /** Get the name of the future task or all then created tasks. */
+    /// Get the name of the future task or all then created tasks.
     #[allow(dead_code)]
     pub fn get_name(&self) -> String {
         self.name.clone()
     }
 
-    /** Get the duration of the future task or all then created tasks. */
+    /// Get the duration of the future task or all then created tasks.
     #[allow(dead_code)]
     pub fn get_duration(&self) -> usize {
         self.duration
     }
 
-    /** Rename the task builder in the Task Builder. */
+    /// Rename the task builder in the Task Builder.
     pub fn set_name(mut self, name: String) -> Self {
         self.name = name;
         self
     }
 
-    /** Set the duration in the Task Builder. */
+    /// Set the duration in the Task Builder.
     pub fn set_duration(mut self, time: usize) -> Self {
         self.duration = time;
         self
     }
 
-    /** Set the duration in the passive part. */
+    /// Set the duration in the passive part.
     #[allow(dead_code)]
     pub fn set_passive_part(mut self, passive: TaskTag) -> Self {
         self.passive_part = passive;
         self
     }
 
-    /** Create a new Task from the builder for the requesting [actor](Wusel). */
+    /// Create a new Task from the builder for the requesting [actor](crate::life::wusel::Wusel).
     pub fn assign(self, start_time: usize, actor: &wusel::Wusel) -> Task {
         Task {
             name: self.name,
@@ -113,6 +115,10 @@ impl TaskBuilder {
     }
 }
 
+/// Type for a Core Task
+///
+/// Such as social interactions, object interactions or walking situations.
+/// Also for just very tasks such as waiting or reading.
 #[derive(Debug, Clone, PartialEq)]
 pub enum TaskTag {
     WaitLike,
@@ -124,7 +130,10 @@ pub enum TaskTag {
     BeMetFrom(wusel::WuselId),            // be met by another wusel (ID)
 }
 
-/** Task, a Wusel can do. */
+/// Task, a Wusel can do.
+///
+/// A task can contain multiple steps. This task struct also is stateful and
+/// keeps track of its progress.
 #[derive(Clone)]
 pub struct Task {
     name: String,
@@ -140,7 +149,7 @@ pub struct Task {
 impl Task {
     pub const PATIENCE_TO_MEET: usize = 20; // TODO
 
-    /** Get the approximately rest time (in ticks), this task needs. */
+    /// Get the approximately rest time (in ticks), this task needs.
     pub fn get_rest_time(&self) -> usize {
         self.duration - self.done_steps
     }
@@ -188,6 +197,7 @@ impl Task {
 }
 
 // TODO (2021-11-21) improve type
+/// Relation between the usage of an [Object](objects::ObjectId) and [Wusel Needs](wusel::Need).
 pub type ActionAffect = (
     objects::ObjectId,       // affected object
     usize,                   // object subtype

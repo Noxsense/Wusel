@@ -1,21 +1,17 @@
-/**
- * main.
- *
- * This is a life simulation game where life is given to multiple wusels whose life can be in your
- * hand, otherwise they will try really hard to keep them alive on their own and you can watch they
- * cute little waddeling and 'wuseln'.
- *
- * @author Nox
- * @version 2021.0.1
- */
-// use rand;
-// use std;
-// use termion;
+//! # Wusel - Game
+//!
+//! This is a life simulation game where life is given to multiple wusels whose life can be in your
+//! hand, otherwise they will try really hard to keep them alive on their own and you can watch they
+//! cute little waddling and 'wuseln'.
+//!
+//! ## Author
+//! Ngoc (Nox) Le <noxsense@gmail.com>
+
 pub mod life;
 pub mod tui;
 pub mod util;
 
-/** The main method of the wusel world. */
+/// The main method of the wusel world.
 fn main() -> Result<(), std::io::Error> {
     env_logger::init(); // initiate the logger.
 
@@ -59,7 +55,7 @@ fn main() -> Result<(), std::io::Error> {
         h = world.get_depth()
     );
 
-    /* Empty world tick. */
+    // Empty world tick.
     world.tick();
 
     for _ in 0..rand::random::<u8>() % 10 + 2 {
@@ -68,17 +64,17 @@ fn main() -> Result<(), std::io::Error> {
         ));
     }
 
-    /* Transportable bibimbap (korean food) */
+    // Transportable bibimbap (korean food)
     let bibimbap = world.food_new("Bibimbap", 10);
     let bibimbap_id = bibimbap;
 
-    /* Position. */
+    // Position.
     world.object_set_position(bibimbap_id, world.position_random());
 
     let steps_per_second = arg_steps_per_second;
     let step_sleep = std::time::Duration::from_millis(1000 / steps_per_second);
 
-    /* Draw the field and make some real automation. */
+    // Draw the field and make some real automation.
     let (w, h) = (world.get_width() as usize, world.get_depth() as usize);
 
     let time_position: &tui::core::ScreenPos = &tui::core::ScreenPos {
@@ -132,7 +128,7 @@ fn main() -> Result<(), std::io::Error> {
             // world.positions_recalculate_grid();
             tui::world_view::render_field(w, world.positions_for_all_placetakers());
 
-            /* Tick the world, show time. */
+            // Tick the world, show time.
             tui::world_view::render_time(time_position, i, world.get_time());
             tui::core::render_progres_bar(
                 timebar_position,
@@ -144,7 +140,7 @@ fn main() -> Result<(), std::io::Error> {
                 false,
             );
 
-            /* Draw selected wusel's needs (right position below field). */
+            // Draw selected wusel's needs (right position below field).
 
             for (wusel_offset, &wusel_id) in world.wusel_get_all_alive().iter().enumerate() {
                 // TODO
@@ -192,28 +188,28 @@ fn main() -> Result<(), std::io::Error> {
 
         world.tick();
 
-        /* Give some unbusy wusels the task to move around. */
+        // Give some unbusy wusels the task to move around.
         let unbusy = world.wusel_get_all_unbusy();
         let wusel_len = world.wusel_count();
         for widx in unbusy {
             let r = rand::random::<usize>() % (4 * wusel_len);
             match r {
                 i if i < wusel_len && i != widx => {
-                    /* Meet randomly with someone: Let [widx] meet [i], if i in [0..|w|). */
+                    // Meet randomly with someone: Let [widx] meet [i], if i in [0..|w|).
                     world.wusel_assign_to_task(
                         widx,
                         life::tasks::TaskBuilder::meet_with(i, true, true).set_duration(10),
                     );
                 }
                 i if i >= wusel_len && i < 2 * wusel_len => {
-                    /* Walk randomly somewhere, if i not an wusel index. */
+                    // Walk randomly somewhere, if i not an wusel index.
                     world.wusel_assign_to_task(
                         widx,
                         life::tasks::TaskBuilder::move_to(world.position_random()),
                     );
                 }
                 i if i >= 2 * wusel_len && i < 3 * wusel_len => {
-                    /* Interact with the object. */
+                    // Interact with the object.
                     world.wusel_assign_to_task(
                         widx,
                         life::tasks::TaskBuilder::use_object(bibimbap_id, 0), // view
