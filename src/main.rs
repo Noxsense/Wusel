@@ -124,6 +124,31 @@ fn main() -> Result<(), std::io::Error> {
         );
     }
 
+    world.construction_new(
+        life::world::ConstructionType::Wall(true, 20),
+        life::areas::Position { x: 10, y: 10, z: 0 },
+    );
+
+    world.construction_new(
+        life::world::ConstructionType::Wall(false, 10),
+        life::areas::Position { x: 10, y: 10, z: 0 },
+    );
+
+    world.construction_new(
+        life::world::ConstructionType::Wall(true, 20),
+        life::areas::Position { x: 11, y: 19, z: 0 },
+    );
+
+    world.construction_new(
+        life::world::ConstructionType::Wall(false, 10),
+        life::areas::Position { x: 30, y: 10, z: 0 },
+    );
+
+    world.construction_new(
+        life::world::ConstructionType::Door(true),
+        life::areas::Position { x: 20, y: 10, z: 0 },
+    );
+
     for i in 0usize..iterations {
         if render {
             // world.positions_recalculate_grid();

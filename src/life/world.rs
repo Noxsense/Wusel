@@ -47,6 +47,10 @@ pub struct World {
     objects_index_with_type: Vec<objects::ObjectType>,
     objects_index_with_whereabouts: Vec<InWorld>,
 
+    // all constructions
+    constructions: Vec<Construction>,
+    constructions_index_on_position_index: Vec<usize>,
+
     // actions in this world.
     actions: Vec<String>,                      // actions to do.
     actions_effects: Vec<tasks::ActionAffect>, // how various actions on various objects may influence
@@ -87,6 +91,9 @@ impl World {
             objects_index_with_id: vec![],
             objects_index_with_type: vec![],
             objects_index_with_whereabouts: vec![],
+
+            constructions: vec![],
+            constructions_index_on_position_index: vec![],
 
             dead_wusels: vec![],
             relations: std::collections::BTreeMap::new(),
@@ -273,12 +280,24 @@ impl World {
         }
 
         // for constructions
-        let constructions_index_on_position_index: Vec<usize> = vec![];
-        for (construction_index, &constructions_position_index) in
-            constructions_index_on_position_index.iter().enumerate()
-        {
-            self.positions[constructions_position_index]
-                .push(PlaceTaker::Construction(construction_index));
+        for (construction_index, &construction) in self.constructions.iter().enumerate() {
+            let constructions_position_index =
+                self.constructions_index_on_position_index[construction_index];
+
+            let placetaker =
+                PlaceTaker::Construction(construction.construction_type, construction.id);
+
+            // add all positions.
+            self.positions[constructions_position_index].push(placetaker);
+
+            if let ConstructionType::Wall(horizontal, length) = construction.construction_type {
+                let mut more_position = constructions_position_index;
+                // first position is already put.
+                for _i in 1..length {
+                    more_position += if horizontal { 1 } else { self.width as usize };
+                    self.positions[more_position].push(placetaker);
+                }
+            }
         }
 
         for (wusel_index, &wusel_position_index) in
@@ -331,6 +350,48 @@ impl World {
         }
     }
 
+    pub fn construction_new(
+        &mut self,
+        construction_type: ConstructionType,
+        position: areas::Position
+    ) {
+        let construction = Construction {
+            id: 0usize,
+            construction_type,
+        };
+
+        let position_index = self.position_to_index(position);
+
+        let placetaker = PlaceTaker::Construction(construction_type, construction.id);
+
+        self.constructions.push(construction);
+
+        // start position.
+        self.constructions_index_on_position_index
+            .push(position_index);
+
+        // all positions it may take.
+        self.update_positions(placetaker, 0, position_index);
+        if let ConstructionType::Wall(horizontal, length) = construction_type {
+            let mut more_position = position_index;
+            // first position is already put.
+            for _i in 1..length {
+                more_position += if horizontal { 1 } else { self.width as usize };
+                self.update_positions(placetaker, 0, more_position);
+            }
+        }
+    }
+
+    fn get_all_doors_indices(&self) -> Vec<usize> {
+        let mut doors = vec![];
+        for (index, construction) in self.constructions.iter().enumerate() {
+            if let ConstructionType::Door(_is_open) = construction.construction_type {
+                doors.push(index);
+            }
+        }
+        doors
+    }
+
     /// Create a new object to exist in this world.
     ///
     /// Placed in a world inventory/storage first, can be placed in world.
@@ -343,17 +404,17 @@ impl World {
         passable: bool,
         consumable_parts: u16,
         storage_capacity: u16,
-        ) -> objects::ObjectId {
+    ) -> objects::ObjectId {
         // Add the new object into the world active objects.
         self.objects.push(objects::Object::new(
-                name,
-                object_type,
-                passable,
-                false, // stackable
-                transportable,
-                consumable_parts,
-                storage_capacity,
-                ));
+            name,
+            object_type,
+            passable,
+            false, // stackable
+            transportable,
+            consumable_parts,
+            storage_capacity,
+        ));
 
         let object_id: objects::ObjectId = self.sequential_object_id;
 
@@ -384,7 +445,7 @@ impl World {
             true,
             bites,
             0,
-            )
+        )
     }
 
     /// Duplicate a world object: Use all attributes, but change the ID.
@@ -969,7 +1030,7 @@ impl World {
 }
 
 /// State (in a sum type) with Positional Data for the world.
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Hash, Eq)]
 enum InWorld {
     OnPositionIndex(usize),
     #[allow(dead_code)]
@@ -979,9 +1040,9 @@ enum InWorld {
 }
 
 /// A type wrapped identifier that represents something in the world.
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Hash, Eq)]
 pub enum PlaceTaker {
-    Construction(usize),
+    Construction(ConstructionType, ConstructionId),
     Wusel(wusel::WuselId),
     Object(objects::ObjectId, objects::ObjectType),
 }
@@ -990,6 +1051,7 @@ pub enum PlaceTaker {
 ///
 /// to create a certain product after a certain time.
 /// Blueprint: [ components, Workstation ] + Time => Product.
+#[derive(Clone, PartialEq, Hash, Eq)]
 #[allow(dead_code)]
 struct Blueprint {
     id: usize,
@@ -1016,4 +1078,27 @@ pub struct Consumable {
 
     // While consuming it, one part (1/size) while change the needs as following.
     need_change: std::collections::HashMap<wusel::Need, i16>,
+}
+
+/// Identifier for a Construction
+pub type ConstructionId = usize;
+
+/// Type and type attributes of a Construction.
+#[derive(Clone, Copy, PartialEq, Hash, Eq)]
+pub enum ConstructionType {
+    Wall(bool, usize), // is_horizontal (grows left->right, otherwise up->down), length
+    Door(bool),        // is_open
+    Window,
+    Stairs(bool), // is_leading_up
+    Floor,
+}
+
+/// A Construction is an enviromental part of the world.
+///
+/// They offer only just few options to interact with.
+/// Mostly they block ways and are there to build and present place for the world.
+#[derive(Clone, Copy, PartialEq, Hash, Eq)]
+pub struct Construction {
+    id: ConstructionId,
+    construction_type: ConstructionType, // TODO better type.
 }
