@@ -18,12 +18,51 @@ fn get_render_for_position(
     Option<Vec<core::TextStyle>>,
 ) {
     match c {
-       Some(life::world::PlaceTaker::Wusel(_))                                               => ('O', Some(core::Rgb(0, 0, 0)), None, Some(vec![core::TextStyle::Bold])), // wusel, -- smiley, alternatively or w
-       Some(life::world::PlaceTaker::Construction(_))                                        => ('#', Some(core::Rgb(000, 000, 000)), None, None), // construction, eg. wall
-       Some(life::world::PlaceTaker::Object(_, life::objects::ObjectType::Furniture(_)))     => ('m', Some(core::Rgb(99, 67, 14)), None, None), // furniture, eg. chair
-       Some(life::world::PlaceTaker::Object(_, life::objects::ObjectType::Miscellaneous(_))) => ('*', Some(core::Rgb(000, 000, 100)), None, None), // miscellaneous, eg. food
-       Some(life::world::PlaceTaker::Object(_, life::objects::ObjectType::Food(_)))          => ('ó', Some(core::Rgb(200, 000, 000)), None, None), // food
-        _                                                                                    => (' ', Some(core::Rgb(000, 100, 000)), Some(core::Rgb(222, 255, 222)), None), // empty
+        Some(life::world::PlaceTaker::Wusel(_)) => (
+            'O',
+            Some(core::Rgb(0, 0, 0)),
+            None,
+            Some(vec![core::TextStyle::Bold]),
+        ),
+
+        Some(life::world::PlaceTaker::Construction(
+            life::world::ConstructionType::Wall(false, _),
+            _,
+        )) => ('#', None, Some(core::hash_color_to_rgb(0xa04c1f)), None),
+
+        Some(life::world::PlaceTaker::Construction(
+            life::world::ConstructionType::Wall(true, _),
+            _,
+        )) => ('#', None, Some(core::hash_color_to_rgb(0xa04c1f)), None),
+
+        Some(life::world::PlaceTaker::Construction(
+            life::world::ConstructionType::Door(true),
+            _,
+        )) => ('-', None, None, None),
+
+        Some(life::world::PlaceTaker::Construction(
+            life::world::ConstructionType::Door(false),
+            _,
+        )) => ('+', None, None, None), // construction, eg. wall
+
+        Some(life::world::PlaceTaker::Object(_, life::objects::ObjectType::Furniture(_))) => {
+            ('m', Some(core::Rgb(99, 67, 14)), None, None)
+        }
+
+        Some(life::world::PlaceTaker::Object(_, life::objects::ObjectType::Miscellaneous(_))) => {
+            ('*', Some(core::Rgb(000, 000, 100)), None, None)
+        }
+
+        Some(life::world::PlaceTaker::Object(_, life::objects::ObjectType::Food(_))) => {
+            ('ó', Some(core::Rgb(200, 000, 000)), None, None)
+        }
+
+        _ => (
+            ' ',
+            Some(core::Rgb(000, 100, 000)),
+            Some(core::Rgb(222, 255, 222)),
+            None,
+        ),
     }
 }
 
@@ -40,7 +79,20 @@ pub fn render_field(w: usize, positions: Vec<Vec<life::world::PlaceTaker>>) {
         x = (p % w) as u16 + 2;
         y = (p / w) as u16 + 2;
 
-        let render_data = get_render_for_position(on_pos.get(0));
+        let most_important = on_pos
+            .iter()
+            .find(|&p| {
+                matches!(
+                    p,
+                    &life::world::PlaceTaker::Construction(
+                        life::world::ConstructionType::Door(_),
+                        _
+                    )
+                )
+            })
+            .or_else(|| on_pos.get(0));
+
+        let render_data = get_render_for_position(most_important);
 
         let (render_char, render_fg, render_bg, render_styles) = render_data;
 
@@ -115,4 +167,3 @@ pub fn render_wusel_need_bar(
         );
     }
 }
-
