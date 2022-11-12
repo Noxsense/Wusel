@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 //! # Wusel - Game
 //!
 //! This is a life simulation game where life is given to multiple wusels whose life can be in your
