@@ -1093,6 +1093,12 @@ pub enum ConstructionType {
     Floor,
 }
 
+pub const WALL_LR: bool = true; // is horizontal
+pub const WALL_UD: bool = false; // is not horizontal
+                                 //
+pub const DOOR_OPEN: bool = true;
+pub const DOOR_CLOSED: bool = false; 
+
 /// A Construction is an enviromental part of the world.
 ///
 /// They offer only just few options to interact with.

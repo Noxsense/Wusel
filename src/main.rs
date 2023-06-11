@@ -133,27 +133,27 @@ fn run(
     }
 
     world.construction_new(
-        life::world::ConstructionType::Wall(true, 20),
+        life::world::ConstructionType::Wall(life::world::WALL_LR, 20),
         life::areas::Position { x: 10, y: 10, z: 0 },
     );
 
     world.construction_new(
-        life::world::ConstructionType::Wall(false, 10),
+        life::world::ConstructionType::Wall(life::world::WALL_UD, 10),
         life::areas::Position { x: 10, y: 10, z: 0 },
     );
 
     world.construction_new(
-        life::world::ConstructionType::Wall(true, 20),
+        life::world::ConstructionType::Wall(life::world::WALL_LR, 20),
         life::areas::Position { x: 11, y: 19, z: 0 },
     );
 
     world.construction_new(
-        life::world::ConstructionType::Wall(false, 10),
+        life::world::ConstructionType::Wall(life::world::WALL_UD, 10),
         life::areas::Position { x: 30, y: 10, z: 0 },
     );
 
     world.construction_new(
-        life::world::ConstructionType::Door(true),
+        life::world::ConstructionType::Door(life::world::DOOR_OPEN),
         life::areas::Position { x: 20, y: 10, z: 0 },
     );
 
