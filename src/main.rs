@@ -37,6 +37,15 @@ fn main() -> Result<(), std::io::Error> {
         None => false,
     };
 
+    return run(iterations, arg_steps_per_second, render, clear_on_exit);
+}
+
+fn run(
+    iterations: usize,
+    arg_steps_per_second: u64,
+    render: bool,
+    clear_on_exit: bool,
+) -> Result<(), std::io::Error> {
     //clear on start.
     tui::core::render_clear_all();
 
