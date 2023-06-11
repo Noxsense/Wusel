@@ -64,24 +64,9 @@ fn run(
         h = world.get_depth()
     );
 
-    // Empty world tick.
-    world.tick();
+    setup_world_example(&mut world);
 
-    for _ in 0..rand::random::<u8>() % 10 + 2 {
-        world.wusel_new_random(util::more_strings::name_gen(
-            rand::random::<usize>() % 13 + 2,
-        ));
-    }
-
-    // Transportable bibimbap (korean food)
-    let bibimbap = world.food_new("Bibimbap", 10);
-    let bibimbap_id = bibimbap;
-
-    // Position.
-    world.object_set_position(bibimbap_id, world.position_random());
-
-    let steps_per_second = arg_steps_per_second;
-    let step_sleep = std::time::Duration::from_millis(1000 / steps_per_second);
+    tui::core::render_clear_all();
 
     // Draw the field and make some real automation.
     let (w, h) = (world.get_width() as usize, world.get_depth() as usize);
@@ -100,8 +85,6 @@ fn run(
     };
     let need_bar_width: u16 = 10;
     let need_panel_show_percentage: bool = true;
-
-    tui::core::render_clear_all();
 
     // frame game field
     if render {
@@ -132,30 +115,9 @@ fn run(
         );
     }
 
-    world.construction_new(
-        life::world::ConstructionType::Wall(life::world::WALL_LR, 20),
-        life::areas::Position { x: 10, y: 10, z: 0 },
-    );
-
-    world.construction_new(
-        life::world::ConstructionType::Wall(life::world::WALL_UD, 10),
-        life::areas::Position { x: 10, y: 10, z: 0 },
-    );
-
-    world.construction_new(
-        life::world::ConstructionType::Wall(life::world::WALL_LR, 20),
-        life::areas::Position { x: 11, y: 19, z: 0 },
-    );
-
-    world.construction_new(
-        life::world::ConstructionType::Wall(life::world::WALL_UD, 10),
-        life::areas::Position { x: 30, y: 10, z: 0 },
-    );
-
-    world.construction_new(
-        life::world::ConstructionType::Door(life::world::DOOR_OPEN),
-        life::areas::Position { x: 20, y: 10, z: 0 },
-    );
+    // time od the simulation.
+    let steps_per_second = arg_steps_per_second;
+    let step_sleep = std::time::Duration::from_millis(1000 / steps_per_second);
 
     for i in 0usize..iterations {
         if render {
@@ -242,13 +204,6 @@ fn run(
                         life::tasks::TaskBuilder::move_to(world.position_random()),
                     );
                 }
-                i if i >= 2 * wusel_len && i < 3 * wusel_len => {
-                    // Interact with the object.
-                    world.wusel_assign_to_task(
-                        widx,
-                        life::tasks::TaskBuilder::use_object(bibimbap_id, 0), // view
-                    );
-                }
                 _ => {} // do nothing randomly.
             }
         }
@@ -268,4 +223,45 @@ fn run(
 
     tui::core::cursor_to(&tui::core::ScreenPos::START.down_by(screen_height));
     Ok(())
+}
+
+// mut world: life::world::World
+fn setup_world_example(world: &mut life::world::World) {
+    // create random wusels
+    for _ in 0..rand::random::<u8>() % 10 + 2 {
+        world.wusel_new_random(util::more_strings::name_gen(
+            rand::random::<usize>() % 13 + 2,
+        ));
+    }
+
+    // Transportable bibimbap (korean food)
+    let bibimbap = world.food_new("Bibimbap", 10);
+    let bibimbap_id = bibimbap;
+    world.object_set_position(bibimbap_id, world.position_random());
+
+    // create fixed construction
+    world.construction_new(
+        life::world::ConstructionType::Wall(life::world::WALL_UD, 10),
+        life::areas::Position { x: 10, y: 10, z: 0 },
+    );
+
+    world.construction_new(
+        life::world::ConstructionType::Wall(life::world::WALL_LR, 20),
+        life::areas::Position { x: 11, y: 19, z: 0 },
+    );
+
+    world.construction_new(
+        life::world::ConstructionType::Wall(life::world::WALL_UD, 10),
+        life::areas::Position { x: 30, y: 10, z: 0 },
+    );
+
+    world.construction_new(
+        life::world::ConstructionType::Door(life::world::DOOR_OPEN),
+        life::areas::Position { x: 20, y: 10, z: 0 },
+    );
+
+    world.construction_new(
+        life::world::ConstructionType::Wall(life::world::WALL_LR, 20),
+        life::areas::Position { x: 10, y: 10, z: 0 },
+    );
 }
