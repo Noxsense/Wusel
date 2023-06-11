@@ -1,0 +1,44 @@
+name: Rust Update
+
+on:
+  schedule:
+    - cron: '0 4 1 * *'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup Rust Toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+
+    - name: Rust Upgrade
+      id: rust-upgrade
+      run: |
+        cargo update --verbose
+        git diff --ignore-all-space >> $GITHUB_OUTPUT
+
+    - name: Create Pull Request
+      uses: peter-evans/create-pull-request@v4
+      with:
+        commit-message: "Cargo Update"
+        delete-branch: true
+        branch: bot/rust_update
+        title: Upgrade Dependencies
+        labels: bot
+        body: |
+          ${{ steps.rust-upgrade.outputs.test }}
+
+    - name: Check if PR built
+      if: ${{ steps.cpr.outputs.pull-request-number }}
+      run: |
+        echo "Created new Pull Request: ${{ steps.cpr.pull-request-url }}"
+
