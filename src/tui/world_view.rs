@@ -6,34 +6,34 @@
 //! Ngoc (Nox) Le <noxsense@gmail.com>
 
 use crate::life;
-use crate::tui::core;
+use crate::tui::screen;
 
 /// Get a styled char for a placeholder in the world.
 fn get_render_for_position(
     c: Option<&life::world::PlaceTaker>,
 ) -> (
     char,
-    Option<core::Rgb>,
-    Option<core::Rgb>,
-    Option<Vec<core::TextStyle>>,
+    Option<screen::Rgb>,
+    Option<screen::Rgb>,
+    Option<Vec<screen::TextStyle>>,
 ) {
     match c {
         Some(life::world::PlaceTaker::Wusel(_)) => (
             'O',
-            Some(core::Rgb(0, 0, 0)),
+            Some(screen::Rgb(0, 0, 0)),
             None,
-            Some(vec![core::TextStyle::Bold]),
+            Some(vec![screen::TextStyle::Bold]),
         ),
 
         Some(life::world::PlaceTaker::Construction(
             life::world::ConstructionType::Wall(false, _),
             _,
-        )) => ('#', None, Some(core::hash_color_to_rgb(0xa04c1f)), None),
+        )) => ('#', None, Some(screen::hash_color_to_rgb(0xa04c1f)), None),
 
         Some(life::world::PlaceTaker::Construction(
             life::world::ConstructionType::Wall(true, _),
             _,
-        )) => ('#', None, Some(core::hash_color_to_rgb(0xa04c1f)), None),
+        )) => ('#', None, Some(screen::hash_color_to_rgb(0xa04c1f)), None),
 
         Some(life::world::PlaceTaker::Construction(
             life::world::ConstructionType::Door(true),
@@ -46,21 +46,21 @@ fn get_render_for_position(
         )) => ('+', None, None, None), // construction, eg. wall
 
         Some(life::world::PlaceTaker::Object(_, life::objects::ObjectType::Furniture(_))) => {
-            ('m', Some(core::Rgb(99, 67, 14)), None, None)
+            ('m', Some(screen::Rgb(99, 67, 14)), None, None)
         }
 
         Some(life::world::PlaceTaker::Object(_, life::objects::ObjectType::Miscellaneous(_))) => {
-            ('*', Some(core::Rgb(000, 000, 100)), None, None)
+            ('*', Some(screen::Rgb(000, 000, 100)), None, None)
         }
 
         Some(life::world::PlaceTaker::Object(_, life::objects::ObjectType::Food(_))) => {
-            ('ó', Some(core::Rgb(200, 000, 000)), None, None)
+            ('ó', Some(screen::Rgb(200, 000, 000)), None, None)
         }
 
         _ => (
             ' ',
-            Some(core::Rgb(000, 100, 000)),
-            Some(core::Rgb(222, 255, 222)),
+            Some(screen::Rgb(000, 100, 000)),
+            Some(screen::Rgb(222, 255, 222)),
             None,
         ),
     }
@@ -97,8 +97,8 @@ pub fn render_field(w: usize, positions: Vec<Vec<life::world::PlaceTaker>>) {
         let (render_char, render_fg, render_bg, render_styles) = render_data;
 
         // Draw position symbol.
-        core::render_spot(
-            &core::ScreenPos { x, y },
+        screen::render::spot(
+            &screen::Pos { x, y },
             render_char,
             render_fg,
             render_bg,
@@ -108,14 +108,14 @@ pub fn render_field(w: usize, positions: Vec<Vec<life::world::PlaceTaker>>) {
         );
     }
 
-    core::render_reset_colours();
+    screen::render::reset_colours();
 }
 
 /// Show time
 /// tick .. time units the session is running
 /// time .. time of the world.
-pub fn render_time(position: &core::ScreenPos, tick: usize, time: usize) {
-    core::cursor_to(position);
+pub fn render_time(position: &screen::Pos, tick: usize, time: usize) {
+    screen::render::cursor_set(position);
     print!(
         "{formatted_time}",
         formatted_time = format!("Step Counter: {} => Time: {}", tick, time)
@@ -124,10 +124,10 @@ pub fn render_time(position: &core::ScreenPos, tick: usize, time: usize) {
 
 /// Render the task list of a wusel, given by string names.
 /// This also crops longer texts.
-pub fn render_wusel_tasklist(position: core::ScreenPos, tasklist: Vec<String>) {
-    core::cursor_to(&position);
+pub fn render_wusel_tasklist(position: screen::Pos, tasklist: Vec<String>) {
+    screen::render::cursor_set(&position);
     print!("{:23}", ""); // clear field.
-    core::cursor_to(&position);
+    screen::render::cursor_set(&position);
     print!("|> ");
 
     let mut length = 3;
@@ -142,7 +142,7 @@ pub fn render_wusel_tasklist(position: core::ScreenPos, tasklist: Vec<String>) {
 
 /// Render a Need Panel.
 pub fn render_wusel_need_bar(
-    position: core::ScreenPos,
+    position: screen::Pos,
     panel_width: u16,
     show_percentage: bool,
     needs: Vec<(crate::life::wusel::Need, u32, u32)>,
@@ -153,16 +153,16 @@ pub fn render_wusel_need_bar(
 
     for (offset, (need, need_full, need_now)) in needs.iter().enumerate() {
         let offset_u16 = offset as u16;
-        core::cursor_to(&(position + (0u16, offset_u16)));
+        screen::render::cursor_set(&(position + (0u16, offset_u16)));
         print!("{title:9}", title = need.get_name());
 
-        core::render_progres_bar(
+        screen::render::progres_bar(
             &(bar_start + (0u16, offset_u16)),
             panel_width,
             show_percentage,
             *need_full,
             *need_now,
-            Some((core::Rgb(0, 255, 0), core::Rgb(255, 0, 0))),
+            Some((screen::Rgb(0, 255, 0), screen::Rgb(255, 0, 0))),
             draw_horizontal,
         );
     }

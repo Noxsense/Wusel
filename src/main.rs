@@ -47,7 +47,7 @@ fn run(
     clear_on_exit: bool,
 ) -> Result<(), std::io::Error> {
     //clear on start.
-    tui::core::render_clear_all();
+    tui::screen::render::clear_all();
 
     let (screen_width, screen_height) = match termion::terminal_size() {
         Ok((w, h)) => (w, h),
@@ -66,20 +66,20 @@ fn run(
 
     setup_world_example(&mut world);
 
-    tui::core::render_clear_all();
+    tui::screen::render::clear_all();
 
     // Draw the field and make some real automation.
     let (w, h) = (world.get_width() as usize, world.get_depth() as usize);
 
-    let time_position: &tui::core::ScreenPos = &tui::core::ScreenPos {
+    let time_position: &tui::screen::Pos = &tui::screen::Pos {
         x: 1u16,
         y: h as u16 + 3,
     };
-    let timebar_position: &tui::core::ScreenPos = &tui::core::ScreenPos {
+    let timebar_position: &tui::screen::Pos = &tui::screen::Pos {
         x: w as u16 + 4,
         y: 1,
     };
-    let need_panel_position: &tui::core::ScreenPos = &tui::core::ScreenPos {
+    let need_panel_position: &tui::screen::Pos = &tui::screen::Pos {
         x: 2u16,
         y: h as u16 + 6,
     };
@@ -90,9 +90,9 @@ fn run(
     // frame game field
     let frame_colour = termion::color::Rgb(100, 100, 100);
     if render {
-        tui::core::render_rectangle(
-            &tui::core::ScreenPos { x: 1, y: 1 },
-            &tui::core::ScreenPos {
+        tui::screen::render::rectangle(
+            &tui::screen::Pos { x: 1, y: 1 },
+            &tui::screen::Pos {
                 x: w as u16 + 2,
                 y: h as u16 + 2,
             },
@@ -103,12 +103,12 @@ fn run(
 
         // frame need panel
         let yellow =termion::color::Rgb(255, 255, 0);
-        tui::core::render_rectangle(
-            &tui::core::ScreenPos {
+        tui::screen::render::rectangle(
+            &tui::screen::Pos {
                 x: need_panel_position.x - 1,
                 y: need_panel_position.y - 1,
             },
-            &tui::core::ScreenPos {
+            &tui::screen::Pos {
                 x: need_panel_position.x + 9 + need_bar_width,
                 y: need_panel_position.y + 7,
             },
@@ -129,7 +129,7 @@ fn run(
 
             // Tick the world, show time.
             tui::world_view::render_time(time_position, i, world.get_time());
-            tui::core::render_progres_bar(
+            tui::screen::render::progres_bar(
                 timebar_position,
                 h as u16 + 3,
                 false,
@@ -147,7 +147,7 @@ fn run(
                 let x_offset = wusel_offset as u16 * 23;
 
                 if need_panel_position.x + x_offset + 20 < screen_width {
-                    tui::core::cursor_to(&(*need_panel_position + (x_offset, 2u16)));
+                    tui::screen::render::cursor_set(&(*need_panel_position + (x_offset, 2u16)));
                     print!(
                         "| {} ({})",
                         world
@@ -214,17 +214,17 @@ fn run(
         std::thread::sleep(step_sleep); // wait.
 
         // cursor to bottom.
-        tui::core::cursor_to(&tui::core::ScreenPos {
+        tui::screen::render::cursor_set(&tui::screen::Pos {
             x: 1,
             y: screen_height,
         });
     }
 
     if clear_on_exit {
-        tui::core::render_reset(&tui::core::ScreenPos::START); // clear whole field.
+        tui::screen::render::reset(&tui::screen::Pos::START); // clear whole field.
     }
 
-    tui::core::cursor_to(&(tui::core::ScreenPos::START + (0u16, screen_height)));
+    tui::screen::render::cursor_set(&(tui::screen::Pos::START + (0u16, screen_height)));
     Ok(())
 }
 
