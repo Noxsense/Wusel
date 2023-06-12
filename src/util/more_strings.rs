@@ -27,8 +27,6 @@ pub fn name_gen(length: usize) -> String {
         ((rand::random::<u8>() % 26) + b'A') as char, // first letter.
     ];
 
-    let mut random_index: usize;
-
     for i in 1usize..length {
         if VOCALS.contains(chars.get(i - 1).unwrap()) {
             // last char is VOCAL

@@ -147,7 +147,7 @@ fn run(
                 let x_offset = wusel_offset as u16 * 23;
 
                 if need_panel_position.x + x_offset + 20 < screen_width {
-                    tui::core::cursor_to(&need_panel_position.right_by(x_offset).up_by(2));
+                    tui::core::cursor_to(&(*need_panel_position + (x_offset, 2u16)));
                     print!(
                         "| {} ({})",
                         world
@@ -160,7 +160,7 @@ fn run(
                     );
 
                     tui::world_view::render_wusel_tasklist(
-                        need_panel_position.right_by(x_offset).up_by(1),
+                        *need_panel_position + (x_offset, 0u16) - (0, 1),
                         world.wusel_get_tasklist_names(wusel_id as usize),
                     );
 
@@ -176,7 +176,7 @@ fn run(
                         .collect();
 
                     tui::world_view::render_wusel_need_bar(
-                        need_panel_position.right_by(x_offset),
+                        *need_panel_position + (x_offset, 0u16),
                         need_bar_width,
                         need_panel_show_percentage,
                         needs,
@@ -224,7 +224,7 @@ fn run(
         tui::core::render_reset(&tui::core::ScreenPos::START); // clear whole field.
     }
 
-    tui::core::cursor_to(&tui::core::ScreenPos::START.down_by(screen_height));
+    tui::core::cursor_to(&(tui::core::ScreenPos::START + (0u16, screen_height)));
     Ok(())
 }
 

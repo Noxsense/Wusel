@@ -149,15 +149,15 @@ pub fn render_wusel_need_bar(
 ) {
     let draw_horizontal = true;
 
-    let bar_start = position.right_by(10);
+    let bar_start = position + (10u16, 0u16);
 
     for (offset, (need, need_full, need_now)) in needs.iter().enumerate() {
         let offset_u16 = offset as u16;
-        core::cursor_to(&position.down_by(offset_u16));
+        core::cursor_to(&(position + (0u16, offset_u16)));
         print!("{title:9}", title = need.get_name());
 
         core::render_progres_bar(
-            &bar_start.down_by(offset_u16),
+            &(bar_start + (0u16, offset_u16)),
             panel_width,
             show_percentage,
             *need_full,

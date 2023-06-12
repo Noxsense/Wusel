@@ -28,6 +28,7 @@ pub fn darken_rgb(colour: Rgb, darker_value: u8) -> Rgb {
 }
 
 /// Position on the Screen.
+#[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub struct ScreenPos {
     pub x: u16,
     pub y: u16,
@@ -35,56 +36,63 @@ pub struct ScreenPos {
 
 impl ScreenPos {
     pub const START: Self = ScreenPos { x: 1, y: 1 };
+}
 
-    pub fn from(position: (u16, u16)) -> Self {
+
+impl std::ops::Add<ScreenPos> for ScreenPos {
+    type Output = Self;
+    fn add(self, _rhs: Self) -> Self {
+        Self {
+            x: self.x.saturating_add(_rhs.x),
+            y: self.y.saturating_add(_rhs.y),
+        }
+    }
+}
+
+impl std::ops::Add<(u16, u16)> for ScreenPos {
+    type Output = Self;
+    fn add(self, _rhs: (u16, u16)) -> Self {
+        Self {
+            x: self.x.saturating_add(_rhs.0),
+            y: self.y.saturating_add(_rhs.1),
+        }
+    }
+}
+
+impl std::ops::Sub<ScreenPos> for ScreenPos {
+    type Output = Self;
+    fn sub(self, _rhs: Self) -> Self {
+        Self {
+            x: self.x.saturating_sub(_rhs.x),
+            y: self.y.saturating_sub(_rhs.y),
+        }
+    }
+}
+
+impl std::ops::Sub<(u16, u16)> for ScreenPos {
+    type Output = Self;
+    fn sub(self, _rhs: (u16, u16)) -> Self {
+        Self {
+            x: self.x.saturating_sub(_rhs.0),
+            y: self.y.saturating_sub(_rhs.1),
+        }
+    }
+}
+
+impl std::convert::From<(u16, u16)> for ScreenPos {
+    /// Create a new Screen Position from a tuple.
+    fn from(position: (u16, u16)) -> Self {
         Self {
             x: position.0,
             y: position.1,
         }
     }
+}
 
-    pub fn left_by(&self, offset: u16) -> Self {
-        Self {
-            x: self.x.saturating_sub(offset),
-            y: self.y,
-        }
-    }
-
-    pub fn left(&self) -> Self {
-        self.left_by(1)
-    }
-
-    pub fn right_by(&self, offset: u16) -> Self {
-        Self {
-            x: self.x.saturating_add(offset),
-            y: self.y,
-        }
-    }
-
-    pub fn right(&self) -> Self {
-        self.right_by(1)
-    }
-
-    pub fn up_by(&self, offset: u16) -> Self {
-        Self {
-            x: self.x,
-            y: self.y.saturating_sub(offset),
-        }
-    }
-
-    pub fn up(&self) -> Self {
-        self.up_by(1)
-    }
-
-    pub fn down_by(&self, offset: u16) -> Self {
-        Self {
-            x: self.x,
-            y: self.y.saturating_add(offset),
-        }
-    }
-
-    pub fn down(&self) -> Self {
-        self.down_by(1)
+impl std::convert::Into<(u16, u16)> for ScreenPos {
+    /// Create a new Screen Position from a tuple.
+    fn into(self) -> (u16, u16) {
+        (self.x, self.y)
     }
 }
 
@@ -335,7 +343,7 @@ pub fn render_progres_bar_from_percent(
         }
         // end bar border.
         render_spot(
-            &position.right_by(bar_max + 1),
+            &(*position + (bar_max + 1, 0u16)),
             ']',
             None,
             None,
@@ -360,7 +368,7 @@ pub fn render_progres_bar_from_percent(
                     bar_colour = rest_color;
                     bar_character = ':';
                 }
-                cursor_to(&position.down_by(i));
+                cursor_to(&(*position + (0u16, i)));
                 print!("{}{}", termion::color::Fg(bar_colour), bar_character);
             }
             render_reset_colours();
@@ -372,7 +380,7 @@ pub fn render_progres_bar_from_percent(
                 } else {
                     bar_character = ':';
                 }
-                cursor_to(&position.down_by(i));
+                cursor_to(&(*position + (0u16, i)));
                 print!("{}", bar_character);
             }
             render_reset_colours();
@@ -380,7 +388,7 @@ pub fn render_progres_bar_from_percent(
 
         // end bar border.
         render_spot(
-            &position.down_by(bar_max + 1),
+            &(*position + (0u16, bar_max + 1)),
             'v',
             None,
             None,
