@@ -345,7 +345,7 @@ fn let_wusel_use_object(
     wusel_index: usize,
     object_index: usize,
     action_index: usize,
-    ) -> bool {
+) -> bool {
     // Invalid wusel index.
     if !world.check_valid_wusel_index(wusel_index) {
         return false;

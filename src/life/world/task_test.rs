@@ -18,19 +18,19 @@ fn test_walking() {
         "on_x".to_string(),
         super::wusel::WuselGender::Female,
         super::areas::Position { x: 0, y: 0, z: 0 },
-        );
+    );
 
     test_world.wusel_new(
         "on_y".to_string(),
         super::wusel::WuselGender::Male,
         super::areas::Position { x: 2, y: 2, z: 0 },
-        );
+    );
 
     test_world.wusel_new(
         "random".to_string(),
         super::wusel::WuselGender::Male,
         super::areas::Position { x: 3, y: 4, z: 0 },
-        );
+    );
 
     let repetition: usize = 1000;
     let bad_behaviour_acceptance = 3;
@@ -64,7 +64,7 @@ fn test_walking() {
                     y: 0,
                     z: 0,
                 }),
-                );
+            );
         }
 
         // assign random walking (y axis).
@@ -79,7 +79,7 @@ fn test_walking() {
                     y: goal_y,
                     z: 0,
                 }),
-                );
+            );
         }
 
         // assign random walking (x-y plane).
@@ -88,7 +88,7 @@ fn test_walking() {
             println!(
                 "{:03}$ Wusel ? goal to ({:2},{:2}, 0)",
                 i, goal_rand.x, goal_rand.y
-                );
+            );
             test_world
                 .wusel_assign_to_task(wusel_wild, super::tasks::TaskBuilder::move_to(goal_rand));
         }
@@ -106,7 +106,7 @@ fn test_walking() {
                 p.y,
                 p.z,
                 if wuselx_left { "left" } else { "right" }
-                );
+            );
 
             let expected_x = if wuselx_left {
                 last_x_position.x.saturating_sub(1)
@@ -141,7 +141,7 @@ fn test_walking() {
                 } else {
                     "to back"
                 }
-                );
+            );
 
             let expected_y = if wusely_tofront {
                 last_y_position.y.saturating_sub(1)
@@ -183,13 +183,13 @@ fn test_consume_bread() {
         "Eater".to_string(),
         super::wusel::WuselGender::Female,
         super::areas::Position { x: 1, y: 0, z: 0 },
-        );
+    );
 
     test_world.wusel_new(
         "Starver".to_string(),
         super::wusel::WuselGender::Male,
         super::areas::Position { x: 2, y: 0, z: 0 },
-        );
+    );
 
     log::debug!("Test World's wusels created.");
 
@@ -217,12 +217,12 @@ fn test_consume_bread() {
     test_world.wusel_assign_to_task(
         1,
         super::tasks::TaskBuilder::move_to(test_world.position_random()),
-        );
+    );
     test_world.wusel_assign_to_task(1, super::tasks::TaskBuilder::use_object(food1_id, 2)); // drop
     test_world.wusel_assign_to_task(
         1,
         super::tasks::TaskBuilder::move_to(test_world.position_random()),
-        );
+    );
     test_world.wusel_assign_to_task(1, super::tasks::TaskBuilder::use_object(food1_id, 1)); // take not exisiting?
 
     // Let the other wusel wait, than it's tries to get the food as well, and consume it.
@@ -233,21 +233,21 @@ fn test_consume_bread() {
             y: test_world.get_depth() - 1,
             z: 0,
         }),
-        );
+    );
     test_world.wusel_assign_to_task(0, super::tasks::TaskBuilder::use_object(food1_id, 1)); // take as well.
     test_world.wusel_assign_to_task(
         0,
         super::tasks::TaskBuilder::move_to(test_world.position_random()),
-        );
+    );
     test_world.wusel_assign_to_task(0, super::tasks::TaskBuilder::use_object(food1_id, 3)); // consume.
     test_world.wusel_assign_to_task(
         0,
         super::tasks::TaskBuilder::move_to(test_world.position_random()),
-        );
+    );
     test_world.wusel_assign_to_task(
         0,
         super::tasks::TaskBuilder::move_to(test_world.position_random()),
-        );
+    );
     log::debug!("Test World's task to work at the workbench assigned.");
 
     // show everyone's stats.
@@ -263,14 +263,14 @@ fn test_consume_bread() {
     let (_w, _h): (usize, usize) = (
         test_world.get_width() as usize,
         test_world.get_depth() as usize,
-        );
+    );
 
     // clear the test screen
     println!(
         "{clear}{hide}",
         clear = termion::clear::All,
         hide = termion::cursor::Hide
-        );
+    );
 
     for _ in 0..300 {
         // render_field(_w, _h, test_world.positions_for_grid());
@@ -278,7 +278,7 @@ fn test_consume_bread() {
         log::debug!(
             "Test World's current grid, time: {}.",
             test_world.get_time()
-            );
+        );
 
         test_world.tick(); // progress time.
 
@@ -371,24 +371,24 @@ fn test_mutual_meeting() {
         "1st".to_string(),
         super::wusel::WuselGender::Female,
         super::areas::Position { x: 1, y: 0, z: 0 },
-        );
+    );
 
     test_world.wusel_new(
         "2nd".to_string(),
         super::wusel::WuselGender::Female,
         super::areas::Position { x: 3, y: 0, z: 0 },
-        );
+    );
     test_world.wusel_new(
         "3rd".to_string(),
         super::wusel::WuselGender::Male,
         super::areas::Position { x: 5, y: 0, z: 0 },
-        );
+    );
 
     test_world.wusel_new(
         "4th".to_string(),
         super::wusel::WuselGender::Male,
         super::areas::Position { x: 9, y: 0, z: 0 },
-        );
+    );
 
     // 4 wusels created.
     assert_eq!(4, test_world.wusel_count());
@@ -408,22 +408,22 @@ fn test_mutual_meeting() {
     test_world.wusel_assign_to_task(
         0,
         super::tasks::TaskBuilder::meet_with(1, true, false).set_duration(7),
-        );
+    );
     // mutual meeting.
     test_world.wusel_assign_to_task(
         1,
         super::tasks::TaskBuilder::meet_with(2, true, false).set_duration(7),
-        );
+    );
     // mutual meeting.
     test_world.wusel_assign_to_task(
         2,
         super::tasks::TaskBuilder::meet_with(3, true, false).set_duration(7),
-        );
+    );
     // mutual meeting.
     test_world.wusel_assign_to_task(
         3,
         super::tasks::TaskBuilder::meet_with(0, true, false).set_duration(7),
-        );
+    );
 
     // 90 ticks later.
     for _ in 0..90 {
@@ -432,4 +432,3 @@ fn test_mutual_meeting() {
         // for w in 0..4 { test_world.wusel_show_tasklist(w); }
     }
 }
-

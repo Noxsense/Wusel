@@ -6,7 +6,8 @@ use crate::life;
 use crate::life::areas;
 use crate::life::objects;
 use crate::life::tasks;
-#[allow(unused_imports)] use crate::life::world;
+#[allow(unused_imports)]
+use crate::life::world;
 use crate::life::wusel;
 
 #[allow(dead_code)]

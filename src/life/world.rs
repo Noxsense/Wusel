@@ -353,7 +353,7 @@ impl World {
     pub fn construction_new(
         &mut self,
         construction_type: ConstructionType,
-        position: areas::Position
+        position: areas::Position,
     ) {
         let construction = Construction {
             id: 0usize,
@@ -1097,7 +1097,7 @@ pub const WALL_LR: bool = true; // is horizontal
 pub const WALL_UD: bool = false; // is not horizontal
                                  //
 pub const DOOR_OPEN: bool = true;
-pub const DOOR_CLOSED: bool = false; 
+pub const DOOR_CLOSED: bool = false;
 
 /// A Construction is an enviromental part of the world.
 ///

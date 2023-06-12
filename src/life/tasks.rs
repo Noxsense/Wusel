@@ -6,9 +6,10 @@
 //! Ngoc (Nox) Le <noxsense@gmail.com>
 
 use crate::life::areas;
-#[allow(unused_imports)] use crate::life::world;
-use crate::life::wusel;
 use crate::life::objects;
+#[allow(unused_imports)]
+use crate::life::world;
+use crate::life::wusel;
 
 /// Id Type of an Action
 pub type ActionId = usize;

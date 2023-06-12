@@ -15,9 +15,7 @@ pub struct Position {
 }
 
 impl Position {
-
-    pub const ROOT: Self
-        = Self { x: 0, y: 0, z: 0 };
+    pub const ROOT: Self = Self { x: 0, y: 0, z: 0 };
 
     /// Simple constructor.
     pub fn new(x: u32, y: u32, z: u32) -> Self {
@@ -66,9 +64,15 @@ impl Area {
         let height = <u32>::max(1, max_z - min_z);
 
         Area::new(
-            Position { x: min_x, y: min_y, z: min_z },
-            width, depth, height
-            )
+            Position {
+                x: min_x,
+                y: min_y,
+                z: min_z,
+            },
+            width,
+            depth,
+            height,
+        )
     }
 
     /// Check, if the position is in the area.
@@ -181,92 +185,292 @@ pub struct Direction {
 
 impl Direction {
     // width x depth slice.
-    const DIRECTION_LIST_XY: [Self; 8 ] = [
-        Self { x: Step::Backward,  y: Step::Backward, z: Step::Stay },
-        Self { x: Step::Stay,      y: Step::Backward, z: Step::Stay },
-        Self { x: Step::Forward,   y: Step::Backward, z: Step::Stay },
+    const DIRECTION_LIST_XY: [Self; 8] = [
+        Self {
+            x: Step::Backward,
+            y: Step::Backward,
+            z: Step::Stay,
+        },
+        Self {
+            x: Step::Stay,
+            y: Step::Backward,
+            z: Step::Stay,
+        },
+        Self {
+            x: Step::Forward,
+            y: Step::Backward,
+            z: Step::Stay,
+        },
         // y change
-        Self { x: Step::Backward,  y: Step::Stay,     z: Step::Stay },
+        Self {
+            x: Step::Backward,
+            y: Step::Stay,
+            z: Step::Stay,
+        },
         // Stay Stay Stay => No actual direction.
-        Self { x: Step::Forward,   y: Step::Stay,     z: Step::Stay },
+        Self {
+            x: Step::Forward,
+            y: Step::Stay,
+            z: Step::Stay,
+        },
         // y change
-        Self { x: Step::Backward,  y: Step::Forward,  z: Step::Stay },
-        Self { x: Step::Stay,      y: Step::Forward,  z: Step::Stay },
-        Self { x: Step::Forward,   y: Step::Forward,  z: Step::Stay },
+        Self {
+            x: Step::Backward,
+            y: Step::Forward,
+            z: Step::Stay,
+        },
+        Self {
+            x: Step::Stay,
+            y: Step::Forward,
+            z: Step::Stay,
+        },
+        Self {
+            x: Step::Forward,
+            y: Step::Forward,
+            z: Step::Stay,
+        },
     ];
 
     // depth x height slice.
     #[allow(dead_code)]
-    const DIRECTION_LIST_YZ: [Self; 8 ] = [
-        Self { x: Step::Stay, y: Step::Backward,  z: Step::Backward, },
-        Self { x: Step::Stay, y: Step::Stay,      z: Step::Backward, },
-        Self { x: Step::Stay, y: Step::Forward,   z: Step::Backward, },
+    const DIRECTION_LIST_YZ: [Self; 8] = [
+        Self {
+            x: Step::Stay,
+            y: Step::Backward,
+            z: Step::Backward,
+        },
+        Self {
+            x: Step::Stay,
+            y: Step::Stay,
+            z: Step::Backward,
+        },
+        Self {
+            x: Step::Stay,
+            y: Step::Forward,
+            z: Step::Backward,
+        },
         // z change
-        Self { x: Step::Stay, y: Step::Backward,  z: Step::Stay,     },
+        Self {
+            x: Step::Stay,
+            y: Step::Backward,
+            z: Step::Stay,
+        },
         // Stay Stay Stay => No actual direction.
-        Self { x: Step::Stay, y: Step::Forward,   z: Step::Stay,     },
+        Self {
+            x: Step::Stay,
+            y: Step::Forward,
+            z: Step::Stay,
+        },
         // z change
-        Self { x: Step::Stay, y: Step::Backward,  z: Step::Forward,  },
-        Self { x: Step::Stay, y: Step::Stay,      z: Step::Forward,  },
-        Self { x: Step::Stay, y: Step::Forward,   z: Step::Forward,  },
+        Self {
+            x: Step::Stay,
+            y: Step::Backward,
+            z: Step::Forward,
+        },
+        Self {
+            x: Step::Stay,
+            y: Step::Stay,
+            z: Step::Forward,
+        },
+        Self {
+            x: Step::Stay,
+            y: Step::Forward,
+            z: Step::Forward,
+        },
     ];
 
     // width x height slice.
     #[allow(dead_code)]
-    const DIRECTION_LIST_XZ: [Self; 8 ] = [
-        Self { x: Step::Backward, y: Step::Stay, z: Step::Backward },
-        Self { x: Step::Stay,     y: Step::Stay, z: Step::Backward },
-        Self { x: Step::Forward,  y: Step::Stay, z: Step::Backward },
+    const DIRECTION_LIST_XZ: [Self; 8] = [
+        Self {
+            x: Step::Backward,
+            y: Step::Stay,
+            z: Step::Backward,
+        },
+        Self {
+            x: Step::Stay,
+            y: Step::Stay,
+            z: Step::Backward,
+        },
+        Self {
+            x: Step::Forward,
+            y: Step::Stay,
+            z: Step::Backward,
+        },
         // z change
-        Self { x: Step::Backward, y: Step::Stay, z: Step::Stay },
+        Self {
+            x: Step::Backward,
+            y: Step::Stay,
+            z: Step::Stay,
+        },
         // Stay Stay Stay => No actual direction.
-        Self { x: Step::Forward,  y: Step::Stay, z: Step::Stay },
+        Self {
+            x: Step::Forward,
+            y: Step::Stay,
+            z: Step::Stay,
+        },
         // z change
-        Self { x: Step::Backward, y: Step::Stay, z: Step::Forward },
-        Self { x: Step::Stay,     y: Step::Stay, z: Step::Forward },
-        Self { x: Step::Forward,  y: Step::Stay, z: Step::Forward },
+        Self {
+            x: Step::Backward,
+            y: Step::Stay,
+            z: Step::Forward,
+        },
+        Self {
+            x: Step::Stay,
+            y: Step::Stay,
+            z: Step::Forward,
+        },
+        Self {
+            x: Step::Forward,
+            y: Step::Stay,
+            z: Step::Forward,
+        },
     ];
 
     // all directions 3D.
     #[allow(dead_code)]
-    const DIRECTION_LIST_XYZ: [Self; 26 ] = [
-        Self { x: Step::Backward, y: Step::Backward, z: Step::Backward },
-        Self { x: Step::Stay,     y: Step::Backward, z: Step::Backward },
-        Self { x: Step::Forward,  y: Step::Backward, z: Step::Backward },
+    const DIRECTION_LIST_XYZ: [Self; 26] = [
+        Self {
+            x: Step::Backward,
+            y: Step::Backward,
+            z: Step::Backward,
+        },
+        Self {
+            x: Step::Stay,
+            y: Step::Backward,
+            z: Step::Backward,
+        },
+        Self {
+            x: Step::Forward,
+            y: Step::Backward,
+            z: Step::Backward,
+        },
         // y change
-        Self { x: Step::Backward, y: Step::Stay, z: Step::Backward },
-        Self { x: Step::Stay,     y: Step::Stay, z: Step::Backward },
-        Self { x: Step::Forward,  y: Step::Stay, z: Step::Backward },
+        Self {
+            x: Step::Backward,
+            y: Step::Stay,
+            z: Step::Backward,
+        },
+        Self {
+            x: Step::Stay,
+            y: Step::Stay,
+            z: Step::Backward,
+        },
+        Self {
+            x: Step::Forward,
+            y: Step::Stay,
+            z: Step::Backward,
+        },
         // y change
-        Self { x: Step::Backward, y: Step::Forward, z: Step::Backward },
-        Self { x: Step::Stay,     y: Step::Forward, z: Step::Backward },
-        Self { x: Step::Forward,  y: Step::Forward, z: Step::Backward },
+        Self {
+            x: Step::Backward,
+            y: Step::Forward,
+            z: Step::Backward,
+        },
+        Self {
+            x: Step::Stay,
+            y: Step::Forward,
+            z: Step::Backward,
+        },
+        Self {
+            x: Step::Forward,
+            y: Step::Forward,
+            z: Step::Backward,
+        },
         //
         // z change
-        Self { x: Step::Backward, y: Step::Backward, z: Step::Stay },
-        Self { x: Step::Stay,     y: Step::Backward, z: Step::Stay },
-        Self { x: Step::Forward,  y: Step::Backward, z: Step::Stay },
+        Self {
+            x: Step::Backward,
+            y: Step::Backward,
+            z: Step::Stay,
+        },
+        Self {
+            x: Step::Stay,
+            y: Step::Backward,
+            z: Step::Stay,
+        },
+        Self {
+            x: Step::Forward,
+            y: Step::Backward,
+            z: Step::Stay,
+        },
         // y change
-        Self { x: Step::Backward, y: Step::Stay, z: Step::Stay },
+        Self {
+            x: Step::Backward,
+            y: Step::Stay,
+            z: Step::Stay,
+        },
         // Stay Stay Stay => No actual direction.
-        Self { x: Step::Forward,  y: Step::Stay, z: Step::Stay },
+        Self {
+            x: Step::Forward,
+            y: Step::Stay,
+            z: Step::Stay,
+        },
         // y change
-        Self { x: Step::Backward, y: Step::Forward, z: Step::Stay },
-        Self { x: Step::Stay,     y: Step::Forward, z: Step::Stay },
-        Self { x: Step::Forward,  y: Step::Forward, z: Step::Stay },
+        Self {
+            x: Step::Backward,
+            y: Step::Forward,
+            z: Step::Stay,
+        },
+        Self {
+            x: Step::Stay,
+            y: Step::Forward,
+            z: Step::Stay,
+        },
+        Self {
+            x: Step::Forward,
+            y: Step::Forward,
+            z: Step::Stay,
+        },
         //
         // z change
-        Self { x: Step::Backward, y: Step::Backward, z: Step::Forward },
-        Self { x: Step::Stay,     y: Step::Backward, z: Step::Forward },
-        Self { x: Step::Forward,  y: Step::Backward, z: Step::Forward },
+        Self {
+            x: Step::Backward,
+            y: Step::Backward,
+            z: Step::Forward,
+        },
+        Self {
+            x: Step::Stay,
+            y: Step::Backward,
+            z: Step::Forward,
+        },
+        Self {
+            x: Step::Forward,
+            y: Step::Backward,
+            z: Step::Forward,
+        },
         // y change
-        Self { x: Step::Backward, y: Step::Stay, z: Step::Forward },
-        Self { x: Step::Stay,     y: Step::Stay, z: Step::Forward },
-        Self { x: Step::Forward,  y: Step::Stay, z: Step::Forward },
+        Self {
+            x: Step::Backward,
+            y: Step::Stay,
+            z: Step::Forward,
+        },
+        Self {
+            x: Step::Stay,
+            y: Step::Stay,
+            z: Step::Forward,
+        },
+        Self {
+            x: Step::Forward,
+            y: Step::Stay,
+            z: Step::Forward,
+        },
         // y change
-        Self { x: Step::Backward, y: Step::Forward, z: Step::Forward },
-        Self { x: Step::Stay,     y: Step::Forward, z: Step::Forward },
-        Self { x: Step::Forward,  y: Step::Forward, z: Step::Forward },
+        Self {
+            x: Step::Backward,
+            y: Step::Forward,
+            z: Step::Forward,
+        },
+        Self {
+            x: Step::Stay,
+            y: Step::Forward,
+            z: Step::Forward,
+        },
+        Self {
+            x: Step::Forward,
+            y: Step::Forward,
+            z: Step::Forward,
+        },
     ];
 
     pub fn as_offset_tuple(&self) -> (i8, i8, i8) {

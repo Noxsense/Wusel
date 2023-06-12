@@ -403,7 +403,7 @@ pub fn render_progres_bar(
     current_value: u32,
     optipnal_colors: Option<(Rgb, Rgb)>,
     draw_horizontal: bool,
-    ) -> f32 {
+) -> f32 {
     let percentage_pre: f32 = current_value as f32 / max_value as f32 * 100f32;
     let percentage: f32 = f32::min(100.0, f32::max(0.0, percentage_pre));
 

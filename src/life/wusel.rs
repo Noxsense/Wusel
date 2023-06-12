@@ -212,7 +212,7 @@ impl Wusel {
     pub fn get_next_task_index_with(
         &self,
         task_matcher: &dyn Fn(&tasks::Task) -> bool,
-        ) -> Option<usize> {
+    ) -> Option<usize> {
         self.tasklist
             .iter()
             .rev()
