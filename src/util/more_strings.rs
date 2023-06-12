@@ -1,31 +1,27 @@
+/// Just vocals.
+const VOCALS: [char; 6] = ['a', 'e', 'i', 'o', 'u', 'y'];
+
+/// Just consonants.
+const CONSONANTS: [char; 20] = [
+    'b', 'c', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'm', 'n', 'p', 'q', 'r', 's', 't', 'v', 'w', 'x',
+    'z',
+];
+
+fn random_vocal_or_constant(probability_of_vocal: usize) -> char {
+    if rand::random::<usize>() % 100 < probability_of_vocal {
+        // pick vocal
+        VOCALS[rand::random::<usize>() % VOCALS.len()]
+    } else {
+        // pick consonant
+        CONSONANTS[rand::random::<usize>() % CONSONANTS.len()]
+    }
+}
+
 /// Generate a name by using a capital alphabetic char
 /// and adding up to the given _lenght_ more chars.
 /// Vocals after Consonants should be more common than another Consonants.
 pub fn name_gen(length: usize) -> String {
     // TODO (2021-12-11) better weighted chars. maybe markov chain. (also less visible.)
-
-    /// Just vocals.
-    const VOCALS: [char; 12] = ['a', 'e', 'i', 'o', 'u', 'y', 'A', 'E', 'I', 'O', 'U', 'Y'];
-
-    /// Weighted Chars after Vocals.
-    /// With Higher change for consonants.
-    const ALPHA_AFTER_VOCAL: [char; 66] = [
-        'a', 'e', 'i', 'o', 'u', 'y', 'b', 'c', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'm', 'n', 'p', 'q',
-        'r', 's', 't', 'v', 'w', 'x', 'z', 'b', 'c', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'm', 'n', 'p',
-        'q', 'r', 's', 't', 'v', 'w', 'x', 'z', 'b', 'c', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'm', 'n',
-        'p', 'q', 'r', 's', 't', 'v', 'w', 'x', 'z',
-    ];
-
-    /// Weighted Chars after Consonants
-    /// With slightly higher chance for vocals.
-    const ALPHA_AFTER_CONSONANT: [char; 100] = [
-        'a', 'e', 'a', 'e', 'i', 'o', 'u', 'y', 'a', 'e', 'i', 'o', 'u', 'y', 'a', 'e', 'i', 'o', 'u',
-        'y', 'a', 'e', 'i', 'o', 'u', 'y', 'a', 'e', 'i', 'o', 'u', 'y', 'a', 'e', 'i', 'o', 'u', 'y',
-        'a', 'e', 'i', 'o', 'u', 'y', 'a', 'e', 'i', 'o', 'u', 'y', 'a', 'e', 'i', 'o', 'u', 'y', 'a',
-        'e', 'i', 'o', 'u', 'y', 'a', 'e', 'i', 'o', 'u', 'y', 'a', 'e', 'i', 'o', 'u', 'y', 'a', 'e',
-        'i', 'o', 'u', 'y', 'b', 'c', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'm', 'n', 'p', 'q', 'r', 's',
-        't', 'v', 'w', 'x', 'z',
-    ];
 
     let mut chars: Vec<char> = vec![
         ((rand::random::<u8>() % 26) + b'A') as char, // first letter.
@@ -35,11 +31,13 @@ pub fn name_gen(length: usize) -> String {
 
     for i in 1usize..length {
         if VOCALS.contains(chars.get(i - 1).unwrap()) {
-            random_index = rand::random::<usize>() % ALPHA_AFTER_VOCAL.len();
-            chars.push(ALPHA_AFTER_VOCAL[random_index]);
+            // last char is VOCAL
+            // => higher percentage of consonants (66%)
+            chars.push(random_vocal_or_constant(34usize));
         } else {
-            random_index = rand::random::<usize>() % ALPHA_AFTER_CONSONANT.len();
-            chars.push(ALPHA_AFTER_CONSONANT[random_index]);
+            // last char is constant.
+            // => higher percentage of vocals (70%)
+            chars.push(random_vocal_or_constant(70usize));
         }
     }
 
