@@ -83,10 +83,12 @@ fn run(
         x: 2u16,
         y: h as u16 + 6,
     };
+
     let need_bar_width: u16 = 10;
     let need_panel_show_percentage: bool = true;
 
     // frame game field
+    let frame_colour = termion::color::Rgb(100, 100, 100);
     if render {
         tui::core::render_rectangle(
             &tui::core::ScreenPos { x: 1, y: 1 },
@@ -94,12 +96,13 @@ fn run(
                 x: w as u16 + 2,
                 y: h as u16 + 2,
             },
-            &format!("{}-", termion::color::Fg(termion::color::Rgb(0, 0, 255))),
-            &format!("{}|", termion::color::Fg(termion::color::Rgb(0, 255, 0))),
-            &format!("{}+", termion::color::Fg(termion::color::Rgb(255, 0, 0))),
+            &format!("{}-", termion::color::Fg(frame_colour)),
+            &format!("{}|", termion::color::Fg(frame_colour)),
+            &format!("{}+", termion::color::Fg(frame_colour)),
         );
 
         // frame need panel
+        let yellow =termion::color::Rgb(255, 255, 0);
         tui::core::render_rectangle(
             &tui::core::ScreenPos {
                 x: need_panel_position.x - 1,
@@ -109,9 +112,9 @@ fn run(
                 x: need_panel_position.x + 9 + need_bar_width,
                 y: need_panel_position.y + 7,
             },
-            &format!("{}-", termion::color::Fg(termion::color::Rgb(255, 255, 0))),
-            &format!("{}|", termion::color::Fg(termion::color::Rgb(255, 255, 0))),
-            &format!("{}+", termion::color::Fg(termion::color::Rgb(255, 255, 0))),
+            &format!("{}-", termion::color::Fg(yellow)),
+            &format!("{}|", termion::color::Fg(yellow)),
+            &format!("{}+", termion::color::Fg(yellow)),
         );
     }
 
