@@ -24,6 +24,27 @@ pub struct Wusel {
     tasklist: Vec<tasks::Task>,
 }
 
+impl std::cmp::Eq for Wusel {
+}
+
+impl std::cmp::PartialEq for Wusel {
+    fn eq(&self, other: &Self) -> bool {
+        other.id == self.id
+    }
+}
+
+impl std::fmt::Display for Wusel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {} (days: {}, status: {:?}, gender: {:?})",
+        self.id,
+        self.name,
+        self.lived_days,
+        self.life,
+        self.gender,
+        )
+    }
+}
+
 impl Wusel {
     pub fn new(id: WuselId, name: String, gender: WuselGender) -> Self {
         let mut new = Self {
@@ -304,7 +325,7 @@ impl Wusel {
 
 /// Life state of a Wusel.
 /// All but alive leads to a not living state, though a ghost may wander and interact.
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub enum Life {
     ALIVE,
     #[allow(unused)]
