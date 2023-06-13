@@ -7,7 +7,6 @@
 
 use crate::life::objects;
 use crate::life::world;
-use crate::life::world::areas;
 use crate::life::wusels;
 
 /// Id Type of an Action
@@ -34,7 +33,7 @@ impl TaskBuilder {
     }
 
     /// Create a new Task Builder, preset for moving.
-    pub fn move_to(pos: areas::Position) -> Self {
+    pub fn move_to(pos: world::areas::Position) -> Self {
         Self {
             name: "Moving".to_string(),
             duration: 1,
@@ -122,7 +121,7 @@ impl TaskBuilder {
 #[derive(Debug, Clone, PartialEq)]
 pub enum TaskTag {
     WaitLike,
-    MoveToPos(areas::Position),
+    MoveToPos(world::areas::Position),
 
     UseObject(objects::ObjectId, ActionId), // object_id, and action_id
 

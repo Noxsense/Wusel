@@ -5,9 +5,7 @@ extern crate env_logger;
 use crate::life;
 use crate::life::objects;
 use crate::life::world;
-use crate::life::world::areas;
 use crate::life::wusels;
-use crate::life::wusels::tasks;
 
 #[allow(dead_code)]
 fn init_log() {
@@ -218,12 +216,15 @@ fn wusel_test_assignment() {
 
     wusel0.assign_to_task(
         init_time,
-        tasks::TaskBuilder::move_to(areas::Position { x: 0, y: 4, z: 0 }),
+        wusels::tasks::TaskBuilder::move_to(world::areas::Position { x: 0, y: 4, z: 0 }),
     );
-    wusel0.assign_to_task(init_time, tasks::TaskBuilder::use_object(food1_id, 1));
     wusel0.assign_to_task(
         init_time,
-        tasks::TaskBuilder::meet_with(wusel1.get_id(), friendly, romantically),
+        wusels::tasks::TaskBuilder::use_object(food1_id, 1),
+    );
+    wusel0.assign_to_task(
+        init_time,
+        wusels::tasks::TaskBuilder::meet_with(wusel1.get_id(), friendly, romantically),
     );
 
     assert!(!wusel0.has_tasklist_empty());
@@ -232,8 +233,8 @@ fn wusel_test_assignment() {
     assert_eq!(wusel1.get_tasklist_len(), 0);
 
     if let Some(task) = wusel0.peek_ongoing_task() {
-        if let tasks::TaskTag::MoveToPos(pos) = task.get_passive_part() {
-            let areas::Position { x, y, z } = pos;
+        if let wusels::tasks::TaskTag::MoveToPos(pos) = task.get_passive_part() {
+            let world::areas::Position { x, y, z } = pos;
             assert_eq!(x, 0);
             assert_eq!(y, 4);
             assert_eq!(z, 0);
@@ -244,13 +245,14 @@ fn wusel_test_assignment() {
         assert!(false);
     }
 
-    let opt_index: Option<usize> =
-        wusel0.get_next_task_index_with(&|task: &tasks::Task| match task.get_passive_part() {
-            tasks::TaskTag::MeetWith(other_id, friend, lover) => {
+    let opt_index: Option<usize> = wusel0.get_next_task_index_with(
+        &|task: &wusels::tasks::Task| match task.get_passive_part() {
+            wusels::tasks::TaskTag::MeetWith(other_id, friend, lover) => {
                 other_id == wusel1.get_id() && friend == friendly && lover == romantically
             }
             _ => false,
-        });
+        },
+    );
 
     println!("Got index: {}", opt_index.unwrap_or(999));
 
