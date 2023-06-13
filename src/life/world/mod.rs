@@ -5,12 +5,14 @@
 //! ## Author
 //! Ngoc (Nox) Le <noxsense@gmail.com>
 
-use crate::life::areas;
 use crate::life::objects;
 use crate::life::wusels;
 use crate::life::wusels::tasks;
 
 use rand;
+
+pub mod areas;
+pub mod items;
 
 // engine.
 mod task_manager;
@@ -49,7 +51,7 @@ pub struct World {
     objects_index_with_whereabouts: Vec<InWorld>,
 
     // all constructions
-    constructions: Vec<Construction>,
+    constructions: Vec<items::Construction>,
     constructions_index_on_position_index: Vec<usize>,
 
     // actions in this world.
@@ -78,71 +80,9 @@ enum InWorld {
 /// A type wrapped identifier that represents something in the world.
 #[derive(Clone, Copy, PartialEq, Hash, Eq)]
 pub enum PlaceTaker {
-    Construction(ConstructionType, ConstructionId),
+    Construction(items::ConstructionType, items::ConstructionId),
     Wusel(wusels::WuselId),
     Object(objects::ObjectId, objects::ObjectType),
-}
-
-/// A Blueprint is a list of required abilities, consumables or positions
-///
-/// to create a certain product after a certain time.
-/// Blueprint: [ components, Workstation ] + Time => Product.
-#[derive(Clone, PartialEq, Hash, Eq)]
-#[allow(dead_code)]
-struct Blueprint {
-    id: usize,
-    product: usize,
-    components: Vec<usize>, // needed components: such as tools (desk) or ingredients (pen, paper).
-    steps: usize,           // needed steps.
-}
-
-/// Something a Wusel can consume
-///
-/// Consumption / Usage will 'destroy' this object.
-/// Consuming it might modify the needs and skills.
-#[derive(Clone, Debug)]
-pub struct Consumable {
-    name: String,
-
-    // Size representation: whole = 100% = size/size.
-    size: u32, // a size representation: consuming this [size]  times, the thing is gone. (fixed)
-    available: f32, // 1.0f whole, 0.0f gone. (temporary)
-
-    // Sometimes, a consumable can spoil (> 0)
-    spoils_after: u32, // spoils after 0: infinite, or N days. (fixed)
-    age: u32,          // the current age of the consumable (temporary)
-
-    // While consuming it, one part (1/size) while change the needs as following.
-    need_change: std::collections::HashMap<wusels::needs::Need, i16>,
-}
-
-/// Identifier for a Construction
-pub type ConstructionId = usize;
-
-/// Type and type attributes of a Construction.
-#[derive(Clone, Copy, PartialEq, Hash, Eq)]
-pub enum ConstructionType {
-    Wall(bool, usize), // is_horizontal (grows left->right, otherwise up->down), length
-    Door(bool),        // is_open
-    Window,
-    Stairs(bool), // is_leading_up
-    Floor,
-}
-
-pub const WALL_LR: bool = true; // is horizontal
-pub const WALL_UD: bool = false; // is not horizontal
-                                 //
-pub const DOOR_OPEN: bool = true;
-pub const DOOR_CLOSED: bool = false;
-
-/// A Construction is an enviromental part of the world.
-///
-/// They offer only just few options to interact with.
-/// Mostly they block ways and are there to build and present place for the world.
-#[derive(Clone, Copy, PartialEq, Hash, Eq)]
-pub struct Construction {
-    id: ConstructionId,
-    construction_type: ConstructionType, // TODO better type.
 }
 
 // TODO split up engine like, updater, getter, etc.
@@ -371,12 +311,14 @@ impl World {
                 self.constructions_index_on_position_index[construction_index];
 
             let placetaker =
-                PlaceTaker::Construction(construction.construction_type, construction.id);
+                PlaceTaker::Construction(construction.construction_type(), construction.id());
 
             // add all positions.
             self.positions[constructions_position_index].push(placetaker);
 
-            if let ConstructionType::Wall(horizontal, length) = construction.construction_type {
+            if let items::ConstructionType::Wall(horizontal, length) =
+                construction.construction_type()
+            {
                 let mut more_position = constructions_position_index;
                 // first position is already put.
                 for _i in 1..length {
@@ -439,17 +381,14 @@ impl World {
     /// Create a new Construction within the world.
     pub fn construction_new(
         &mut self,
-        construction_type: ConstructionType,
+        construction_type: items::ConstructionType,
         position: areas::Position,
     ) {
-        let construction = Construction {
-            id: 0usize,
-            construction_type,
-        };
+        let construction = items::Construction::new(0usize, construction_type);
 
         let position_index = self.position_to_index(position);
 
-        let placetaker = PlaceTaker::Construction(construction_type, construction.id);
+        let placetaker = PlaceTaker::Construction(construction_type, construction.id());
 
         self.constructions.push(construction);
 
@@ -459,7 +398,7 @@ impl World {
 
         // all positions it may take.
         self.update_positions(placetaker, 0, position_index);
-        if let ConstructionType::Wall(horizontal, length) = construction_type {
+        if let items::ConstructionType::Wall(horizontal, length) = construction_type {
             let mut more_position = position_index;
             // first position is already put.
             for _i in 1..length {
@@ -473,7 +412,7 @@ impl World {
     fn get_all_doors_indices(&self) -> Vec<usize> {
         let mut doors = vec![];
         for (index, construction) in self.constructions.iter().enumerate() {
-            if let ConstructionType::Door(_is_open) = construction.construction_type {
+            if let items::ConstructionType::Door(_is_open) = construction.construction_type() {
                 doors.push(index);
             }
         }

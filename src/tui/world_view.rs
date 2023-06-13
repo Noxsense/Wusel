@@ -26,22 +26,22 @@ fn get_render_for_position(
         ),
 
         Some(life::world::PlaceTaker::Construction(
-            life::world::ConstructionType::Wall(false, _),
+            life::world::items::ConstructionType::Wall(false, _),
             _,
         )) => ('#', None, Some(screen::hash_color_to_rgb(0xa04c1f)), None),
 
         Some(life::world::PlaceTaker::Construction(
-            life::world::ConstructionType::Wall(true, _),
+            life::world::items::ConstructionType::Wall(true, _),
             _,
         )) => ('#', None, Some(screen::hash_color_to_rgb(0xa04c1f)), None),
 
         Some(life::world::PlaceTaker::Construction(
-            life::world::ConstructionType::Door(true),
+            life::world::items::ConstructionType::Door(true),
             _,
         )) => ('-', None, None, None),
 
         Some(life::world::PlaceTaker::Construction(
-            life::world::ConstructionType::Door(false),
+            life::world::items::ConstructionType::Door(false),
             _,
         )) => ('+', None, None, None), // construction, eg. wall
 
@@ -85,7 +85,7 @@ pub fn render_field(w: usize, positions: Vec<Vec<life::world::PlaceTaker>>) {
                 matches!(
                     p,
                     &life::world::PlaceTaker::Construction(
-                        life::world::ConstructionType::Door(_),
+                        life::world::items::ConstructionType::Door(_),
                         _
                     )
                 )

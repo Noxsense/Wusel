@@ -7,7 +7,6 @@ pub mod world;
 
 pub mod wusels;
 
-pub mod areas;
 pub mod objects;
 
 /// Default ticks per minute

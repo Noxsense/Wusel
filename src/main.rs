@@ -264,27 +264,27 @@ fn setup_world_example(world: &mut life::world::World) {
 
     // create fixed construction
     world.construction_new(
-        life::world::ConstructionType::Wall(life::world::WALL_UD, 10),
-        life::areas::Position { x: 10, y: 10, z: 0 },
+        life::world::items::ConstructionType::Wall(life::world::items::WALL_UD, 10),
+        life::world::areas::Position { x: 10, y: 10, z: 0 },
     );
 
     world.construction_new(
-        life::world::ConstructionType::Wall(life::world::WALL_LR, 20),
-        life::areas::Position { x: 11, y: 19, z: 0 },
+        life::world::items::ConstructionType::Wall(life::world::items::WALL_LR, 20),
+        life::world::areas::Position { x: 11, y: 19, z: 0 },
     );
 
     world.construction_new(
-        life::world::ConstructionType::Wall(life::world::WALL_UD, 10),
-        life::areas::Position { x: 30, y: 10, z: 0 },
+        life::world::items::ConstructionType::Wall(life::world::items::WALL_UD, 10),
+        life::world::areas::Position { x: 30, y: 10, z: 0 },
     );
 
     world.construction_new(
-        life::world::ConstructionType::Door(life::world::DOOR_OPEN),
-        life::areas::Position { x: 20, y: 10, z: 0 },
+        life::world::items::ConstructionType::Door(life::world::items::DOOR_OPEN),
+        life::world::areas::Position { x: 20, y: 10, z: 0 },
     );
 
     world.construction_new(
-        life::world::ConstructionType::Wall(life::world::WALL_LR, 20),
-        life::areas::Position { x: 10, y: 10, z: 0 },
+        life::world::items::ConstructionType::Wall(life::world::items::WALL_LR, 20),
+        life::world::areas::Position { x: 10, y: 10, z: 0 },
     );
 }

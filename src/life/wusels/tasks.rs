@@ -5,10 +5,9 @@
 //! ## Author
 //! Ngoc (Nox) Le <noxsense@gmail.com>
 
-use crate::life::areas;
 use crate::life::objects;
-#[allow(unused_imports)]
 use crate::life::world;
+use crate::life::world::areas;
 use crate::life::wusels;
 
 /// Id Type of an Action

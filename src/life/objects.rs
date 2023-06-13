@@ -7,6 +7,8 @@
 //! ## Author
 //! Ngoc (Nox) Le <noxsense@gmail.com>
 
+//  TODO (2023-06-13) check if this is redundant.
+
 /// Types of an object.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ObjectType {
