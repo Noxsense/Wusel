@@ -8,9 +8,7 @@
 use termion;
 pub use termion::color::Rgb;
 
-
 pub mod render;
-
 
 /// Position on the Screen.
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
@@ -22,7 +20,6 @@ pub struct Pos {
 impl Pos {
     pub const START: Self = Pos { x: 1, y: 1 };
 }
-
 
 impl std::ops::Add<Pos> for Pos {
     type Output = Self;

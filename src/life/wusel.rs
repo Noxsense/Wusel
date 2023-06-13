@@ -24,8 +24,7 @@ pub struct Wusel {
     tasklist: Vec<tasks::Task>,
 }
 
-impl std::cmp::Eq for Wusel {
-}
+impl std::cmp::Eq for Wusel {}
 
 impl std::cmp::PartialEq for Wusel {
     fn eq(&self, other: &Self) -> bool {
@@ -35,12 +34,10 @@ impl std::cmp::PartialEq for Wusel {
 
 impl std::fmt::Display for Wusel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {} (days: {}, status: {:?}, gender: {:?})",
-        self.id,
-        self.name,
-        self.lived_days,
-        self.life,
-        self.gender,
+        write!(
+            f,
+            "{}: {} (days: {}, status: {:?}, gender: {:?})",
+            self.id, self.name, self.lived_days, self.life, self.gender,
         )
     }
 }

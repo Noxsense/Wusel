@@ -102,7 +102,7 @@ fn run(
         );
 
         // frame need panel
-        let yellow =termion::color::Rgb(255, 255, 0);
+        let yellow = termion::color::Rgb(255, 255, 0);
         tui::screen::render::rectangle(
             &tui::screen::Pos {
                 x: need_panel_position.x - 1,
@@ -147,7 +147,9 @@ fn run(
                 let x_offset = wusel_offset as u16 * 23;
 
                 if need_panel_position.x + x_offset + 20 < screen_width {
-                    tui::screen::render::cursor_set(&(*need_panel_position + (x_offset, 2u16)));
+                    tui::screen::render::cursor_set(
+                        &(*need_panel_position + (x_offset, 0u16) - (0u16, 2u16)),
+                    );
                     print!(
                         "| {} ({})",
                         world
@@ -183,6 +185,23 @@ fn run(
                     );
                 }
             }
+        } else {
+            println!("World Time: {}", world.get_time());
+            for (wusel_offset, &wusel_id) in world.wusel_get_all_alive().iter().enumerate() {
+                println!(
+                    "* {wusel_name} (w{wusel_id})",
+                    wusel_name = world
+                        .wusel_get_name(wusel_id as usize)
+                        .unwrap_or_else(|| "No Name".to_string()),
+                );
+
+                print!("  * tasks: ");
+                for (task) in world.wusel_get_tasklist_names(wusel_id as usize).iter() {
+                    print!(" {task}, ");
+                }
+                println!("...")
+            }
+            println!("");
         }
 
         world.tick();
