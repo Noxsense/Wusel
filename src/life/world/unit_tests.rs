@@ -3,12 +3,11 @@
 extern crate env_logger;
 
 use crate::life;
-use crate::life::areas;
 use crate::life::objects;
-use crate::life::tasks;
-#[allow(unused_imports)]
 use crate::life::world;
-use crate::life::wusel;
+use crate::life::world::areas;
+use crate::life::wusels;
+use crate::life::wusels::tasks;
 
 #[allow(dead_code)]
 fn init_log() {
@@ -19,25 +18,25 @@ fn init_log() {
 fn wusel_init() {
     init_log();
 
-    let wusel: wusel::Wusel;
+    let wusel: wusels::Wusel;
 
-    wusel = wusel::Wusel::new(
+    wusel = wusels::Wusel::new(
         0,
         "Wusel Name Start".to_string(),
-        wusel::WuselGender::Female,
+        wusels::WuselGender::Female,
     );
 
     assert_eq!(wusel.get_id(), 0usize);
     assert_eq!(wusel.get_name(), "Wusel Name Start".to_string());
-    assert_eq!(wusel.get_gender(), wusel::WuselGender::Female);
+    assert_eq!(wusel.get_gender(), wusels::WuselGender::Female);
 
     assert_eq!(wusel.is_alive(), true);
 
-    for &need in wusel::Need::VALUES.iter() {
+    for &need in wusels::needs::Need::VALUES.iter() {
         assert_eq!(wusel.get_need(need), need.get_full()); // init_log full.
     }
 
-    for &ability in wusel::Ability::VALUES.iter() {
+    for &ability in wusels::abilities::Ability::VALUES.iter() {
         assert_eq!(wusel.get_ability(ability), 0u32);
     }
 
@@ -55,33 +54,33 @@ fn wusel_init() {
 fn wusel_rename_and_co() {
     init_log();
 
-    let mut wusel: wusel::Wusel;
+    let mut wusel: wusels::Wusel;
 
-    wusel = wusel::Wusel::new(
+    wusel = wusels::Wusel::new(
         0,
         "Wusel Name Start".to_string(),
-        wusel::WuselGender::Female,
+        wusels::WuselGender::Female,
     );
 
     assert_eq!(wusel.get_id(), 0usize);
     assert_eq!(wusel.get_name(), "Wusel Name Start".to_string());
-    assert_eq!(wusel.get_gender(), wusel::WuselGender::Female);
+    assert_eq!(wusel.get_gender(), wusels::WuselGender::Female);
 
     wusel.set_name("NewName".to_string());
     assert_eq!(wusel.get_name(), "NewName".to_string());
 
-    wusel.set_gender(wusel::WuselGender::Male);
-    assert_eq!(wusel.get_gender(), wusel::WuselGender::Male);
+    wusel.set_gender(wusels::WuselGender::Male);
+    assert_eq!(wusel.get_gender(), wusels::WuselGender::Male);
 
     // rest stayes the same.
 
     assert_eq!(wusel.is_alive(), true);
 
-    for &need in wusel::Need::VALUES.iter() {
+    for &need in wusels::needs::Need::VALUES.iter() {
         assert_eq!(wusel.get_need(need), need.get_full()); // init_log full.
     }
 
-    for &ability in wusel::Ability::VALUES.iter() {
+    for &ability in wusels::abilities::Ability::VALUES.iter() {
         assert_eq!(wusel.get_ability(ability), 0u32);
     }
 
@@ -99,25 +98,25 @@ fn wusel_rename_and_co() {
 fn wusel_tick_to_death() {
     init_log();
 
-    let mut wusel: wusel::Wusel;
+    let mut wusel: wusels::Wusel;
 
-    wusel = wusel::Wusel::new(
+    wusel = wusels::Wusel::new(
         0,
         "Wusel Name Start".to_string(),
-        wusel::WuselGender::Female,
+        wusels::WuselGender::Female,
     );
 
     assert!(wusel.is_alive());
 
-    for &need in wusel::Need::VALUES.iter() {
+    for &need in wusels::needs::Need::VALUES.iter() {
         assert_eq!(wusel.get_need(need), need.get_full()); // init_log full.
     }
 
-    for &ability in wusel::Ability::VALUES.iter() {
+    for &ability in wusels::abilities::Ability::VALUES.iter() {
         assert_eq!(wusel.get_ability(ability), 0u32);
     }
 
-    let water_full = wusel::Need::WATER.get_full();
+    let water_full = wusels::needs::Need::WATER.get_full();
 
     log::debug!("Start ticking, {} times.", water_full);
 
@@ -125,8 +124,8 @@ fn wusel_tick_to_death() {
     for i in 0..water_full - 1 {
         log::debug!("- {} Tick.", i);
         wusel.wusel_tick(i % life::DAY == 0 && i > 0); // day.
-        assert_ne!(wusel.get_need(wusel::Need::WATER), 0u32);
-        assert_ne!(wusel.get_need(wusel::Need::WATER), water_full);
+        assert_ne!(wusel.get_need(wusels::needs::Need::WATER), 0u32);
+        assert_ne!(wusel.get_need(wusels::needs::Need::WATER), water_full);
         assert!(wusel.is_alive());
     }
 
@@ -143,7 +142,7 @@ fn wusel_tick_to_death() {
     assert!(day_range.contains(&wusel.get_lived_days()));
 
     assert!(wusel.is_alive());
-    assert_eq!(wusel.get_need(wusel::Need::WATER), 1u32);
+    assert_eq!(wusel.get_need(wusels::needs::Need::WATER), 1u32);
 
     assert!(!wusel.is_pregnant());
     assert_eq!(wusel.get_other_parent(), None);
@@ -162,8 +161,8 @@ fn wusel_tick_to_death() {
 fn wusel_impregnate() {
     init_log();
 
-    let mut wusel0 = wusel::Wusel::new(0, "Wusel0".to_string(), wusel::WuselGender::Female);
-    let mut wusel1 = wusel::Wusel::new(1, "Wusel1".to_string(), wusel::WuselGender::Female); // can also be female, no restrictions.
+    let mut wusel0 = wusels::Wusel::new(0, "Wusel0".to_string(), wusels::WuselGender::Female);
+    let mut wusel1 = wusels::Wusel::new(1, "Wusel1".to_string(), wusels::WuselGender::Female); // can also be female, no restrictions.
 
     wusel0.set_pregnancy(Some(wusel1.get_id()), Some(3)); // 3 days pregnant with wusel1's child.
 
@@ -192,7 +191,7 @@ fn wusel_impregnate() {
     // define gender.
     // set parents.
 
-    let baby = wusel::Wusel::new(2, "Baby".to_string(), wusel::WuselGender::random());
+    let baby = wusels::Wusel::new(2, "Baby".to_string(), wusels::WuselGender::random());
     wusel0.set_pregnancy(None, None); // done.
 
     assert_eq!(baby.get_lived_days(), 0);
@@ -207,8 +206,8 @@ fn wusel_impregnate() {
 fn wusel_test_assignment() {
     init_log();
 
-    let mut wusel0 = wusel::Wusel::new(0, "Wusel0".to_string(), wusel::WuselGender::Female);
-    let wusel1 = wusel::Wusel::new(1, "Wusel1".to_string(), wusel::WuselGender::Female); // can also be female, no restrictions.
+    let mut wusel0 = wusels::Wusel::new(0, "Wusel0".to_string(), wusels::WuselGender::Female);
+    let wusel1 = wusels::Wusel::new(1, "Wusel1".to_string(), wusels::WuselGender::Female); // can also be female, no restrictions.
 
     let init_time = 0;
     let friendly = true;

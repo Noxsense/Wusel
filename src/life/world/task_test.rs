@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use super::wusel;
+use super::wusels;
 
 #[test]
 fn test_walking() {
@@ -16,19 +16,19 @@ fn test_walking() {
 
     test_world.wusel_new(
         "on_x".to_string(),
-        super::wusel::WuselGender::Female,
+        super::wusels::WuselGender::Female,
         super::areas::Position { x: 0, y: 0, z: 0 },
     );
 
     test_world.wusel_new(
         "on_y".to_string(),
-        super::wusel::WuselGender::Male,
+        super::wusels::WuselGender::Male,
         super::areas::Position { x: 2, y: 2, z: 0 },
     );
 
     test_world.wusel_new(
         "random".to_string(),
-        super::wusel::WuselGender::Male,
+        super::wusels::WuselGender::Male,
         super::areas::Position { x: 3, y: 4, z: 0 },
     );
 
@@ -181,13 +181,13 @@ fn test_consume_bread() {
 
     test_world.wusel_new(
         "Eater".to_string(),
-        super::wusel::WuselGender::Female,
+        super::wusels::WuselGender::Female,
         super::areas::Position { x: 1, y: 0, z: 0 },
     );
 
     test_world.wusel_new(
         "Starver".to_string(),
-        super::wusel::WuselGender::Male,
+        super::wusels::WuselGender::Male,
         super::areas::Position { x: 2, y: 0, z: 0 },
     );
 
@@ -253,7 +253,7 @@ fn test_consume_bread() {
     // show everyone's stats.
     for i in 0usize..2 {
         // test_world.wusel_show_tasklist(i); // tasks
-        for n in wusel::Need::VALUES.iter() {
+        for n in crate::life::wusels::needs::Need::VALUES.iter() {
             test_world.wusel_set_need(i, n, 100);
         }
     }
@@ -369,24 +369,24 @@ fn test_mutual_meeting() {
 
     test_world.wusel_new(
         "1st".to_string(),
-        super::wusel::WuselGender::Female,
+        super::wusels::WuselGender::Female,
         super::areas::Position { x: 1, y: 0, z: 0 },
     );
 
     test_world.wusel_new(
         "2nd".to_string(),
-        super::wusel::WuselGender::Female,
+        super::wusels::WuselGender::Female,
         super::areas::Position { x: 3, y: 0, z: 0 },
     );
     test_world.wusel_new(
         "3rd".to_string(),
-        super::wusel::WuselGender::Male,
+        super::wusels::WuselGender::Male,
         super::areas::Position { x: 5, y: 0, z: 0 },
     );
 
     test_world.wusel_new(
         "4th".to_string(),
-        super::wusel::WuselGender::Male,
+        super::wusels::WuselGender::Male,
         super::areas::Position { x: 9, y: 0, z: 0 },
     );
 
