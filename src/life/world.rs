@@ -12,6 +12,7 @@ use crate::life::wusels::tasks;
 
 use rand;
 
+// engine.
 mod task_manager;
 mod task_test;
 mod unit_tests;
@@ -60,9 +61,91 @@ pub struct World {
     dead_wusels: Vec<wusels::Wusel>,
 
     #[allow(dead_code)]
-    relations: std::collections::BTreeMap<(wusels::WuselId, wusels::WuselId), wusels::relations::Relation>, // vector of wusel relations
+    relations:
+        std::collections::BTreeMap<(wusels::WuselId, wusels::WuselId), wusels::relations::Relation>, // vector of wusel relations
 }
 
+/// State (in a sum type) with Positional Data for the world.
+#[derive(Clone, Copy, PartialEq, Hash, Eq)]
+enum InWorld {
+    OnPositionIndex(usize),
+    #[allow(dead_code)]
+    InStorageId(objects::ObjectId),
+    HeldByWuselId(wusels::WuselId),
+    Nowhere,
+}
+
+/// A type wrapped identifier that represents something in the world.
+#[derive(Clone, Copy, PartialEq, Hash, Eq)]
+pub enum PlaceTaker {
+    Construction(ConstructionType, ConstructionId),
+    Wusel(wusels::WuselId),
+    Object(objects::ObjectId, objects::ObjectType),
+}
+
+/// A Blueprint is a list of required abilities, consumables or positions
+///
+/// to create a certain product after a certain time.
+/// Blueprint: [ components, Workstation ] + Time => Product.
+#[derive(Clone, PartialEq, Hash, Eq)]
+#[allow(dead_code)]
+struct Blueprint {
+    id: usize,
+    product: usize,
+    components: Vec<usize>, // needed components: such as tools (desk) or ingredients (pen, paper).
+    steps: usize,           // needed steps.
+}
+
+/// Something a Wusel can consume
+///
+/// Consumption / Usage will 'destroy' this object.
+/// Consuming it might modify the needs and skills.
+#[derive(Clone, Debug)]
+pub struct Consumable {
+    name: String,
+
+    // Size representation: whole = 100% = size/size.
+    size: u32, // a size representation: consuming this [size]  times, the thing is gone. (fixed)
+    available: f32, // 1.0f whole, 0.0f gone. (temporary)
+
+    // Sometimes, a consumable can spoil (> 0)
+    spoils_after: u32, // spoils after 0: infinite, or N days. (fixed)
+    age: u32,          // the current age of the consumable (temporary)
+
+    // While consuming it, one part (1/size) while change the needs as following.
+    need_change: std::collections::HashMap<wusels::needs::Need, i16>,
+}
+
+/// Identifier for a Construction
+pub type ConstructionId = usize;
+
+/// Type and type attributes of a Construction.
+#[derive(Clone, Copy, PartialEq, Hash, Eq)]
+pub enum ConstructionType {
+    Wall(bool, usize), // is_horizontal (grows left->right, otherwise up->down), length
+    Door(bool),        // is_open
+    Window,
+    Stairs(bool), // is_leading_up
+    Floor,
+}
+
+pub const WALL_LR: bool = true; // is horizontal
+pub const WALL_UD: bool = false; // is not horizontal
+                                 //
+pub const DOOR_OPEN: bool = true;
+pub const DOOR_CLOSED: bool = false;
+
+/// A Construction is an enviromental part of the world.
+///
+/// They offer only just few options to interact with.
+/// Mostly they block ways and are there to build and present place for the world.
+#[derive(Clone, Copy, PartialEq, Hash, Eq)]
+pub struct Construction {
+    id: ConstructionId,
+    construction_type: ConstructionType, // TODO better type.
+}
+
+// TODO split up engine like, updater, getter, etc.
 impl World {
     /// Create a new world.
     pub fn new(width: u32, depth: u32) -> Self {
@@ -116,8 +199,11 @@ impl World {
         let new_day: bool = self.clock % Self::TICKS_PER_DAY == 0;
 
         let mut some_busy_wusel: Vec<wusels::WuselId> = vec![];
-        let mut new_babies: Vec<(wusels::WuselId, Option<wusels::WuselId>, wusels::WuselGender)> =
-            vec![];
+        let mut new_babies: Vec<(
+            wusels::WuselId,
+            Option<wusels::WuselId>,
+            wusels::WuselGender,
+        )> = vec![];
         let mut dying_wusels: Vec<wusels::WuselId> = vec![];
 
         // Decay on every object and living.
@@ -350,6 +436,7 @@ impl World {
         }
     }
 
+    /// Create a new Construction within the world.
     pub fn construction_new(
         &mut self,
         construction_type: ConstructionType,
@@ -382,6 +469,7 @@ impl World {
         }
     }
 
+    /// Get all construction inidces of a door.
     fn get_all_doors_indices(&self) -> Vec<usize> {
         let mut doors = vec![];
         for (index, construction) in self.constructions.iter().enumerate() {
@@ -789,7 +877,12 @@ impl World {
     /// Set the requesting need's level of the wusel.
     ///
     /// This wraps [wusel::Wusel::set_need](wusel::Wusel::set_need) for a world wusel.
-    pub fn wusel_set_need(&mut self, wusel_id: wusels::WuselId, need: &wusels::needs::Need, new_value: u32) {
+    pub fn wusel_set_need(
+        &mut self,
+        wusel_id: wusels::WuselId,
+        need: &wusels::needs::Need,
+        new_value: u32,
+    ) {
         if let Some(index) = self.get_wusels_index_by_id(wusel_id) {
             self.wusels[index].set_need(*need, new_value);
         }
@@ -839,7 +932,11 @@ impl World {
     /// Increase the requesting ability's value of the wusel.
     ///
     /// This wraps [wusel::Wusel::improve](wusel::Wusel::improve) for a world wusel.
-    pub fn wusel_improve(&mut self, wusel_id: wusels::WuselId, ability: wusels::abilities::Ability) {
+    pub fn wusel_improve(
+        &mut self,
+        wusel_id: wusels::WuselId,
+        ability: wusels::abilities::Ability,
+    ) {
         if let Some(index) = self.get_wusels_index_by_id(wusel_id) {
             self.wusels[index].improve(ability);
         }
@@ -1027,84 +1124,4 @@ impl World {
 
         rel.update(relationtype, change);
     }
-}
-
-/// State (in a sum type) with Positional Data for the world.
-#[derive(Clone, Copy, PartialEq, Hash, Eq)]
-enum InWorld {
-    OnPositionIndex(usize),
-    #[allow(dead_code)]
-    InStorageId(objects::ObjectId),
-    HeldByWuselId(wusels::WuselId),
-    Nowhere,
-}
-
-/// A type wrapped identifier that represents something in the world.
-#[derive(Clone, Copy, PartialEq, Hash, Eq)]
-pub enum PlaceTaker {
-    Construction(ConstructionType, ConstructionId),
-    Wusel(wusels::WuselId),
-    Object(objects::ObjectId, objects::ObjectType),
-}
-
-/// A Blueprint is a list of required abilities, consumables or positions
-///
-/// to create a certain product after a certain time.
-/// Blueprint: [ components, Workstation ] + Time => Product.
-#[derive(Clone, PartialEq, Hash, Eq)]
-#[allow(dead_code)]
-struct Blueprint {
-    id: usize,
-    product: usize,
-    components: Vec<usize>, // needed components: such as tools (desk) or ingredients (pen, paper).
-    steps: usize,           // needed steps.
-}
-
-/// Something a Wusel can consume
-///
-/// Consumption / Usage will 'destroy' this object.
-/// Consuming it might modify the needs and skills.
-#[derive(Clone, Debug)]
-pub struct Consumable {
-    name: String,
-
-    // Size representation: whole = 100% = size/size.
-    size: u32, // a size representation: consuming this [size]  times, the thing is gone. (fixed)
-    available: f32, // 1.0f whole, 0.0f gone. (temporary)
-
-    // Sometimes, a consumable can spoil (> 0)
-    spoils_after: u32, // spoils after 0: infinite, or N days. (fixed)
-    age: u32,          // the current age of the consumable (temporary)
-
-    // While consuming it, one part (1/size) while change the needs as following.
-    need_change: std::collections::HashMap<wusels::needs::Need, i16>,
-}
-
-/// Identifier for a Construction
-pub type ConstructionId = usize;
-
-/// Type and type attributes of a Construction.
-#[derive(Clone, Copy, PartialEq, Hash, Eq)]
-pub enum ConstructionType {
-    Wall(bool, usize), // is_horizontal (grows left->right, otherwise up->down), length
-    Door(bool),        // is_open
-    Window,
-    Stairs(bool), // is_leading_up
-    Floor,
-}
-
-pub const WALL_LR: bool = true; // is horizontal
-pub const WALL_UD: bool = false; // is not horizontal
-                                 //
-pub const DOOR_OPEN: bool = true;
-pub const DOOR_CLOSED: bool = false;
-
-/// A Construction is an enviromental part of the world.
-///
-/// They offer only just few options to interact with.
-/// Mostly they block ways and are there to build and present place for the world.
-#[derive(Clone, Copy, PartialEq, Hash, Eq)]
-pub struct Construction {
-    id: ConstructionId,
-    construction_type: ConstructionType, // TODO better type.
 }

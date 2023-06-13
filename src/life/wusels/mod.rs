@@ -5,10 +5,10 @@
 //! ## Author
 //! Ngoc (Nox) Le <noxsense@gmail.com>
 
-pub mod tasks;
+pub mod abilities;
 pub mod needs;
 pub mod relations;
-pub mod abilities;
+pub mod tasks;
 
 pub type WuselId = usize;
 
@@ -366,4 +366,3 @@ impl Wusel {
         }
     }
 }
-

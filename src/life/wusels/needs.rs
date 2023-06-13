@@ -3,7 +3,6 @@
 
 use crate::life;
 
-
 /// A need, the Wusel needs to satisfy to survive.
 #[derive(Debug, Copy, Clone, Eq, Hash, PartialEq, PartialOrd)]
 pub enum Need {

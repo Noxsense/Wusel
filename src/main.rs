@@ -166,16 +166,17 @@ fn run(
                         world.wusel_get_tasklist_names(wusel_id as usize),
                     );
 
-                    let needs: Vec<(life::wusels::needs::Need, u32, u32)> = life::wusels::needs::Need::VALUES
-                        .iter()
-                        .map(|need| {
-                            (
-                                *need,
-                                need.get_full(),
-                                world.wusel_get_need(wusel_id, *need),
-                            )
-                        })
-                        .collect();
+                    let needs: Vec<(life::wusels::needs::Need, u32, u32)> =
+                        life::wusels::needs::Need::VALUES
+                            .iter()
+                            .map(|need| {
+                                (
+                                    *need,
+                                    need.get_full(),
+                                    world.wusel_get_need(wusel_id, *need),
+                                )
+                            })
+                            .collect();
 
                     tui::world_view::render_wusel_need_bar(
                         *need_panel_position + (x_offset, 0u16),

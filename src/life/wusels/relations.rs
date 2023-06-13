@@ -32,7 +32,6 @@ impl RelationType {
     }
 }
 
-
 impl Default for Relation {
     fn default() -> Self {
         Self::new()
