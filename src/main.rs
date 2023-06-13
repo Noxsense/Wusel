@@ -187,7 +187,7 @@ fn run(
             }
         } else {
             println!("World Time: {}", world.get_time());
-            for (wusel_offset, &wusel_id) in world.wusel_get_all_alive().iter().enumerate() {
+            for (_, &wusel_id) in world.wusel_get_all_alive().iter().enumerate() {
                 println!(
                     "* {wusel_name} (w{wusel_id})",
                     wusel_name = world
@@ -196,7 +196,7 @@ fn run(
                 );
 
                 print!("  * tasks: ");
-                for (task) in world.wusel_get_tasklist_names(wusel_id as usize).iter() {
+                for task in world.wusel_get_tasklist_names(wusel_id as usize).iter() {
                     print!(" {task}, ");
                 }
                 println!("...")

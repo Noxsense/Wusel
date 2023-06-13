@@ -370,7 +370,7 @@ fn let_wusel_use_object(
     }
 
     let object_id = opt_object_id.unwrap();
-    let object_type = world.objects_index_with_type[object_index];
+    let _object_type = world.objects_index_with_type[object_index];
 
     // Check where the object is.
     // If AtPosition(position) => go to position (position).
@@ -420,7 +420,7 @@ fn let_wusel_use_object(
         .actions_effects
         .iter()
         .find(|(obj_id, act_id, _effect_str, _effect_vec)| {
-            matches!(world.get_object_type_by_id(*obj_id), Some(object_type))
+            matches!(world.get_object_type_by_id(*obj_id), Some(_object_type))
                 && *act_id == action_index
         });
 

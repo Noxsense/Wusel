@@ -987,7 +987,7 @@ impl World {
             let other_name = self.wusels[other_id].get_name();
 
             // Print Relation.
-            print!("[{:?}: {}]", other_name, relation.show());
+            print!("[{:?}: {relation}]", other_name);
             has_relations = true;
         }
 

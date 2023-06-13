@@ -33,9 +33,9 @@ impl std::cmp::PartialEq for Wusel {
 }
 
 impl std::fmt::Display for Wusel {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
-            f,
+            fmt,
             "{}: {} (days: {}, status: {:?}, gender: {:?})",
             self.id, self.name, self.lived_days, self.life, self.gender,
         )
@@ -487,7 +487,7 @@ impl RelationType {
 }
 
 /// Pair of Wusels which may have a relation.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Relation {
     officially: String,    // officially known state (Friends, Spouse, etc..)
     friendship: i32,       // shared friendship between both.
@@ -498,6 +498,26 @@ pub struct Relation {
 impl Default for Relation {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl std::fmt::Display for Relation {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            fmt,
+            "'{official}' {relation_friendly_char}{friendly} {relation_romance_char}{romance}{kinship}",
+            official = self.officially,
+            relation_friendly_char = RelationType::Friendship.to_char(),
+            friendly = self.friendship,
+            relation_romance_char = RelationType::Romance.to_char(),
+            romance = self.romance,
+            kinship = match self.kindred_distance {
+                -1 => "",
+                0 => " Self?",
+                1 => " Siblings|Parents|Kids",
+                _ => "Related",
+            }
+        )
     }
 }
 
@@ -524,22 +544,5 @@ impl Relation {
 
     pub fn update_friendship(&mut self, change: i32) {
         self.friendship += change;
-    }
-
-    pub fn show(&self) -> String {
-        format!(
-            "'{official}' {relation_friendly_char}{friendly} {relation_romance_char}{romance}{kinship}",
-            official = self.officially,
-            relation_friendly_char = RelationType::Friendship.to_char(),
-            friendly = self.friendship,
-            relation_romance_char = RelationType::Romance.to_char(),
-            romance = self.romance,
-            kinship = match self.kindred_distance {
-                -1 => "",
-                0 => " Self?",
-                1 => " Siblings|Parents|Kids",
-                _ => "Related",
-            }
-        )
     }
 }
