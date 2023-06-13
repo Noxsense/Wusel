@@ -336,6 +336,7 @@ pub enum Life {
 pub enum WuselGender {
     Female,
     Male,
+    Undefined,
     // TODO (2021-12-11) Though it is still discrete.
     // Make something like: can carry / can impregnate (not mutually exclusive, independent from gender identification
 }
@@ -351,6 +352,7 @@ impl WuselGender {
         match self {
             Self::Female => 'f',
             Self::Male => 'm',
+            Self::Undefined => 'x',
         }
     }
 
@@ -358,6 +360,7 @@ impl WuselGender {
         match self {
             Self::Female => '\u{2640}',
             Self::Male => '\u{2642}',
+            Self::Undefined => '\u{26b2}',
         }
     }
 }

@@ -157,7 +157,7 @@ fn run(
                             .unwrap_or_else(|| "No Name".to_string()),
                         world
                             .wusel_get_gender(wusel_id as usize)
-                            .unwrap_or(life::wusel::WuselGender::Female)
+                            .unwrap_or(life::wusel::WuselGender::Undefined)
                             .to_char(),
                     );
 
