@@ -6,9 +6,9 @@
 //! Ngoc (Nox) Le <noxsense@gmail.com>
 
 use crate::life::areas;
-use crate::life::tasks;
 use crate::life::world;
-use crate::life::wusel;
+use crate::life::wusels;
+use crate::life::wusels::tasks;
 
 const MEET_RESULT_ERROR: i8 = -1; //  meeting error.
 const MEET_RESULT_OK: i8 = 0; //  When they met, like the C-ish "OK".
@@ -229,9 +229,9 @@ fn let_two_wusels_meet(
             passive_id,
             intention_good && performance,
             if romantically {
-                wusel::RelationType::Romance
+                wusels::relations::RelationType::Romance
             } else {
-                wusel::RelationType::Friendship
+                wusels::relations::RelationType::Friendship
             },
         );
 
@@ -288,7 +288,7 @@ fn let_two_wusels_meet(
         // On tie, let this active be the first one.
         // (No waiting-to-be-met needs to be deleted.)
 
-        let skill = wusel::Ability::COMMUNICATION;
+        let skill = wusels::abilities::Ability::COMMUNICATION;
         let c0 = world.wusels[active_index].get_ability(skill);
         let c1 = world.wusels[passive_index].get_ability(skill);
 

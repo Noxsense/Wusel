@@ -3,11 +3,12 @@
 //! Life simulation with Wusels (the living parts), objects (passive parts)
 //! positions and other directional information and task managers.
 
+pub mod world;
+
+pub mod wusels;
+
 pub mod areas;
 pub mod objects;
-pub mod tasks;
-pub mod world;
-pub mod wusel;
 
 /// Default ticks per minute
 const MINUTE: u32 = 2; // ticks

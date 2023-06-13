@@ -157,7 +157,7 @@ fn run(
                             .unwrap_or_else(|| "No Name".to_string()),
                         world
                             .wusel_get_gender(wusel_id as usize)
-                            .unwrap_or(life::wusel::WuselGender::Undefined)
+                            .unwrap_or(life::wusels::WuselGender::Undefined)
                             .to_char(),
                     );
 
@@ -166,7 +166,7 @@ fn run(
                         world.wusel_get_tasklist_names(wusel_id as usize),
                     );
 
-                    let needs: Vec<(life::wusel::Need, u32, u32)> = life::wusel::Need::VALUES
+                    let needs: Vec<(life::wusels::needs::Need, u32, u32)> = life::wusels::needs::Need::VALUES
                         .iter()
                         .map(|need| {
                             (
@@ -216,14 +216,14 @@ fn run(
                     // Meet randomly with someone: Let [widx] meet [i], if i in [0..|w|).
                     world.wusel_assign_to_task(
                         widx,
-                        life::tasks::TaskBuilder::meet_with(i, true, true).set_duration(10),
+                        life::wusels::tasks::TaskBuilder::meet_with(i, true, true).set_duration(10),
                     );
                 }
                 i if i >= wusel_len && i < 2 * wusel_len => {
                     // Walk randomly somewhere, if i not an wusel index.
                     world.wusel_assign_to_task(
                         widx,
-                        life::tasks::TaskBuilder::move_to(world.position_random()),
+                        life::wusels::tasks::TaskBuilder::move_to(world.position_random()),
                     );
                 }
                 _ => {} // do nothing randomly.

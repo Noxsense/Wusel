@@ -9,7 +9,7 @@ use crate::life::areas;
 use crate::life::objects;
 #[allow(unused_imports)]
 use crate::life::world;
-use crate::life::wusel;
+use crate::life::wusels;
 
 /// Id Type of an Action
 pub type ActionId = usize;
@@ -44,7 +44,7 @@ impl TaskBuilder {
     }
 
     /// Create a new Task Builder, preset for meeting.
-    pub fn meet_with(passive: wusel::WuselId, friendly: bool, romantically: bool) -> Self {
+    pub fn meet_with(passive: wusels::WuselId, friendly: bool, romantically: bool) -> Self {
         Self {
             name: "Meeting".to_string(),
             duration: 1,
@@ -62,7 +62,7 @@ impl TaskBuilder {
     }
 
     /// Create a new Task Builder, preset for being met.
-    pub fn be_met_from(active: wusel::WuselId) -> Self {
+    pub fn be_met_from(active: wusels::WuselId) -> Self {
         Self {
             name: "Being Met".to_string(),
             duration: 1,
@@ -102,7 +102,7 @@ impl TaskBuilder {
     }
 
     /// Create a new Task from the builder for the requesting [actor](crate::life::wusel::Wusel).
-    pub fn assign(self, start_time: usize, actor: &wusel::Wusel) -> Task {
+    pub fn assign(self, start_time: usize, actor: &wusels::Wusel) -> Task {
         Task {
             name: self.name,
             started: false,
@@ -127,8 +127,8 @@ pub enum TaskTag {
 
     UseObject(objects::ObjectId, ActionId), // object_id, and action_id
 
-    MeetWith(wusel::WuselId, bool, bool), // commute with another wusel (ID)
-    BeMetFrom(wusel::WuselId),            // be met by another wusel (ID)
+    MeetWith(wusels::WuselId, bool, bool), // commute with another wusel (ID)
+    BeMetFrom(wusels::WuselId),            // be met by another wusel (ID)
 }
 
 /// Task, a Wusel can do.
@@ -143,7 +143,7 @@ pub struct Task {
     duration: usize,
     done_steps: usize,
 
-    active_actor_id: wusel::WuselId, // wusel ID.
+    active_actor_id: wusels::WuselId, // wusel ID.
     passive_part: TaskTag,           // position | object-to-be | object | wusel | nothing.
 }
 
@@ -203,5 +203,5 @@ pub type ActionAffect = (
     objects::ObjectId,       // affected object
     usize,                   // object subtype
     &'static str,            // name
-    Vec<(wusel::Need, i16)>, // affected needs
+    Vec<(wusels::needs::Need, i16)>, // affected needs
 );
