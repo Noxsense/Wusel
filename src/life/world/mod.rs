@@ -22,6 +22,18 @@ mod unit_tests;
 // TODO (2021-11-25) refactor the way something is stored in the world.
 // TODO (2021-11-25) refactor how to peek into the world.
 // TODO (2021-11-27) handler: life to life manager, positional things by world.
+//
+//
+// TODO (2023-06-13) world.dimensions() => world.area() => world.positions()
+// TODO (2023-06-13) world.time() : usize / current time.
+// TODO (2023-06-13) world.wusels() // wusel_ids
+// TODO (2023-06-13) world.wusel_new() // wusel_ids
+// TODO (2023-06-13) world.wusel_set(id, ...) // update data
+// TODO (2023-06-13) world.wusel_get(id) // copy of wusel data to view.
+// TODO (2023-06-13) world.interactive_items() // objects for wusels. (food, doors, ...)
+// TODO (2023-06-13) world.noninteractive_items() // Contruction walls, stairs (also doors)
+// TODO (2023-06-13) world.items_set(id) // update item.
+// TODO (2023-06-13) world.items_get(id) // data.
 
 ///  The place of existence, time and relations.
 pub struct World {
