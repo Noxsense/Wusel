@@ -5,13 +5,16 @@
 //! ## Author
 //! Ngoc (Nox) Le <noxsense@gmail.com>
 
-use crate::life::areas;
 use crate::life::objects;
-use crate::life::tasks;
-use crate::life::wusel;
+use crate::life::wusels;
+use crate::life::wusels::tasks;
 
 use rand;
 
+pub mod areas;
+pub mod items;
+
+// engine.
 mod task_manager;
 mod task_test;
 mod unit_tests;
@@ -19,6 +22,18 @@ mod unit_tests;
 // TODO (2021-11-25) refactor the way something is stored in the world.
 // TODO (2021-11-25) refactor how to peek into the world.
 // TODO (2021-11-27) handler: life to life manager, positional things by world.
+//
+//
+// TODO (2023-06-13) world.dimensions() => world.area() => world.positions()
+// TODO (2023-06-13) world.time() : usize / current time.
+// TODO (2023-06-13) world.wusels() // wusel_ids
+// TODO (2023-06-13) world.wusel_new() // wusel_ids
+// TODO (2023-06-13) world.wusel_set(id, ...) // update data
+// TODO (2023-06-13) world.wusel_get(id) // copy of wusel data to view.
+// TODO (2023-06-13) world.interactive_items() // objects for wusels. (food, doors, ...)
+// TODO (2023-06-13) world.noninteractive_items() // Contruction walls, stairs (also doors)
+// TODO (2023-06-13) world.items_set(id) // update item.
+// TODO (2023-06-13) world.items_get(id) // data.
 
 ///  The place of existence, time and relations.
 pub struct World {
@@ -32,11 +47,11 @@ pub struct World {
 
     clock: usize, // time of the world.
 
-    sequential_wusel_id: wusel::WuselId,
+    sequential_wusel_id: wusels::WuselId,
 
     // all currently living wusel in map.
-    wusels: Vec<wusel::Wusel>,
-    wusels_index_with_id: Vec<wusel::WuselId>,
+    wusels: Vec<wusels::Wusel>,
+    wusels_index_with_id: Vec<wusels::WuselId>,
     wusels_index_on_position_index: Vec<usize>,
 
     sequential_object_id: objects::ObjectId,
@@ -48,7 +63,7 @@ pub struct World {
     objects_index_with_whereabouts: Vec<InWorld>,
 
     // all constructions
-    constructions: Vec<Construction>,
+    constructions: Vec<items::Construction>,
     constructions_index_on_position_index: Vec<usize>,
 
     // actions in this world.
@@ -57,12 +72,32 @@ pub struct World {
 
     // more world information ...
     #[allow(dead_code)]
-    dead_wusels: Vec<wusel::Wusel>,
+    dead_wusels: Vec<wusels::Wusel>,
 
     #[allow(dead_code)]
-    relations: std::collections::BTreeMap<(wusel::WuselId, wusel::WuselId), wusel::Relation>, // vector of wusel relations
+    relations:
+        std::collections::BTreeMap<(wusels::WuselId, wusels::WuselId), wusels::relations::Relation>, // vector of wusel relations
 }
 
+/// State (in a sum type) with Positional Data for the world.
+#[derive(Clone, Copy, PartialEq, Hash, Eq)]
+enum InWorld {
+    OnPositionIndex(usize),
+    #[allow(dead_code)]
+    InStorageId(objects::ObjectId),
+    HeldByWuselId(wusels::WuselId),
+    Nowhere,
+}
+
+/// A type wrapped identifier that represents something in the world.
+#[derive(Clone, Copy, PartialEq, Hash, Eq)]
+pub enum PlaceTaker {
+    Construction(items::ConstructionType, items::ConstructionId),
+    Wusel(wusels::WuselId),
+    Object(objects::ObjectId, objects::ObjectType),
+}
+
+// TODO split up engine like, updater, getter, etc.
 impl World {
     /// Create a new world.
     pub fn new(width: u32, depth: u32) -> Self {
@@ -115,10 +150,13 @@ impl World {
         // A new day is over: Forward the day structure to the world.
         let new_day: bool = self.clock % Self::TICKS_PER_DAY == 0;
 
-        let mut some_busy_wusel: Vec<wusel::WuselId> = vec![];
-        let mut new_babies: Vec<(wusel::WuselId, Option<wusel::WuselId>, wusel::WuselGender)> =
-            vec![];
-        let mut dying_wusels: Vec<wusel::WuselId> = vec![];
+        let mut some_busy_wusel: Vec<wusels::WuselId> = vec![];
+        let mut new_babies: Vec<(
+            wusels::WuselId,
+            Option<wusels::WuselId>,
+            wusels::WuselGender,
+        )> = vec![];
+        let mut dying_wusels: Vec<wusels::WuselId> = vec![];
 
         // Decay on every object and living.
         for (i, wusel) in self.wusels.iter_mut().enumerate() {
@@ -135,7 +173,7 @@ impl World {
 
             // If pregnant: Maybe push out the child => Failure, Early or too late.
             if wusel.is_pregnant() {
-                let other_parent: Option<wusel::WuselId> = wusel.get_other_parent();
+                let other_parent: Option<wusels::WuselId> = wusel.get_other_parent();
                 let pregnancy_days: Option<u8> = wusel.get_remaining_pregnancy_days();
                 let maybe_now: u8 = rand::random::<u8>() % 100;
                 let possibility: u8 = match pregnancy_days {
@@ -145,7 +183,7 @@ impl World {
                 };
                 if (0u8..possibility).contains(&maybe_now) {
                     log::debug!("Pop the baby!");
-                    let gender = wusel::WuselGender::random();
+                    let gender = wusels::WuselGender::random();
                     new_babies.push((wusel.get_id(), other_parent, gender));
                     // end pregnancy.
                     wusel.set_pregnancy(None, None);
@@ -285,12 +323,14 @@ impl World {
                 self.constructions_index_on_position_index[construction_index];
 
             let placetaker =
-                PlaceTaker::Construction(construction.construction_type, construction.id);
+                PlaceTaker::Construction(construction.construction_type(), construction.id());
 
             // add all positions.
             self.positions[constructions_position_index].push(placetaker);
 
-            if let ConstructionType::Wall(horizontal, length) = construction.construction_type {
+            if let items::ConstructionType::Wall(horizontal, length) =
+                construction.construction_type()
+            {
                 let mut more_position = constructions_position_index;
                 // first position is already put.
                 for _i in 1..length {
@@ -350,19 +390,17 @@ impl World {
         }
     }
 
+    /// Create a new Construction within the world.
     pub fn construction_new(
         &mut self,
-        construction_type: ConstructionType,
-        position: areas::Position
+        construction_type: items::ConstructionType,
+        position: areas::Position,
     ) {
-        let construction = Construction {
-            id: 0usize,
-            construction_type,
-        };
+        let construction = items::Construction::new(0usize, construction_type);
 
         let position_index = self.position_to_index(position);
 
-        let placetaker = PlaceTaker::Construction(construction_type, construction.id);
+        let placetaker = PlaceTaker::Construction(construction_type, construction.id());
 
         self.constructions.push(construction);
 
@@ -372,7 +410,7 @@ impl World {
 
         // all positions it may take.
         self.update_positions(placetaker, 0, position_index);
-        if let ConstructionType::Wall(horizontal, length) = construction_type {
+        if let items::ConstructionType::Wall(horizontal, length) = construction_type {
             let mut more_position = position_index;
             // first position is already put.
             for _i in 1..length {
@@ -382,10 +420,11 @@ impl World {
         }
     }
 
+    /// Get all construction inidces of a door.
     fn get_all_doors_indices(&self) -> Vec<usize> {
         let mut doors = vec![];
         for (index, construction) in self.constructions.iter().enumerate() {
-            if let ConstructionType::Door(_is_open) = construction.construction_type {
+            if let items::ConstructionType::Door(_is_open) = construction.construction_type() {
                 doors.push(index);
             }
         }
@@ -601,11 +640,11 @@ impl World {
     pub fn wusel_new(
         &mut self,
         name: String,
-        gender: wusel::WuselGender,
+        gender: wusels::WuselGender,
         position: areas::Position,
     ) {
         let new_wusel_id = self.sequential_wusel_id; // almost id (for a long time unique)
-        let new_wusel = wusel::Wusel::new(new_wusel_id, name, gender); // new wusel at (position)
+        let new_wusel = wusels::Wusel::new(new_wusel_id, name, gender); // new wusel at (position)
 
         // Add wusel to positions, start at (position).
         let position_index = self.position_to_index(position);
@@ -621,7 +660,7 @@ impl World {
 
     /// Create a new random wusel.
     pub fn wusel_new_random(&mut self, wusel_name: String) {
-        let wusel_gender = wusel::WuselGender::random();
+        let wusel_gender = wusels::WuselGender::random();
         let wusel_position = self.position_random();
         self.wusel_new(wusel_name, wusel_gender, wusel_position);
     }
@@ -637,14 +676,14 @@ impl World {
     }
 
     /// Return the wusel index that holds the wusle with the requesting identifier.
-    fn get_wusels_index_by_id(&self, wusel_id: wusel::WuselId) -> Option<usize> {
+    fn get_wusels_index_by_id(&self, wusel_id: wusels::WuselId) -> Option<usize> {
         self.wusels_index_with_id
             .iter()
             .position(|id| *id == wusel_id)
     }
 
     /// Return an index for positions that is held by the wusel given by their identifier.
-    fn get_wusel_position_index_by_id(&self, wusel_id: wusel::WuselId) -> Option<&usize> {
+    fn get_wusel_position_index_by_id(&self, wusel_id: wusels::WuselId) -> Option<&usize> {
         if let Some(wusel_index) = self.get_wusels_index_by_id(wusel_id) {
             self.wusels_index_on_position_index.get(wusel_index)
         } else {
@@ -653,7 +692,7 @@ impl World {
     }
 
     /// Get an optional Position for the wusel given by their identifier.
-    pub fn wusel_get_position(&self, wusel_id: wusel::WuselId) -> Option<areas::Position> {
+    pub fn wusel_get_position(&self, wusel_id: wusels::WuselId) -> Option<areas::Position> {
         self.get_wusel_position_index_by_id(wusel_id)
             .map(|&position_index| self.position_from_index(position_index))
             .map(|opt_position| opt_position.unwrap())
@@ -661,7 +700,7 @@ impl World {
 
     /// Set the position of the indexed wusel to the nearest valid position
     /// If the position may land out of the grid, put it to the nearest border.
-    pub fn wusel_set_position(&mut self, wusel_id: wusel::WuselId, position: areas::Position) {
+    pub fn wusel_set_position(&mut self, wusel_id: wusels::WuselId, position: areas::Position) {
         if let Some(&wusel_index) = self.get_wusel_position_index_by_id(wusel_id) {
             self.wusel_set_position_by_index(wusel_index, position);
         }
@@ -721,7 +760,7 @@ impl World {
     /// Check if the wusel of the world is alive.
     ///
     /// This wraps [wusel::Wusel::is_alive](wusel::Wusel::is_alive) for a world wusel.
-    pub fn wusel_is_alive(&self, wusel_id: wusel::WuselId) -> Option<bool> {
+    pub fn wusel_is_alive(&self, wusel_id: wusels::WuselId) -> Option<bool> {
         self.get_wusels_index_by_id(wusel_id)
             .map(|index| self.wusels[index].is_alive())
     }
@@ -729,7 +768,7 @@ impl World {
     /// Get the age of the wusel in days.
     ///
     /// This wraps [wusel::Wusel::get_lived_days](wusel::Wusel::get_lived_days) for a world wusel.
-    pub fn wusel_get_lived_days(&self, wusel_id: wusel::WuselId) -> Option<u32> {
+    pub fn wusel_get_lived_days(&self, wusel_id: wusels::WuselId) -> Option<u32> {
         self.get_wusels_index_by_id(wusel_id)
             .map(|index| self.wusels[index].get_lived_days())
     }
@@ -737,7 +776,7 @@ impl World {
     /// Set the life stage of the wusel. This also indirectly may override the age in days.
     ///
     /// This wraps [wusel::Wusel::set_life_state](wusel::Wusel::set_life_state) for a world wusel.
-    pub fn wusel_set_life_state(&mut self, wusel_id: wusel::WuselId, life_state: wusel::Life) {
+    pub fn wusel_set_life_state(&mut self, wusel_id: wusels::WuselId, life_state: wusels::Life) {
         if let Some(index) = self.get_wusels_index_by_id(wusel_id) {
             self.wusels[index].set_life_state(life_state);
         }
@@ -746,7 +785,7 @@ impl World {
     /// Get the name of the wusel.
     ///
     /// This wraps [wusel::Wusel::get_name](wusel::Wusel::get_name) for a world wusel.
-    pub fn wusel_get_name(&self, wusel_id: wusel::WuselId) -> Option<String> {
+    pub fn wusel_get_name(&self, wusel_id: wusels::WuselId) -> Option<String> {
         self.get_wusels_index_by_id(wusel_id)
             .map(|index| self.wusels[index].get_name())
     }
@@ -754,7 +793,7 @@ impl World {
     /// Set the name of a Wusel.
     ///
     /// This wraps [wusel::Wusel::set_name](wusel::Wusel::set_name) for a world wusel.
-    pub fn wusel_set_name(&mut self, wusel_id: wusel::WuselId, new_name: String) {
+    pub fn wusel_set_name(&mut self, wusel_id: wusels::WuselId, new_name: String) {
         if let Some(index) = self.get_wusels_index_by_id(wusel_id) {
             self.wusels[index].set_name(new_name);
         }
@@ -763,7 +802,7 @@ impl World {
     /// Get the gender of the wusel.
     ///
     /// This wraps [wusel::Wusel::get_gender](wusel::Wusel::get_gender) for a world wusel.
-    pub fn wusel_get_gender(&self, wusel_id: wusel::WuselId) -> Option<wusel::WuselGender> {
+    pub fn wusel_get_gender(&self, wusel_id: wusels::WuselId) -> Option<wusels::WuselGender> {
         self.get_wusels_index_by_id(wusel_id)
             .map(|index| self.wusels[index].get_gender())
     }
@@ -771,7 +810,7 @@ impl World {
     /// Set the gender of a Wusel.
     ///
     /// This wraps [wusel::Wusel::set_gender](wusel::Wusel::set_gender) for a world wusel.
-    pub fn wusel_set_gender(&mut self, wusel_id: wusel::WuselId, new_gender: wusel::WuselGender) {
+    pub fn wusel_set_gender(&mut self, wusel_id: wusels::WuselId, new_gender: wusels::WuselGender) {
         if let Some(index) = self.get_wusels_index_by_id(wusel_id) {
             self.wusels[index].set_gender(new_gender);
         }
@@ -780,7 +819,7 @@ impl World {
     /// Get the requested need's level of the wusel.
     ///
     /// This wraps [wusel::Wusel::get_need](wusel::Wusel::get_need) for a world wusel.
-    pub fn wusel_get_need(&mut self, wusel_id: wusel::WuselId, need: wusel::Need) -> u32 {
+    pub fn wusel_get_need(&mut self, wusel_id: wusels::WuselId, need: wusels::needs::Need) -> u32 {
         self.get_wusels_index_by_id(wusel_id)
             .map(|index| self.wusels[index].get_need(need))
             .unwrap_or(0u32)
@@ -789,7 +828,12 @@ impl World {
     /// Set the requesting need's level of the wusel.
     ///
     /// This wraps [wusel::Wusel::set_need](wusel::Wusel::set_need) for a world wusel.
-    pub fn wusel_set_need(&mut self, wusel_id: wusel::WuselId, need: &wusel::Need, new_value: u32) {
+    pub fn wusel_set_need(
+        &mut self,
+        wusel_id: wusels::WuselId,
+        need: &wusels::needs::Need,
+        new_value: u32,
+    ) {
         if let Some(index) = self.get_wusels_index_by_id(wusel_id) {
             self.wusels[index].set_need(*need, new_value);
         }
@@ -801,8 +845,8 @@ impl World {
     /// for a world wusel.
     pub fn wusel_set_need_relative(
         &mut self,
-        wusel_id: wusel::WuselId,
-        need: &wusel::Need,
+        wusel_id: wusels::WuselId,
+        need: &wusels::needs::Need,
         relative: i16,
     ) {
         if let Some(index) = self.get_wusels_index_by_id(wusel_id) {
@@ -815,8 +859,8 @@ impl World {
     /// This wraps [wusel::Wusel::get_ability](wusel::Wusel::get_ability) for a world wusel.
     pub fn wusel_get_ability(
         &self,
-        wusel_id: wusel::WuselId,
-        ability: wusel::Ability,
+        wusel_id: wusels::WuselId,
+        ability: wusels::abilities::Ability,
     ) -> Option<u32> {
         self.get_wusels_index_by_id(wusel_id)
             .map(|index| self.wusels[index].get_ability(ability))
@@ -827,8 +871,8 @@ impl World {
     /// This wraps [wusel::Wusel::set_ability](wusel::Wusel::set_ability) for a world wusel.
     pub fn wusel_set_ability(
         &mut self,
-        wusel_id: wusel::WuselId,
-        ability: wusel::Ability,
+        wusel_id: wusels::WuselId,
+        ability: wusels::abilities::Ability,
         new_value: u32,
     ) {
         if let Some(index) = self.get_wusels_index_by_id(wusel_id) {
@@ -839,7 +883,11 @@ impl World {
     /// Increase the requesting ability's value of the wusel.
     ///
     /// This wraps [wusel::Wusel::improve](wusel::Wusel::improve) for a world wusel.
-    pub fn wusel_improve(&mut self, wusel_id: wusel::WuselId, ability: wusel::Ability) {
+    pub fn wusel_improve(
+        &mut self,
+        wusel_id: wusels::WuselId,
+        ability: wusels::abilities::Ability,
+    ) {
         if let Some(index) = self.get_wusels_index_by_id(wusel_id) {
             self.wusels[index].improve(ability);
         }
@@ -849,7 +897,7 @@ impl World {
     ///
     /// This wraps [wusel::Wusel::has_tasklist_empty](wusel::Wusel::has_tasklist_empty) for a world
     /// wusel.
-    pub fn wusel_has_tasklist_empty(&self, wusel_id: wusel::WuselId) -> Option<bool> {
+    pub fn wusel_has_tasklist_empty(&self, wusel_id: wusels::WuselId) -> Option<bool> {
         self.get_wusels_index_by_id(wusel_id)
             .map(|index| self.wusels[index].has_tasklist_empty())
     }
@@ -858,7 +906,7 @@ impl World {
     ///
     /// This wraps [wusel::Wusel::get_tasklist_len](wusel::Wusel::get_tasklist_len) for a world
     /// wusel.
-    pub fn wusel_get_tasklist_len(&self, wusel_id: wusel::WuselId) -> Option<usize> {
+    pub fn wusel_get_tasklist_len(&self, wusel_id: wusels::WuselId) -> Option<usize> {
         self.get_wusels_index_by_id(wusel_id)
             .map(|index| self.wusels[index].get_tasklist_len())
     }
@@ -867,7 +915,7 @@ impl World {
     ///
     /// This wraps [wusel::Wusel::get_tasklist_names](wusel::Wusel::get_tasklist_names)
     /// for a world wusel.
-    pub fn wusel_get_tasklist_names(&mut self, wusel_id: wusel::WuselId) -> Vec<String> {
+    pub fn wusel_get_tasklist_names(&mut self, wusel_id: wusels::WuselId) -> Vec<String> {
         if let Some(index) = self.get_wusels_index_by_id(wusel_id) {
             self.wusels[index].get_tasklist_names()
         } else {
@@ -891,7 +939,7 @@ impl World {
     /// Abort the wusel's task.
     ///
     /// This wraps [wusel::Wusel::abort_task](wusel::Wusel::abort_task) for a world wusel.
-    pub fn wusel_abort_task(&mut self, wusel_id: wusel::WuselId, task_index: usize) {
+    pub fn wusel_abort_task(&mut self, wusel_id: wusels::WuselId, task_index: usize) {
         if let Some(index) = self.get_wusels_index_by_id(wusel_id) {
             self.wusels[index].abort_task(task_index);
         }
@@ -904,7 +952,7 @@ impl World {
     ///
     /// This wraps [wusel::Wusel::peek_ongoing_task](wusel::Wusel::peek_ongoing_task)
     /// for a world wusel.
-    pub fn wusel_peek_ongoing_task(&self, wusel_id: wusel::WuselId) -> Option<&tasks::Task> {
+    pub fn wusel_peek_ongoing_task(&self, wusel_id: wusels::WuselId) -> Option<&tasks::Task> {
         if let Some(index) = self.get_wusels_index_by_id(wusel_id) {
             self.wusels[index].peek_ongoing_task()
         } else {
@@ -915,7 +963,7 @@ impl World {
     /// Check if the wusel is pregnant.
     ///
     /// This wraps [wusel::Wusel::is_pregnant](wusel::Wusel::is_pregnant) for a world wusel.
-    pub fn wusel_is_pregnant(&self, wusel_id: wusel::WuselId) -> Option<bool> {
+    pub fn wusel_is_pregnant(&self, wusel_id: wusels::WuselId) -> Option<bool> {
         self.get_wusels_index_by_id(wusel_id)
             .map(|index| self.wusels[index].is_pregnant())
     }
@@ -925,8 +973,8 @@ impl World {
     /// This wraps [wusel::Wusel::set_pregnancy](wusel::Wusel::set_pregnancy) for a world wusel.
     pub fn wusel_set_pregnancy(
         &mut self,
-        wusel_id: wusel::WuselId,
-        other_parent: Option<wusel::WuselId>,
+        wusel_id: wusels::WuselId,
+        other_parent: Option<wusels::WuselId>,
         remaining_days: Option<u8>,
     ) {
         if let Some(index) = self.get_wusels_index_by_id(wusel_id) {
@@ -938,7 +986,7 @@ impl World {
     ///
     /// This wraps [wusel::Wusel::get_other_parent](wusel::Wusel::get_other_parent)
     /// for a world wusel.
-    pub fn wusel_get_other_parent(&self, wusel_id: wusel::WuselId) -> Option<wusel::WuselId> {
+    pub fn wusel_get_other_parent(&self, wusel_id: wusels::WuselId) -> Option<wusels::WuselId> {
         self.get_wusels_index_by_id(wusel_id)
             .map(|index| self.wusels[index].get_other_parent())
             .unwrap_or(None)
@@ -947,7 +995,7 @@ impl World {
     /// Get the remaining days of the wusel's pregnancy.
     ///
     /// This wraps [wusel::Wusel::get_remaining_pregnancy_days](wusel::Wusel::get_remaining_pregnancy_days) for a world wusel.
-    pub fn wusel_get_remaining_pregnancy_days(&self, wusel_id: wusel::WuselId) -> Option<u8> {
+    pub fn wusel_get_remaining_pregnancy_days(&self, wusel_id: wusels::WuselId) -> Option<u8> {
         self.get_wusels_index_by_id(wusel_id)
             .map(|index| self.wusels[index].get_remaining_pregnancy_days())
             .unwrap_or(None)
@@ -972,7 +1020,7 @@ impl World {
         let mut has_relations: bool = false;
 
         for (who, relation) in self.relations.iter() {
-            let other_id: wusel::WuselId;
+            let other_id: wusels::WuselId;
 
             // Get the other wusel.
             // Skip where this wusel is even not part in the relation.
@@ -987,7 +1035,7 @@ impl World {
             let other_name = self.wusels[other_id].get_name();
 
             // Print Relation.
-            print!("[{:?}: {}]", other_name, relation.show());
+            print!("[{:?}: {relation}]", other_name);
             has_relations = true;
         }
 
@@ -1001,10 +1049,10 @@ impl World {
     /// Update the relation of two wusels, given by their ID.
     pub fn wusel_update_relations(
         &mut self,
-        wusel0_id: wusel::WuselId,
-        wusel1_id: wusel::WuselId,
+        wusel0_id: wusels::WuselId,
+        wusel1_id: wusels::WuselId,
         nice: bool,
-        relationtype: wusel::RelationType,
+        relationtype: wusels::relations::RelationType,
     ) {
         // TODO (2021-12-11) refactor.
 
@@ -1023,82 +1071,8 @@ impl World {
         let rel = self
             .relations
             .entry(key)
-            .or_insert_with(wusel::Relation::new);
+            .or_insert_with(wusels::relations::Relation::new);
 
         rel.update(relationtype, change);
     }
-}
-
-/// State (in a sum type) with Positional Data for the world.
-#[derive(Clone, Copy, PartialEq, Hash, Eq)]
-enum InWorld {
-    OnPositionIndex(usize),
-    #[allow(dead_code)]
-    InStorageId(objects::ObjectId),
-    HeldByWuselId(wusel::WuselId),
-    Nowhere,
-}
-
-/// A type wrapped identifier that represents something in the world.
-#[derive(Clone, Copy, PartialEq, Hash, Eq)]
-pub enum PlaceTaker {
-    Construction(ConstructionType, ConstructionId),
-    Wusel(wusel::WuselId),
-    Object(objects::ObjectId, objects::ObjectType),
-}
-
-/// A Blueprint is a list of required abilities, consumables or positions
-///
-/// to create a certain product after a certain time.
-/// Blueprint: [ components, Workstation ] + Time => Product.
-#[derive(Clone, PartialEq, Hash, Eq)]
-#[allow(dead_code)]
-struct Blueprint {
-    id: usize,
-    product: usize,
-    components: Vec<usize>, // needed components: such as tools (desk) or ingredients (pen, paper).
-    steps: usize,           // needed steps.
-}
-
-/// Something a Wusel can consume
-///
-/// Consumption / Usage will 'destroy' this object.
-/// Consuming it might modify the needs and skills.
-#[derive(Clone, Debug)]
-pub struct Consumable {
-    name: String,
-
-    // Size representation: whole = 100% = size/size.
-    size: u32, // a size representation: consuming this [size]  times, the thing is gone. (fixed)
-    available: f32, // 1.0f whole, 0.0f gone. (temporary)
-
-    // Sometimes, a consumable can spoil (> 0)
-    spoils_after: u32, // spoils after 0: infinite, or N days. (fixed)
-    age: u32,          // the current age of the consumable (temporary)
-
-    // While consuming it, one part (1/size) while change the needs as following.
-    need_change: std::collections::HashMap<wusel::Need, i16>,
-}
-
-/// Identifier for a Construction
-pub type ConstructionId = usize;
-
-/// Type and type attributes of a Construction.
-#[derive(Clone, Copy, PartialEq, Hash, Eq)]
-pub enum ConstructionType {
-    Wall(bool, usize), // is_horizontal (grows left->right, otherwise up->down), length
-    Door(bool),        // is_open
-    Window,
-    Stairs(bool), // is_leading_up
-    Floor,
-}
-
-/// A Construction is an enviromental part of the world.
-///
-/// They offer only just few options to interact with.
-/// Mostly they block ways and are there to build and present place for the world.
-#[derive(Clone, Copy, PartialEq, Hash, Eq)]
-pub struct Construction {
-    id: ConstructionId,
-    construction_type: ConstructionType, // TODO better type.
 }

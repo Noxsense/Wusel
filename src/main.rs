@@ -37,8 +37,17 @@ fn main() -> Result<(), std::io::Error> {
         None => false,
     };
 
+    return run(iterations, arg_steps_per_second, render, clear_on_exit);
+}
+
+fn run(
+    iterations: usize,
+    arg_steps_per_second: u64,
+    render: bool,
+    clear_on_exit: bool,
+) -> Result<(), std::io::Error> {
     //clear on start.
-    tui::core::render_clear_all();
+    tui::screen::render::clear_all();
 
     let (screen_width, screen_height) = match termion::terminal_size() {
         Ok((w, h)) => (w, h),
@@ -55,98 +64,63 @@ fn main() -> Result<(), std::io::Error> {
         h = world.get_depth()
     );
 
-    // Empty world tick.
-    world.tick();
+    setup_world_example(&mut world);
 
-    for _ in 0..rand::random::<u8>() % 10 + 2 {
-        world.wusel_new_random(util::more_strings::name_gen(
-            rand::random::<usize>() % 13 + 2,
-        ));
-    }
-
-    // Transportable bibimbap (korean food)
-    let bibimbap = world.food_new("Bibimbap", 10);
-    let bibimbap_id = bibimbap;
-
-    // Position.
-    world.object_set_position(bibimbap_id, world.position_random());
-
-    let steps_per_second = arg_steps_per_second;
-    let step_sleep = std::time::Duration::from_millis(1000 / steps_per_second);
+    tui::screen::render::clear_all();
 
     // Draw the field and make some real automation.
     let (w, h) = (world.get_width() as usize, world.get_depth() as usize);
 
-    let time_position: &tui::core::ScreenPos = &tui::core::ScreenPos {
+    let time_position: &tui::screen::Pos = &tui::screen::Pos {
         x: 1u16,
         y: h as u16 + 3,
     };
-    let timebar_position: &tui::core::ScreenPos = &tui::core::ScreenPos {
+    let timebar_position: &tui::screen::Pos = &tui::screen::Pos {
         x: w as u16 + 4,
         y: 1,
     };
-    let need_panel_position: &tui::core::ScreenPos = &tui::core::ScreenPos {
+    let need_panel_position: &tui::screen::Pos = &tui::screen::Pos {
         x: 2u16,
         y: h as u16 + 6,
     };
+
     let need_bar_width: u16 = 10;
     let need_panel_show_percentage: bool = true;
 
-    tui::core::render_clear_all();
-
     // frame game field
+    let frame_colour = termion::color::Rgb(100, 100, 100);
     if render {
-        tui::core::render_rectangle(
-            &tui::core::ScreenPos { x: 1, y: 1 },
-            &tui::core::ScreenPos {
+        tui::screen::render::rectangle(
+            &tui::screen::Pos { x: 1, y: 1 },
+            &tui::screen::Pos {
                 x: w as u16 + 2,
                 y: h as u16 + 2,
             },
-            &format!("{}-", termion::color::Fg(termion::color::Rgb(0, 0, 255))),
-            &format!("{}|", termion::color::Fg(termion::color::Rgb(0, 255, 0))),
-            &format!("{}+", termion::color::Fg(termion::color::Rgb(255, 0, 0))),
+            &format!("{}-", termion::color::Fg(frame_colour)),
+            &format!("{}|", termion::color::Fg(frame_colour)),
+            &format!("{}+", termion::color::Fg(frame_colour)),
         );
 
         // frame need panel
-        tui::core::render_rectangle(
-            &tui::core::ScreenPos {
+        let yellow = termion::color::Rgb(255, 255, 0);
+        tui::screen::render::rectangle(
+            &tui::screen::Pos {
                 x: need_panel_position.x - 1,
                 y: need_panel_position.y - 1,
             },
-            &tui::core::ScreenPos {
+            &tui::screen::Pos {
                 x: need_panel_position.x + 9 + need_bar_width,
                 y: need_panel_position.y + 7,
             },
-            &format!("{}-", termion::color::Fg(termion::color::Rgb(255, 255, 0))),
-            &format!("{}|", termion::color::Fg(termion::color::Rgb(255, 255, 0))),
-            &format!("{}+", termion::color::Fg(termion::color::Rgb(255, 255, 0))),
+            &format!("{}-", termion::color::Fg(yellow)),
+            &format!("{}|", termion::color::Fg(yellow)),
+            &format!("{}+", termion::color::Fg(yellow)),
         );
     }
 
-    world.construction_new(
-        life::world::ConstructionType::Wall(true, 20),
-        life::areas::Position { x: 10, y: 10, z: 0 },
-    );
-
-    world.construction_new(
-        life::world::ConstructionType::Wall(false, 10),
-        life::areas::Position { x: 10, y: 10, z: 0 },
-    );
-
-    world.construction_new(
-        life::world::ConstructionType::Wall(true, 20),
-        life::areas::Position { x: 11, y: 19, z: 0 },
-    );
-
-    world.construction_new(
-        life::world::ConstructionType::Wall(false, 10),
-        life::areas::Position { x: 30, y: 10, z: 0 },
-    );
-
-    world.construction_new(
-        life::world::ConstructionType::Door(true),
-        life::areas::Position { x: 20, y: 10, z: 0 },
-    );
+    // time od the simulation.
+    let steps_per_second = arg_steps_per_second;
+    let step_sleep = std::time::Duration::from_millis(1000 / steps_per_second);
 
     for i in 0usize..iterations {
         if render {
@@ -155,7 +129,7 @@ fn main() -> Result<(), std::io::Error> {
 
             // Tick the world, show time.
             tui::world_view::render_time(time_position, i, world.get_time());
-            tui::core::render_progres_bar(
+            tui::screen::render::progres_bar(
                 timebar_position,
                 h as u16 + 3,
                 false,
@@ -173,7 +147,9 @@ fn main() -> Result<(), std::io::Error> {
                 let x_offset = wusel_offset as u16 * 23;
 
                 if need_panel_position.x + x_offset + 20 < screen_width {
-                    tui::core::cursor_to(&need_panel_position.right_by(x_offset).up_by(2));
+                    tui::screen::render::cursor_set(
+                        &(*need_panel_position + (x_offset, 0u16) - (0u16, 2u16)),
+                    );
                     print!(
                         "| {} ({})",
                         world
@@ -181,34 +157,52 @@ fn main() -> Result<(), std::io::Error> {
                             .unwrap_or_else(|| "No Name".to_string()),
                         world
                             .wusel_get_gender(wusel_id as usize)
-                            .unwrap_or(life::wusel::WuselGender::Female)
+                            .unwrap_or(life::wusels::WuselGender::Undefined)
                             .to_char(),
                     );
 
                     tui::world_view::render_wusel_tasklist(
-                        need_panel_position.right_by(x_offset).up_by(1),
+                        *need_panel_position + (x_offset, 0u16) - (0, 1),
                         world.wusel_get_tasklist_names(wusel_id as usize),
                     );
 
-                    let needs: Vec<(life::wusel::Need, u32, u32)> = life::wusel::Need::VALUES
-                        .iter()
-                        .map(|need| {
-                            (
-                                *need,
-                                need.get_full(),
-                                world.wusel_get_need(wusel_id, *need),
-                            )
-                        })
-                        .collect();
+                    let needs: Vec<(life::wusels::needs::Need, u32, u32)> =
+                        life::wusels::needs::Need::VALUES
+                            .iter()
+                            .map(|need| {
+                                (
+                                    *need,
+                                    need.get_full(),
+                                    world.wusel_get_need(wusel_id, *need),
+                                )
+                            })
+                            .collect();
 
                     tui::world_view::render_wusel_need_bar(
-                        need_panel_position.right_by(x_offset),
+                        *need_panel_position + (x_offset, 0u16),
                         need_bar_width,
                         need_panel_show_percentage,
                         needs,
                     );
                 }
             }
+        } else {
+            println!("World Time: {}", world.get_time());
+            for (_, &wusel_id) in world.wusel_get_all_alive().iter().enumerate() {
+                println!(
+                    "* {wusel_name} (w{wusel_id})",
+                    wusel_name = world
+                        .wusel_get_name(wusel_id as usize)
+                        .unwrap_or_else(|| "No Name".to_string()),
+                );
+
+                print!("  * tasks: ");
+                for task in world.wusel_get_tasklist_names(wusel_id as usize).iter() {
+                    print!(" {task}, ");
+                }
+                println!("...")
+            }
+            println!("");
         }
 
         world.tick();
@@ -223,21 +217,14 @@ fn main() -> Result<(), std::io::Error> {
                     // Meet randomly with someone: Let [widx] meet [i], if i in [0..|w|).
                     world.wusel_assign_to_task(
                         widx,
-                        life::tasks::TaskBuilder::meet_with(i, true, true).set_duration(10),
+                        life::wusels::tasks::TaskBuilder::meet_with(i, true, true).set_duration(10),
                     );
                 }
                 i if i >= wusel_len && i < 2 * wusel_len => {
                     // Walk randomly somewhere, if i not an wusel index.
                     world.wusel_assign_to_task(
                         widx,
-                        life::tasks::TaskBuilder::move_to(world.position_random()),
-                    );
-                }
-                i if i >= 2 * wusel_len && i < 3 * wusel_len => {
-                    // Interact with the object.
-                    world.wusel_assign_to_task(
-                        widx,
-                        life::tasks::TaskBuilder::use_object(bibimbap_id, 0), // view
+                        life::wusels::tasks::TaskBuilder::move_to(world.position_random()),
                     );
                 }
                 _ => {} // do nothing randomly.
@@ -247,16 +234,57 @@ fn main() -> Result<(), std::io::Error> {
         std::thread::sleep(step_sleep); // wait.
 
         // cursor to bottom.
-        tui::core::cursor_to(&tui::core::ScreenPos {
+        tui::screen::render::cursor_set(&tui::screen::Pos {
             x: 1,
             y: screen_height,
         });
     }
 
     if clear_on_exit {
-        tui::core::render_reset(&tui::core::ScreenPos::START); // clear whole field.
+        tui::screen::render::reset(&tui::screen::Pos::START); // clear whole field.
     }
 
-    tui::core::cursor_to(&tui::core::ScreenPos::START.down_by(screen_height));
+    tui::screen::render::cursor_set(&(tui::screen::Pos::START + (0u16, screen_height)));
     Ok(())
+}
+
+// mut world: life::world::World
+fn setup_world_example(world: &mut life::world::World) {
+    // create random wusels
+    for _ in 0..rand::random::<u8>() % 10 + 2 {
+        world.wusel_new_random(util::more_strings::name_gen(
+            rand::random::<usize>() % 13 + 2,
+        ));
+    }
+
+    // Transportable bibimbap (korean food)
+    let bibimbap = world.food_new("Bibimbap", 10);
+    let bibimbap_id = bibimbap;
+    world.object_set_position(bibimbap_id, world.position_random());
+
+    // create fixed construction
+    world.construction_new(
+        life::world::items::ConstructionType::Wall(life::world::items::WALL_UD, 10),
+        life::world::areas::Position { x: 10, y: 10, z: 0 },
+    );
+
+    world.construction_new(
+        life::world::items::ConstructionType::Wall(life::world::items::WALL_LR, 20),
+        life::world::areas::Position { x: 11, y: 19, z: 0 },
+    );
+
+    world.construction_new(
+        life::world::items::ConstructionType::Wall(life::world::items::WALL_UD, 10),
+        life::world::areas::Position { x: 30, y: 10, z: 0 },
+    );
+
+    world.construction_new(
+        life::world::items::ConstructionType::Door(life::world::items::DOOR_OPEN),
+        life::world::areas::Position { x: 20, y: 10, z: 0 },
+    );
+
+    world.construction_new(
+        life::world::items::ConstructionType::Wall(life::world::items::WALL_LR, 20),
+        life::world::areas::Position { x: 10, y: 10, z: 0 },
+    );
 }

@@ -7,6 +7,8 @@
 //! ## Author
 //! Ngoc (Nox) Le <noxsense@gmail.com>
 
+//  TODO (2023-06-13) check if this is redundant.
+
 /// Types of an object.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ObjectType {
@@ -16,12 +18,10 @@ pub enum ObjectType {
 }
 
 /// Subtype or Subcategory of an Object
-pub type ObjectSubtype
-    = &'static str; // String doesn't support Copy Trait, what is used for the TaskTag.
+pub type ObjectSubtype = &'static str; // String doesn't support Copy Trait, what is used for the TaskTag.
 
 /// Identifier type (tuple) for an object.
-pub type ObjectId
-    = usize;
+pub type ObjectId = usize;
 
 /// A world object indicates an object in the world which is not a wusel.
 #[derive(Debug, Clone)]
@@ -31,17 +31,16 @@ pub struct Object {
     object_type: ObjectType,
     object_attributes: u8,
     consumable_bites: u16,
-    storage_capacity: u16,   // items that can be stored 0
+    storage_capacity: u16, // items that can be stored 0
 
     consumable_bites_left: u16,
     storage_capacity_left: u16,
 }
 
 impl Object {
-
-    pub const OBJECT_IS_BLOCKING: u8  = 0b001; // not passable, will block the way.
+    pub const OBJECT_IS_BLOCKING: u8 = 0b001; // not passable, will block the way.
     pub const OBJECT_IS_STACKABLE: u8 = 0b010; // can be under or on top of another object.
-    pub const OBJECT_IS_PORTABLE: u8  = 0b100; // can be carried or stored.
+    pub const OBJECT_IS_PORTABLE: u8 = 0b100; // can be carried or stored.
 
     fn get_items_created() -> usize {
         0
@@ -51,7 +50,7 @@ impl Object {
         name: String,
         object_type: ObjectType,
         is_solid: bool,
-        is_stackable:bool,
+        is_stackable: bool,
         is_portable: bool,
         consumable_bites: u16,
         storage_capacity: u16,
@@ -98,14 +97,20 @@ impl Object {
         self.name = name;
     }
 
-    pub fn to_object_attributes(
-        is_blocking: bool,
-        is_stackable:bool,
-        is_portable: bool
-    ) -> u8 {
-        (if is_blocking { Self::OBJECT_IS_BLOCKING } else { 0u8 })
-        + if is_stackable { Self::OBJECT_IS_STACKABLE } else { 0u8 }
-        + if is_portable { Self::OBJECT_IS_PORTABLE } else { 0u8 }
+    pub fn to_object_attributes(is_blocking: bool, is_stackable: bool, is_portable: bool) -> u8 {
+        (if is_blocking {
+            Self::OBJECT_IS_BLOCKING
+        } else {
+            0u8
+        }) + if is_stackable {
+            Self::OBJECT_IS_STACKABLE
+        } else {
+            0u8
+        } + if is_portable {
+            Self::OBJECT_IS_PORTABLE
+        } else {
+            0u8
+        }
     }
 
     pub fn is_blocking_stackable_portable(&self) -> (bool, bool, bool) {
