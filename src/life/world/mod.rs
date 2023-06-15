@@ -11,6 +11,8 @@ use crate::life::wusels::tasks;
 
 use rand;
 
+pub mod world2;
+
 pub mod areas;
 pub mod items;
 

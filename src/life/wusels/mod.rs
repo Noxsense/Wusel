@@ -59,6 +59,7 @@ impl WuselGender {
 
 /// Wusel.
 /// Bundle of information on a certain position and abilities.
+#[derive(Debug)]
 pub struct Wusel {
     id: WuselId,
     name: String,
@@ -68,7 +69,7 @@ pub struct Wusel {
     lived_days: u32,
     needs: std::collections::HashMap<needs::Need, u32>,
     abilities: std::collections::HashMap<abilities::Ability, u32>,
-    tasklist: Vec<tasks::Task>,
+    tasklist: Vec<tasks::Task>, // TODO (2023-06-14) remove safely
 }
 
 impl std::cmp::Eq for Wusel {}
@@ -86,6 +87,34 @@ impl std::fmt::Display for Wusel {
             "{}: {} (days: {}, status: {:?}, gender: {:?})",
             self.id, self.name, self.lived_days, self.life, self.gender,
         )
+    }
+}
+
+// impl Copy for Wusel { }
+
+impl Clone for Wusel {
+    fn clone(&self) -> Self {
+        let mut new = Self {
+            id: self.id,
+            name: self.name.to_string(),
+            gender: self.gender,
+            pregnancy: self.pregnancy,
+            life: self.life,
+            lived_days: self.lived_days,
+            needs: std::collections::HashMap::new(),
+            abilities: std::collections::HashMap::new(),
+            tasklist: vec![],
+        };
+
+        for (n, v) in self.needs.iter() {
+            new.needs.insert(*n, *v);
+        }
+
+        for (a, v) in self.abilities.iter() {
+            new.abilities.insert(*a, *v);
+        }
+
+        new
     }
 }
 

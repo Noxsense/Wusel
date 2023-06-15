@@ -52,6 +52,17 @@ impl Area {
             iterator_index: 0,
         }
     }
+    pub fn width(&self) -> u32 {
+        self.width
+    }
+
+    pub fn depth(&self) -> u32 {
+        self.depth
+    }
+
+    pub fn height(&self) -> u32 {
+        self.height
+    }
 
     /// Create an area, that is spanned by the given positions.
     pub fn span(a: &Position, b: &Position) -> Self {

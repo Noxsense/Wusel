@@ -133,7 +133,7 @@ pub enum TaskTag {
 ///
 /// A task can contain multiple steps. This task struct also is stateful and
 /// keeps track of its progress.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Task {
     name: String,
     started: bool,
