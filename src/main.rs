@@ -66,17 +66,20 @@ fn run(
     println!("Configuration: {:?}", config);
     println!("Save:          {:?}", save);
 
+    // make clone of initial save.
+    let mut simulating = *&save;
+
     let mut i = 0;
     while i < config.max_iterations {
         // run simulation.
-        // TODO: run simulation
+        simulating = simulating.saturating_add(1);
 
         // render.
-        renderer(save, 0u8);
+        renderer(simulating, 0u8);
         i += 1;
     }
 
-    Ok(save)
+    Ok(simulating)
 }
 
 //////
@@ -118,5 +121,17 @@ mod main_test {
         if let Err(_) = crate::store_save(42u64) {
             assert!(false, "Stroing the dave failed.");
         }
+    }
+
+    #[test]
+    fn should_simulate_time_within_the_run() {
+        let save = 0u64;
+        let simulation_done = crate::run(
+            crate::Config { velocity: 1, max_iterations: 11 },
+            save,
+            |_, _| Ok(()),
+        ).unwrap();
+        assert_eq!(11u64, simulation_done, "Time Passed within the save on normal time.");
+        assert_eq!(0u64, save, "Initial Save is untouched.");
     }
 }
