@@ -7,10 +7,6 @@
 //! ## Author
 //! Ngoc (Nox) Le <noxsense@gmail.com>
 
-type Config = usize;
-type Save = u64;
-type UserView = u8;
-
 /// The main method of the wusel world.
 fn main() -> Result<(), std::io::Error> {
     env_logger::init();
@@ -22,13 +18,25 @@ fn main() -> Result<(), std::io::Error> {
     store_save(simulation_done)
 }
 
+#[derive(Debug, PartialEq, Clone, Copy, Eq, Hash)]
+struct Config {
+    /// how many simulated time units are played withim one real time unit. (normal: 1)
+    velocity: usize,
+
+    /// max iterations (debug): how many iterations should the simulation run
+    max_iterations: usize,
+}
+
+type Save = u64;
+type UserView = u8;
+
 
 fn load_configuration(config_file_name: &str) -> Result<Config, std::io::Error> {
     let file = std::fs::File::open(config_file_name);
     if let Err(error) = file {
         return Err(error);
     }
-    Ok(42usize)
+    Ok(Config { velocity: 1, max_iterations: 10})
 }
 
 fn load_save() -> Option<Save> {
@@ -55,11 +63,11 @@ fn run(
     save: Save,
     renderer: impl Fn(Save, UserView) -> Result<(), std::io::Error>
 ) -> Result<Save, std::io::Error> {
-    println!("Configuration: {}", config);
-    println!("Save:          {}", save);
+    println!("Configuration: {:?}", config);
+    println!("Save:          {:?}", save);
 
     let mut i = 0;
-    while i < 10 {
+    while i < config.max_iterations {
         // run simulation.
         // TODO: run simulation
 
@@ -78,7 +86,9 @@ mod main_test {
     #[test]
     fn should_loads_default_configloading() {
         // TODO setup: with configuration file
-        assert_eq!(42usize, crate::load_configuration("res/config.yaml").unwrap());
+        let config = crate::load_configuration("res/config.yaml").unwrap();
+        assert_eq!(1usize, config.velocity);
+        assert_eq!(10usize, config.max_iterations);
     }
 
     #[test]
