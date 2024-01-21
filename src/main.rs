@@ -9,13 +9,16 @@
 
 type Config = usize;
 type Save = u64;
+type UserView = u8;
 
 /// The main method of the wusel world.
 fn main() -> Result<(), std::io::Error> {
     env_logger::init();
     let config = load_configuration("res/config.yaml").unwrap();
     let save = load_save().unwrap_or_else(new_save);
-    let simulation_done = run(config, save).unwrap();
+
+    let simulation_done = run(config, save, get_renderer(config)).unwrap();
+
     store_save(simulation_done)
 }
 
@@ -40,9 +43,31 @@ fn store_save(to_be_saved: Save) -> Result<(), std::io::Error> {
     Ok(())
 }
 
-fn run(config: Config, save: Save) -> Result<Save, std::io::Error> {
+fn get_renderer(config: Config) -> impl Fn(Save, UserView) -> Result<(), std::io::Error> {
+    |save, view| {
+        println!("render: {}, user_view: {}", save, view);
+        Ok(())
+    }
+}
+
+fn run(
+    config: Config,
+    save: Save,
+    renderer: impl Fn(Save, UserView) -> Result<(), std::io::Error>
+) -> Result<Save, std::io::Error> {
     println!("Configuration: {}", config);
     println!("Save:          {}", save);
+
+    let mut i = 0;
+    while i < 10 {
+        // run simulation.
+        // TODO: run simulation
+
+        // render.
+        renderer(save, 0u8);
+        i += 1;
+    }
+
     Ok(save)
 }
 
