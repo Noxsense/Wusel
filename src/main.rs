@@ -11,7 +11,7 @@
 fn main() -> Result<(), std::io::Error> {
     env_logger::init();
     let config = load_configuration("res/config.yaml").unwrap();
-    let save = load_save().unwrap_or_else(new_save);
+    let save = load_save("res/.wusel").unwrap_or_else(new_save);
 
     let simulation_done = run(config, save, get_renderer(config)).unwrap();
 
@@ -39,7 +39,11 @@ fn load_configuration(config_file_name: &str) -> Result<Config, std::io::Error> 
     Ok(Config { velocity: 1, max_iterations: 10})
 }
 
-fn load_save() -> Option<Save> {
+fn load_save(wusel_save_file: &str) -> Option<Save> {
+    let file = std::fs::File::open(wusel_save_file);
+    if let Err(error) = file {
+        return None;
+    }
     Some(42u64)
 }
 
@@ -89,7 +93,7 @@ mod main_test {
     #[test]
     fn should_loads_default_configloading() {
         // TODO setup: with configuration file
-        let config = crate::load_configuration("res/config.yaml").unwrap();
+        let config = crate::load_configuration("src/test-res/config.yaml").unwrap();
         assert_eq!(1usize, config.velocity);
         assert_eq!(10usize, config.max_iterations);
     }
@@ -97,7 +101,7 @@ mod main_test {
     #[test]
     fn should_fails_if_no_configuration_is_found() {
         // TODO setup: no configuration file
-        if let Err(error) = crate::load_configuration("/xxx/not_existent.yaml") {
+        if let Err(error) = crate::load_configuration("src/test-res/not_existent.yaml") {
             assert_eq!("No such file or directory (os error 2)", error.to_string());
         } else {
             assert!(false, "The Configuration was not found and should fail")
@@ -107,13 +111,13 @@ mod main_test {
     #[test]
     fn should_loads_last_save_if_available() {
         // TODO setup with save file
-        assert_eq!(Some(42u64), crate::load_save());
+        assert_eq!(Some(42u64), crate::load_save("src/test-res/.wusel"));
     }
 
     #[test]
     fn should_loads_empty_save_if_not_provided() {
         // TODO setup no save file
-        assert_eq!(None, crate::load_save());
+        assert_eq!(None, crate::load_save("src/test-res/res/.no_wusel_save"));
     }
 
     #[test]
