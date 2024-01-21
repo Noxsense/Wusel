@@ -28,7 +28,7 @@ fn load_configuration(config_file_name: &str) -> Result<Config, std::io::Error> 
 
 fn load_save(wusel_save_file: &str) -> Option<Save> {
     let file = std::fs::File::open(wusel_save_file);
-    if let Err(error) = file {
+    if let Err(_) = file {
         return None;
     }
     Some(SimpleWorld{
@@ -72,7 +72,13 @@ fn run(
         };
 
         // render.
-        renderer(simulating, 0u8);
+        if let Err(render_error) = renderer(simulating, 0u8) {
+            // interupt on renddr error.
+            return Err(std::io::Error::new(
+                    render_error.kind(),
+                    format!("Render Error ({:?})", render_error)));
+        }
+
         i += 1;
     }
 
