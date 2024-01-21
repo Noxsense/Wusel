@@ -15,7 +15,8 @@ fn main() -> Result<(), std::io::Error> {
     env_logger::init();
     let config = load_configuration("res/config.yaml").unwrap();
     let save = load_save().unwrap_or_else(new_save);
-    run(config, save)
+    let simulation_done = run(config, save).unwrap();
+    store_save(simulation_done)
 }
 
 
@@ -35,10 +36,14 @@ fn new_save() -> Save {
     21u64
 }
 
-fn run(config: Config, save: Save) -> Result<(), std::io::Error> {
+fn store_save(to_be_saved: Save) -> Result<(), std::io::Error> {
+    Ok(())
+}
+
+fn run(config: Config, save: Save) -> Result<Save, std::io::Error> {
     println!("Configuration: {}", config);
     println!("Save:          {}", save);
-    Ok(())
+    Ok(save)
 }
 
 //////
@@ -71,5 +76,12 @@ mod main_test {
     fn should_loads_empty_save_if_not_provided() {
         // TODO setup no save file
         assert_eq!(None, crate::load_save());
+    }
+
+    #[test]
+    fn should_store_save() {
+        if let Err(_) = crate::store_save(42u64) {
+            assert!(false, "Stroing the dave failed.");
+        }
     }
 }
