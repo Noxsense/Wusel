@@ -31,14 +31,20 @@ fn load_save(wusel_save_file: &str) -> Option<Save> {
     if let Err(_) = file {
         return None;
     }
-    Some(SimpleWorld{
+    Some(World{
         time: 42u64,
+        wusel: Wusel {
+            position: Position { x: 0, y: 0, z: 0 },
+        },
     })
 }
 
 fn new_save() -> Save {
-    SimpleWorld{
+    World{
         time: 0,
+        wusel: Wusel {
+            position: Position { x: 0, y: 0, z: 0 },
+        },
     }
 }
 
@@ -67,8 +73,9 @@ fn run(
     let mut i = 0;
     while i < config.max_iterations {
         // run simulation.
-        simulating = SimpleWorld {
+        simulating = World {
             time: simulating.time.saturating_add(1),
+            wusel: *&simulating.wusel,
         };
 
         // render.
@@ -95,14 +102,35 @@ struct Config {
     max_iterations: usize,
 }
 
-type Save = SimpleWorld;
+type Save = World;
 type UserView = u8;
 
 #[derive(Debug, PartialEq, Clone, Copy, Eq, Hash)]
-struct SimpleWorld { // TODO: placeholder.
+struct World { // TODO: placeholder.
     /// how many simulated time units are played withim one real time unit. (normal: 1)
     time: u64,
+    wusel: Wusel,
 }
+
+#[derive(Debug, PartialEq, Clone, Copy, Eq, Hash)]
+struct Wusel { // TODO: placeholder.
+    /// Position of the wusel.
+    position: Position,
+}
+
+
+#[derive(Debug, PartialEq, Clone, Copy, Eq, Hash)]
+struct Position {
+    /// width (bird's eye: horizontal axis)
+    x: u64,
+
+    /// depth (bird's eye: vertical axis)
+    y: u64,
+
+    /// height (bird's eye: upper may cover below, up to certsin level)
+    z: u64,
+}
+
 
 //////
 
@@ -130,8 +158,11 @@ mod main_test {
     fn should_loads_last_save_if_available() {
         // TODO setup with save file
         let save = crate::load_save("src/test-res/.wusel");
-        assert_eq!(Some(crate::SimpleWorld {
+        assert_eq!(Some(crate::World {
             time: 42u64,
+            wusel: crate::Wusel {
+                position: crate::Position { x: 0, y: 0, z: 0 },
+            },
         }), save);
     }
 
@@ -143,8 +174,11 @@ mod main_test {
 
     #[test]
     fn should_store_save() {
-        let save = crate::SimpleWorld {
+        let save = crate::World {
             time: 2,
+            wusel: crate::Wusel {
+                position: crate::Position { x: 0, y: 0, z: 0 },
+            },
         };
         if let Err(_) = crate::store_save(save) {
             assert!(false, "Storing the dave failed.");
@@ -153,8 +187,11 @@ mod main_test {
 
     #[test]
     fn should_simulate_time_within_the_run() {
-        let save = crate::SimpleWorld {
+        let save = crate::World {
             time: 7,
+            wusel: crate::Wusel {
+                position: crate::Position { x: 0, y: 0, z: 0 },
+            },
         };
         let simulation_done = crate::run(
             crate::Config { velocity: 1, max_iterations: 11 },
