@@ -18,19 +18,6 @@ fn main() -> Result<(), std::io::Error> {
     store_save(simulation_done)
 }
 
-#[derive(Debug, PartialEq, Clone, Copy, Eq, Hash)]
-struct Config {
-    /// how many simulated time units are played withim one real time unit. (normal: 1)
-    velocity: usize,
-
-    /// max iterations (debug): how many iterations should the simulation run
-    max_iterations: usize,
-}
-
-type Save = u64;
-type UserView = u8;
-
-
 fn load_configuration(config_file_name: &str) -> Result<Config, std::io::Error> {
     let file = std::fs::File::open(config_file_name);
     if let Err(error) = file {
@@ -44,11 +31,15 @@ fn load_save(wusel_save_file: &str) -> Option<Save> {
     if let Err(error) = file {
         return None;
     }
-    Some(42u64)
+    Some(SimpleWorld{
+        time: 42u64,
+    })
 }
 
 fn new_save() -> Save {
-    21u64
+    SimpleWorld{
+        time: 0,
+    }
 }
 
 fn store_save(to_be_saved: Save) -> Result<(), std::io::Error> {
@@ -57,7 +48,7 @@ fn store_save(to_be_saved: Save) -> Result<(), std::io::Error> {
 
 fn get_renderer(config: Config) -> impl Fn(Save, UserView) -> Result<(), std::io::Error> {
     |save, view| {
-        println!("render: {}, user_view: {}", save, view);
+        println!("render: {:?}, user_view: {:?}", save, view);
         Ok(())
     }
 }
@@ -76,7 +67,9 @@ fn run(
     let mut i = 0;
     while i < config.max_iterations {
         // run simulation.
-        simulating = simulating.saturating_add(1);
+        simulating = SimpleWorld {
+            time: simulating.time.saturating_add(1),
+        };
 
         // render.
         renderer(simulating, 0u8);
@@ -84,6 +77,25 @@ fn run(
     }
 
     Ok(simulating)
+}
+
+
+#[derive(Debug, PartialEq, Clone, Copy, Eq, Hash)]
+struct Config {
+    /// how many simulated time units are played withim one real time unit. (normal: 1)
+    velocity: usize,
+
+    /// max iterations (debug): how many iterations should the simulation run
+    max_iterations: usize,
+}
+
+type Save = SimpleWorld;
+type UserView = u8;
+
+#[derive(Debug, PartialEq, Clone, Copy, Eq, Hash)]
+struct SimpleWorld { // TODO: placeholder.
+    /// how many simulated time units are played withim one real time unit. (normal: 1)
+    time: u64,
 }
 
 //////
@@ -111,7 +123,10 @@ mod main_test {
     #[test]
     fn should_loads_last_save_if_available() {
         // TODO setup with save file
-        assert_eq!(Some(42u64), crate::load_save("src/test-res/.wusel"));
+        let save = crate::load_save("src/test-res/.wusel");
+        assert_eq!(Some(crate::SimpleWorld {
+            time: 42u64,
+        }), save);
     }
 
     #[test]
@@ -122,20 +137,25 @@ mod main_test {
 
     #[test]
     fn should_store_save() {
-        if let Err(_) = crate::store_save(42u64) {
-            assert!(false, "Stroing the dave failed.");
+        let save = crate::SimpleWorld {
+            time: 2,
+        };
+        if let Err(_) = crate::store_save(save) {
+            assert!(false, "Storing the dave failed.");
         }
     }
 
     #[test]
     fn should_simulate_time_within_the_run() {
-        let save = 0u64;
+        let save = crate::SimpleWorld {
+            time: 7,
+        };
         let simulation_done = crate::run(
             crate::Config { velocity: 1, max_iterations: 11 },
             save,
             |_, _| Ok(()),
         ).unwrap();
-        assert_eq!(11u64, simulation_done, "Time Passed within the save on normal time.");
-        assert_eq!(0u64, save, "Initial Save is untouched.");
+        assert_eq!(18u64, simulation_done.time, "Time Passed within the save on normal time.");
+        assert_eq!(7u64, save.time, "Initial Save is untouched.");
     }
 }
