@@ -23,7 +23,10 @@ fn load_configuration(config_file_name: &str) -> Result<Config, std::io::Error> 
     if let Err(error) = file {
         return Err(error);
     }
-    Ok(Config { velocity: 1, max_iterations: 10})
+    Ok(Config {
+        velocity: 1,
+        max_iterations: 10,
+    })
 }
 
 fn load_save(wusel_save_file: &str) -> Option<Save> {
@@ -31,7 +34,7 @@ fn load_save(wusel_save_file: &str) -> Option<Save> {
     if file.is_err() {
         return None;
     }
-    Some(World{
+    Some(World {
         time: 42u64,
         wusel: Wusel {
             position: Position { x: 0, y: 0, z: 0 },
@@ -40,7 +43,7 @@ fn load_save(wusel_save_file: &str) -> Option<Save> {
 }
 
 fn new_save() -> Save {
-    World{
+    World {
         time: 0,
         wusel: Wusel {
             position: Position { x: 0, y: 0, z: 0 },
@@ -62,7 +65,7 @@ fn get_renderer(config: Config) -> impl Fn(Save, UserView) -> Result<(), std::io
 fn run(
     config: Config,
     save: Save,
-    renderer: impl Fn(Save, UserView) -> Result<(), std::io::Error>
+    renderer: impl Fn(Save, UserView) -> Result<(), std::io::Error>,
 ) -> Result<Save, std::io::Error> {
     println!("Configuration: {:?}", config);
     println!("Save:          {:?}", save);
@@ -79,8 +82,9 @@ fn run(
         if let Err(render_error) = renderer(simulating, 0u8) {
             // interupt on renddr error.
             return Err(std::io::Error::new(
-                    render_error.kind(),
-                    format!("Render Error ({:?})", render_error)));
+                render_error.kind(),
+                format!("Render Error ({:?})", render_error),
+            ));
         }
 
         i += 1;
@@ -96,7 +100,6 @@ fn tick(last_save: Save) -> Result<Save, std::io::Error> {
     })
 }
 
-
 #[derive(Debug, PartialEq, Clone, Copy, Eq, Hash)]
 struct Config {
     /// how many simulated time units are played withim one real time unit. (normal: 1)
@@ -110,18 +113,19 @@ type Save = World;
 type UserView = u8;
 
 #[derive(Debug, PartialEq, Clone, Copy, Eq, Hash)]
-struct World { // TODO: placeholder.
+struct World {
+    // TODO: placeholder.
     /// how many simulated time units are played withim one real time unit. (normal: 1)
     time: u64,
     wusel: Wusel,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy, Eq, Hash)]
-struct Wusel { // TODO: placeholder.
+struct Wusel {
+    // TODO: placeholder.
     /// Position of the wusel.
     position: Position,
 }
-
 
 #[derive(Debug, PartialEq, Clone, Copy, Eq, Hash)]
 struct Position {
@@ -134,7 +138,6 @@ struct Position {
     /// height (bird's eye: upper may cover below, up to certsin level)
     z: u64,
 }
-
 
 //////
 
@@ -162,12 +165,15 @@ mod main_test {
     fn should_loads_last_save_if_available() {
         // TODO setup with save file
         let save = crate::load_save("src/test-res/.wusel");
-        assert_eq!(Some(crate::World {
-            time: 42u64,
-            wusel: crate::Wusel {
-                position: crate::Position { x: 0, y: 0, z: 0 },
-            },
-        }), save);
+        assert_eq!(
+            Some(crate::World {
+                time: 42u64,
+                wusel: crate::Wusel {
+                    position: crate::Position { x: 0, y: 0, z: 0 },
+                },
+            }),
+            save
+        );
     }
 
     #[test]
@@ -198,12 +204,18 @@ mod main_test {
             },
         };
         let simulation_done = crate::run(
-            crate::Config { velocity: 1, max_iterations: 11 },
+            crate::Config {
+                velocity: 1,
+                max_iterations: 11,
+            },
             save,
             |_, _| Ok(()),
-        ).unwrap();
-        assert_eq!(18u64, simulation_done.time,
-                   "Time Passed within the save on normal time.");
+        )
+        .unwrap();
+        assert_eq!(
+            18u64, simulation_done.time,
+            "Time Passed within the save on normal time."
+        );
         assert_eq!(7u64, save.time, "Initial Save is untouched.");
     }
 
@@ -216,7 +228,10 @@ mod main_test {
             },
         };
         let simulation_done = crate::tick(save).unwrap();
-        assert_eq!(save.time + 1, simulation_done.time,
-                   "Time Passed ticked one time.");
+        assert_eq!(
+            save.time + 1,
+            simulation_done.time,
+            "Time Passed ticked one time."
+        );
     }
 }
