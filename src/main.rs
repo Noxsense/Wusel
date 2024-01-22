@@ -26,6 +26,7 @@ fn load_configuration(config_file_name: &str) -> Result<Config, std::io::Error> 
     Ok(Config {
         velocity: 1,
         max_iterations: 10,
+        renderer: 0,
     })
 }
 
@@ -56,9 +57,21 @@ fn store_save(to_be_saved: Save) -> Result<(), std::io::Error> {
 }
 
 fn get_renderer(config: Config) -> impl Fn(Save, UserView) -> Result<(), std::io::Error> {
-    |save, view| {
-        println!("render: {:?}, user_view: {:?}", save, view);
-        Ok(())
+    match config.renderer {
+        // log renderer.
+        0u8 => |save, view| {
+            println!("view: {:?}, save: {:?}", view, save);
+            Ok(())
+        },
+
+        // TODO graphical ascii renderer
+
+        // TODO graphical renderer
+
+        // default renderer, muted renderer,  not even log.
+        _ => |_, _| {
+            Ok(())
+        },
     }
 }
 
@@ -107,6 +120,9 @@ struct Config {
 
     /// max iterations (debug): how many iterations should the simulation run
     max_iterations: usize,
+
+    /// renderer used for the programm.
+    renderer: u8,
 }
 
 type Save = World;
@@ -207,6 +223,7 @@ mod main_test {
             crate::Config {
                 velocity: 1,
                 max_iterations: 11,
+                renderer: 0u8,
             },
             save,
             |_, _| Ok(()),
