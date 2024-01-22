@@ -28,7 +28,7 @@ fn load_configuration(config_file_name: &str) -> Result<Config, std::io::Error> 
 
 fn load_save(wusel_save_file: &str) -> Option<Save> {
     let file = std::fs::File::open(wusel_save_file);
-    if let Err(_) = file {
+    if file.is_err() {
         return None;
     }
     Some(World{
@@ -68,15 +68,12 @@ fn run(
     println!("Save:          {:?}", save);
 
     // make clone of initial save.
-    let mut simulating = *&save;
+    let mut simulating = save;
 
     let mut i = 0;
     while i < config.max_iterations {
         // run simulation.
-        simulating = World {
-            time: simulating.time.saturating_add(1),
-            wusel: *&simulating.wusel,
-        };
+        simulating = tick(simulating)?;
 
         // render.
         if let Err(render_error) = renderer(simulating, 0u8) {
@@ -90,6 +87,13 @@ fn run(
     }
 
     Ok(simulating)
+}
+
+fn tick(last_save: Save) -> Result<Save, std::io::Error> {
+    Ok(World {
+        time: last_save.time.saturating_add(1),
+        wusel: last_save.wusel,
+    })
 }
 
 
@@ -198,7 +202,21 @@ mod main_test {
             save,
             |_, _| Ok(()),
         ).unwrap();
-        assert_eq!(18u64, simulation_done.time, "Time Passed within the save on normal time.");
+        assert_eq!(18u64, simulation_done.time,
+                   "Time Passed within the save on normal time.");
         assert_eq!(7u64, save.time, "Initial Save is untouched.");
+    }
+
+    #[test]
+    fn should_simulate_time_within_the_tick() {
+        let save = crate::World {
+            time: 7,
+            wusel: crate::Wusel {
+                position: crate::Position { x: 0, y: 0, z: 0 },
+            },
+        };
+        let simulation_done = crate::tick(save).unwrap();
+        assert_eq!(save.time + 1, simulation_done.time,
+                   "Time Passed ticked one time.");
     }
 }
