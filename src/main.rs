@@ -39,6 +39,11 @@ fn load_save(wusel_save_file: &str) -> Option<Save> {
         time: 42u64,
         wusel: Wusel {
             position: Position { x: 0, y: 0, z: 0 },
+            age: 0,
+            nourishment: 10,
+            wakefulness: 10,
+            digestion: 0,
+            tidiness: 10,
         },
     })
 }
@@ -46,9 +51,7 @@ fn load_save(wusel_save_file: &str) -> Option<Save> {
 fn new_save() -> Save {
     World {
         time: 0,
-        wusel: Wusel {
-            position: Position { x: 0, y: 0, z: 0 },
-        },
+        wusel: Wusel::new(),
     }
 }
 
@@ -109,10 +112,18 @@ fn run(
 fn tick(last_save: Save) -> Result<Save, std::io::Error> {
     Ok(World {
         time: last_save.time.saturating_add(1),
-        wusel: last_save.wusel,
+        wusel: Wusel {
+            position: last_save.wusel.position,
+            age: last_save.wusel.age,
+            nourishment: last_save.wusel.nourishment,
+            wakefulness: last_save.wusel.wakefulness,
+            digestion: last_save.wusel.digestion,
+            tidiness: last_save.wusel.tidiness,
+        },
     })
 }
 
+/// Configuration of the game start.
 #[derive(Debug, PartialEq, Clone, Copy, Eq, Hash)]
 struct Config {
     /// how many simulated time units are played withim one real time unit. (normal: 1)
@@ -128,6 +139,8 @@ struct Config {
 type Save = World;
 type UserView = u8;
 
+/// World.
+/// View of the World and life.
 #[derive(Debug, PartialEq, Clone, Copy, Eq, Hash)]
 struct World {
     // TODO: placeholder.
@@ -136,13 +149,68 @@ struct World {
     wusel: Wusel,
 }
 
+/// Wusel.
+/// A living object, "that discovers the wolrd."
+/// A bundle of needs position in the world.
+/// For Living it has an own drive to survive, explore and sozialize.
 #[derive(Debug, PartialEq, Clone, Copy, Eq, Hash)]
 struct Wusel {
-    // TODO: placeholder.
     /// Position of the wusel.
     position: Position,
+
+    /// Age of a wusel.
+    /// when it is born, the age starts, if the wusel is too old, it dies.
+    age: u64,
+
+    /// Life Need for Sleep; if too low, the Wusel falls asleep and must rest.
+    /// while sleepy, a wusel is also slower.
+    wakefulness: u64,
+
+    /// Life Need for Food and Water; if too low, the Wusel starves and dies.
+    /// while hungry, the wusel is not very focussed, or distractable.
+    nourishment: u64,
+
+    /// After taking Food and Water, the digestion starts (progress).
+    /// if the digestions is done, the Wusel needs to get rid of digested materials.
+    digestion: u64,
+
+    /// Level of Tidiness.
+    /// If The Wusel gets too dirty, the immune system is weakened,
+    /// and it may feel uncomfortable.
+    tidiness: u64,
+
 }
 
+impl Wusel {
+    fn new() -> Self {
+        Self {
+            // root position for new wusel.
+            position: Position {
+                x: 0,
+                y: 0,
+                z: 0,
+            },
+
+            // just born.
+            age: 0,
+
+            // not about to fall asleep.
+            wakefulness: 10,
+
+            // not about to starve to dead.
+            nourishment: 10,
+
+            // digesting nothing.
+            digestion: 0,
+
+            // not that dirty.
+            tidiness: 10,
+        }
+    }
+}
+
+/// Position.
+/// A point in the world with three coordinates.
 #[derive(Debug, PartialEq, Clone, Copy, Eq, Hash)]
 struct Position {
     /// width (bird's eye: horizontal axis)
@@ -186,6 +254,11 @@ mod main_test {
                 time: 42u64,
                 wusel: crate::Wusel {
                     position: crate::Position { x: 0, y: 0, z: 0 },
+                    age: 0,
+                    nourishment: 10,
+                    wakefulness: 10,
+                    digestion: 0,
+                    tidiness: 10,
                 },
             }),
             save
@@ -204,6 +277,11 @@ mod main_test {
             time: 2,
             wusel: crate::Wusel {
                 position: crate::Position { x: 0, y: 0, z: 0 },
+                age: 0,
+                nourishment: 10,
+                wakefulness: 10,
+                digestion: 0,
+                tidiness: 10,
             },
         };
         if let Err(_) = crate::store_save(save) {
@@ -215,9 +293,7 @@ mod main_test {
     fn should_simulate_time_within_the_run() {
         let save = crate::World {
             time: 7,
-            wusel: crate::Wusel {
-                position: crate::Position { x: 0, y: 0, z: 0 },
-            },
+            wusel: crate::Wusel::new(),
         };
         let simulation_done = crate::run(
             crate::Config {
@@ -240,9 +316,7 @@ mod main_test {
     fn should_simulate_time_within_the_tick() {
         let save = crate::World {
             time: 7,
-            wusel: crate::Wusel {
-                position: crate::Position { x: 0, y: 0, z: 0 },
-            },
+            wusel: crate::Wusel::new(),
         };
         let simulation_done = crate::tick(save).unwrap();
         assert_eq!(
