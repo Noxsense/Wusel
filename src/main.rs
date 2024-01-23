@@ -114,7 +114,7 @@ fn tick(last_save: Save) -> Result<Save, std::io::Error> {
         time: last_save.time.saturating_add(1),
         wusel: Wusel {
             position: last_save.wusel.position,
-            age: last_save.wusel.age,
+            age: last_save.wusel.age.saturating_add(1),
             nourishment: last_save.wusel.nourishment.saturating_sub(1),
             wakefulness: last_save.wusel.wakefulness.saturating_sub(1),
             digestion: last_save.wusel.digestion.saturating_sub(1),
@@ -347,5 +347,25 @@ mod main_test {
         assert!(wusel_ticked.nourishment < save.wusel.nourishment);
         assert!(wusel_ticked.digestion < save.wusel.digestion);
         assert!(wusel_ticked.tidiness < save.wusel.tidiness);
+    }
+
+    #[test]
+    fn should_increase_wusel_age_every_tick() {
+        let save = crate::World {
+            time: 0,
+            wusel: crate::Wusel {
+                position: crate::Position {x: 0, y: 0, z: 0, },
+                age: 0,
+                wakefulness: 0,
+                nourishment: 0,
+                digestion: 0,
+                tidiness: 0,
+            },
+        };
+
+        let simulation_result = crate::tick(save).unwrap();
+
+        let wusel_ticked = simulation_result.wusel;
+        assert!(wusel_ticked.age > save.wusel.age);
     }
 }
