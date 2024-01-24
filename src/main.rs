@@ -38,6 +38,7 @@ fn load_save(wusel_save_file: &str) -> Option<Save> {
     Some(World {
         time: 42u64,
         wusel: Wusel {
+            id: WuselId { value: 0 },
             position: Position { x: 0, y: 0, z: 0 },
             age: 0,
             nourishment: 10,
@@ -51,7 +52,7 @@ fn load_save(wusel_save_file: &str) -> Option<Save> {
 fn new_save() -> Save {
     World {
         time: 0,
-        wusel: Wusel::new(),
+        wusel: Wusel::new(WuselId::generate()),
     }
 }
 
@@ -72,9 +73,7 @@ fn get_renderer(config: Config) -> impl Fn(Save, UserView) -> Result<(), std::io
         // TODO graphical renderer
 
         // default renderer, muted renderer,  not even log.
-        _ => |_, _| {
-            Ok(())
-        },
+        _ => |_, _| Ok(()),
     }
 }
 
@@ -113,6 +112,7 @@ fn tick(last_save: Save) -> Result<Save, std::io::Error> {
     Ok(World {
         time: last_save.time.saturating_add(1),
         wusel: Wusel {
+            id: last_save.wusel.id,
             position: last_save.wusel.position,
             age: last_save.wusel.age.saturating_add(1),
             nourishment: last_save.wusel.nourishment.saturating_sub(1),
@@ -155,6 +155,9 @@ struct World {
 /// For Living it has an own drive to survive, explore and sozialize.
 #[derive(Debug, PartialEq, Clone, Copy, Eq, Hash)]
 struct Wusel {
+    /// Identificator of one Wusel, should be unique.
+    id: WuselId,
+
     /// Position of the wusel.
     position: Position,
 
@@ -178,18 +181,16 @@ struct Wusel {
     /// If The Wusel gets too dirty, the immune system is weakened,
     /// and it may feel uncomfortable.
     tidiness: u64,
-
 }
 
 impl Wusel {
-    fn new() -> Self {
+    fn new(id: WuselId) -> Self {
         Self {
+            // with given wusel id.
+            id,
+
             // root position for new wusel.
-            position: Position {
-                x: 0,
-                y: 0,
-                z: 0,
-            },
+            position: Position { x: 0, y: 0, z: 0 },
 
             // just born.
             age: 0,
@@ -206,6 +207,19 @@ impl Wusel {
             // not that dirty.
             tidiness: 10,
         }
+    }
+}
+
+/// Simple Id to have a unique Wusel.
+#[derive(Debug, PartialEq, Clone, Copy, Eq, Hash)]
+struct WuselId {
+    value: usize, // TODO uuid on the long run.
+}
+
+impl WuselId {
+    /// generate a new wusel-id
+    fn generate() -> Self {
+        WuselId { value: rand::random::<usize>(), }
     }
 }
 
@@ -253,6 +267,7 @@ mod main_test {
             Some(crate::World {
                 time: 42u64,
                 wusel: crate::Wusel {
+                    id: crate::WuselId { value: 0 },
                     position: crate::Position { x: 0, y: 0, z: 0 },
                     age: 0,
                     nourishment: 10,
@@ -276,6 +291,7 @@ mod main_test {
         let save = crate::World {
             time: 2,
             wusel: crate::Wusel {
+                id: crate::WuselId::generate(),
                 position: crate::Position { x: 0, y: 0, z: 0 },
                 age: 0,
                 nourishment: 10,
@@ -293,7 +309,7 @@ mod main_test {
     fn should_simulate_time_within_the_run() {
         let save = crate::World {
             time: 7,
-            wusel: crate::Wusel::new(),
+            wusel: crate::Wusel::new(crate::WuselId::generate()),
         };
         let simulation_done = crate::run(
             crate::Config {
@@ -316,7 +332,7 @@ mod main_test {
     fn should_simulate_time_within_the_tick() {
         let save = crate::World {
             time: 7,
-            wusel: crate::Wusel::new(),
+            wusel: crate::Wusel::new(crate::WuselId::generate()),
         };
         let simulation_done = crate::tick(save).unwrap();
         assert_eq!(
@@ -328,17 +344,16 @@ mod main_test {
 
     #[test]
     fn should_decrease_fullness_of_wusel_wellbeing_every_tick() {
-        let save = crate::World {
-            time: 0,
-            wusel: crate::Wusel {
-                position: crate::Position {x: 0, y: 0, z: 0, },
-                age: 0u64,
-                wakefulness: 10u64,
-                nourishment: 10u64,
-                digestion: 10u64,
-                tidiness: 10u64,
-            },
+        let wusel = crate::Wusel {
+            id: crate:: WuselId::generate(),
+            position: crate::Position { x: 0, y: 0, z: 0 },
+            age: 0u64,
+            wakefulness: 10u64,
+            nourishment: 10u64,
+            digestion: 10u64,
+            tidiness: 10u64,
         };
+        let save = crate::World { time: 0, wusel };
 
         let simulation_result = crate::tick(save).unwrap();
 
@@ -351,17 +366,16 @@ mod main_test {
 
     #[test]
     fn should_increase_wusel_age_every_tick() {
-        let save = crate::World {
-            time: 0,
-            wusel: crate::Wusel {
-                position: crate::Position {x: 0, y: 0, z: 0, },
-                age: 0,
-                wakefulness: 0,
-                nourishment: 0,
-                digestion: 0,
-                tidiness: 0,
-            },
+        let wusel = crate::Wusel {
+            id: crate:: WuselId::generate(),
+            position: crate::Position { x: 0, y: 0, z: 0 },
+            age: 0,
+            wakefulness: 0,
+            nourishment: 0,
+            digestion: 0,
+            tidiness: 0,
         };
+        let save = crate::World { time: 0, wusel };
 
         let simulation_result = crate::tick(save).unwrap();
 
