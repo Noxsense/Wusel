@@ -13,7 +13,7 @@ fn main() -> Result<(), std::io::Error> {
     let config = load_configuration("res/config.yaml").unwrap();
     let save = load_save("res/.wusel").unwrap_or_else(new_save);
 
-    let simulation_done = run(config, save, get_renderer(config)).unwrap();
+    let simulation_done = run(config, &save, get_renderer(config)).unwrap();
 
     store_save(simulation_done)
 }
@@ -37,7 +37,7 @@ fn load_save(wusel_save_file: &str) -> Option<Save> {
     }
     Some(World {
         time: 42u64,
-        wusel: Wusel {
+        wusels: vec![Wusel {
             id: WuselId { value: 0 },
             position: Position { x: 0, y: 0, z: 0 },
             age: 0,
@@ -45,56 +45,63 @@ fn load_save(wusel_save_file: &str) -> Option<Save> {
             wakefulness: 10,
             digestion: 0,
             tidiness: 10,
-        },
+        }],
     })
 }
 
 fn new_save() -> Save {
     World {
         time: 0,
-        wusel: Wusel::new(WuselId::generate()),
+        wusels: vec![Wusel::new(WuselId::generate())],
     }
 }
 
-fn store_save(to_be_saved: Save) -> Result<(), std::io::Error> {
+fn store_save(_to_be_saved: Save) -> Result<(), std::io::Error> {
+    // TODO write save to file.
     Ok(())
 }
 
-fn get_renderer(config: Config) -> impl Fn(Save, UserView) -> Result<(), std::io::Error> {
+fn get_renderer(config: Config) -> impl Fn(&Save, UserView) -> Result<(), std::io::Error> {
     match config.renderer {
         // log renderer.
-        0u8 => |save, view| {
-            println!("view: {:?}, save: {:?}", view, save);
-            Ok(())
-        },
+        0u8 => log_renderer,
 
         // TODO graphical ascii renderer
 
         // TODO graphical renderer
 
         // default renderer, muted renderer,  not even log.
-        _ => |_, _| Ok(()),
+        _ => mute_renderer,
     }
+}
+
+fn log_renderer(save: &Save, view: UserView) -> Result<(), std::io::Error> {
+    println!("view: {:?}, save: {:?}", view, save);
+    Ok(())
+}
+
+fn mute_renderer(_: &Save, _: UserView) -> Result<(), std::io::Error> {
+    Ok(())
 }
 
 fn run(
     config: Config,
-    save: Save,
-    renderer: impl Fn(Save, UserView) -> Result<(), std::io::Error>,
+    save: &Save,
+    renderer: impl Fn(&Save, UserView) -> Result<(), std::io::Error>,
 ) -> Result<Save, std::io::Error> {
     println!("Configuration: {:?}", config);
     println!("Save:          {:?}", save);
 
     // make clone of initial save.
-    let mut simulating = save;
+    let mut simulating = save.clone();
 
     let mut i = 0;
     while i < config.max_iterations {
         // run simulation.
-        simulating = tick(simulating)?;
+        simulating = tick(&simulating)?;
 
         // render.
-        if let Err(render_error) = renderer(simulating, 0u8) {
+        if let Err(render_error) = renderer(&simulating, 0u8) {
             // interupt on renddr error.
             return Err(std::io::Error::new(
                 render_error.kind(),
@@ -108,18 +115,18 @@ fn run(
     Ok(simulating)
 }
 
-fn tick(last_save: Save) -> Result<Save, std::io::Error> {
+fn tick(last_save: &Save) -> Result<Save, std::io::Error> {
     Ok(World {
         time: last_save.time.saturating_add(1),
-        wusel: Wusel {
-            id: last_save.wusel.id,
-            position: last_save.wusel.position,
-            age: last_save.wusel.age.saturating_add(1),
-            nourishment: last_save.wusel.nourishment.saturating_sub(1),
-            wakefulness: last_save.wusel.wakefulness.saturating_sub(1),
-            digestion: last_save.wusel.digestion.saturating_sub(1),
-            tidiness: last_save.wusel.tidiness.saturating_sub(1),
-        },
+        wusels: vec![Wusel {
+            id: last_save.wusels[0].id,
+            position: last_save.wusels[0].position,
+            age: last_save.wusels[0].age.saturating_add(1),
+            nourishment: last_save.wusels[0].nourishment.saturating_sub(1),
+            wakefulness: last_save.wusels[0].wakefulness.saturating_sub(1),
+            digestion: last_save.wusels[0].digestion.saturating_sub(1),
+            tidiness: last_save.wusels[0].tidiness.saturating_sub(1),
+        }],
     })
 }
 
@@ -141,12 +148,12 @@ type UserView = u8;
 
 /// World.
 /// View of the World and life.
-#[derive(Debug, PartialEq, Clone, Copy, Eq, Hash)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 struct World {
     // TODO: placeholder.
     /// how many simulated time units are played withim one real time unit. (normal: 1)
     time: u64,
-    wusel: Wusel,
+    wusels: Vec<Wusel>,
 }
 
 /// Wusel.
@@ -158,10 +165,10 @@ struct Wusel {
     /// Identificator of one Wusel, should be unique.
     id: WuselId,
 
-    /// Position of the wusel.
+    /// Position of the Wusel.
     position: Position,
 
-    /// Age of a wusel.
+    /// Age of a Wusel.
     /// when it is born, the age starts, if the wusel is too old, it dies.
     age: u64,
 
@@ -189,7 +196,7 @@ impl Wusel {
             // with given wusel id.
             id,
 
-            // root position for new wusel.
+            // root position for new Wusel.
             position: Position { x: 0, y: 0, z: 0 },
 
             // just born.
@@ -219,7 +226,9 @@ struct WuselId {
 impl WuselId {
     /// generate a new wusel-id
     fn generate() -> Self {
-        WuselId { value: rand::random::<usize>(), }
+        WuselId {
+            value: rand::random::<usize>(),
+        }
     }
 }
 
@@ -266,7 +275,7 @@ mod main_test {
         assert_eq!(
             Some(crate::World {
                 time: 42u64,
-                wusel: crate::Wusel {
+                wusels: vec![crate::Wusel {
                     id: crate::WuselId { value: 0 },
                     position: crate::Position { x: 0, y: 0, z: 0 },
                     age: 0,
@@ -274,7 +283,7 @@ mod main_test {
                     wakefulness: 10,
                     digestion: 0,
                     tidiness: 10,
-                },
+                }],
             }),
             save
         );
@@ -290,7 +299,7 @@ mod main_test {
     fn should_store_save() {
         let save = crate::World {
             time: 2,
-            wusel: crate::Wusel {
+            wusels: vec![crate::Wusel {
                 id: crate::WuselId::generate(),
                 position: crate::Position { x: 0, y: 0, z: 0 },
                 age: 0,
@@ -298,7 +307,7 @@ mod main_test {
                 wakefulness: 10,
                 digestion: 0,
                 tidiness: 10,
-            },
+            }],
         };
         if let Err(_) = crate::store_save(save) {
             assert!(false, "Storing the dave failed.");
@@ -309,7 +318,7 @@ mod main_test {
     fn should_simulate_time_within_the_run() {
         let save = crate::World {
             time: 7,
-            wusel: crate::Wusel::new(crate::WuselId::generate()),
+            wusels: vec![crate::Wusel::new(crate::WuselId::generate())],
         };
         let simulation_done = crate::run(
             crate::Config {
@@ -317,7 +326,7 @@ mod main_test {
                 max_iterations: 11,
                 renderer: 0u8,
             },
-            save,
+            &save,
             |_, _| Ok(()),
         )
         .unwrap();
@@ -332,9 +341,9 @@ mod main_test {
     fn should_simulate_time_within_the_tick() {
         let save = crate::World {
             time: 7,
-            wusel: crate::Wusel::new(crate::WuselId::generate()),
+            wusels: vec![crate::Wusel::new(crate::WuselId::generate())],
         };
-        let simulation_done = crate::tick(save).unwrap();
+        let simulation_done = crate::tick(&save).unwrap();
         assert_eq!(
             save.time + 1,
             simulation_done.time,
@@ -345,7 +354,7 @@ mod main_test {
     #[test]
     fn should_decrease_fullness_of_wusel_wellbeing_every_tick() {
         let wusel = crate::Wusel {
-            id: crate:: WuselId::generate(),
+            id: crate::WuselId::generate(),
             position: crate::Position { x: 0, y: 0, z: 0 },
             age: 0u64,
             wakefulness: 10u64,
@@ -353,21 +362,24 @@ mod main_test {
             digestion: 10u64,
             tidiness: 10u64,
         };
-        let save = crate::World { time: 0, wusel };
+        let save = crate::World {
+            time: 0,
+            wusels: vec![wusel],
+        };
 
-        let simulation_result = crate::tick(save).unwrap();
+        let simulation_result = crate::tick(&save).unwrap();
 
-        let wusel_ticked = simulation_result.wusel;
-        assert!(wusel_ticked.wakefulness < save.wusel.wakefulness);
-        assert!(wusel_ticked.nourishment < save.wusel.nourishment);
-        assert!(wusel_ticked.digestion < save.wusel.digestion);
-        assert!(wusel_ticked.tidiness < save.wusel.tidiness);
+        let wusel_ticked = simulation_result.wusels[0];
+        assert!(wusel_ticked.wakefulness < save.wusels[0].wakefulness);
+        assert!(wusel_ticked.nourishment < save.wusels[0].nourishment);
+        assert!(wusel_ticked.digestion < save.wusels[0].digestion);
+        assert!(wusel_ticked.tidiness < save.wusels[0].tidiness);
     }
 
     #[test]
     fn should_increase_wusel_age_every_tick() {
         let wusel = crate::Wusel {
-            id: crate:: WuselId::generate(),
+            id: crate::WuselId::generate(),
             position: crate::Position { x: 0, y: 0, z: 0 },
             age: 0,
             wakefulness: 0,
@@ -375,11 +387,11 @@ mod main_test {
             digestion: 0,
             tidiness: 0,
         };
-        let save = crate::World { time: 0, wusel };
+        let save = crate::World { time: 0, wusels: vec![wusel] };
 
-        let simulation_result = crate::tick(save).unwrap();
+        let simulation_result = crate::tick(&save).unwrap();
 
-        let wusel_ticked = simulation_result.wusel;
-        assert!(wusel_ticked.age > save.wusel.age);
+        let wusel_ticked = simulation_result.wusels[0];
+        assert!(wusel_ticked.age > save.wusels[0].age);
     }
 }
