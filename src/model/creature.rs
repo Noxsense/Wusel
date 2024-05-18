@@ -1,4 +1,4 @@
-use crate::world::Position;
+use crate::model::world::Position;
 
 /// Wusel.
 /// A living object, "that discovers the wolrd."

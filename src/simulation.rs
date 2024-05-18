@@ -1,12 +1,11 @@
-use crate::creature::*;
-use crate::world::*;
+use crate::model::creature::*;
+use crate::model::world::*;
 
 pub fn tick(last_save: &World) -> Result<World, std::io::Error> {
     let new_time = last_save.time() + 1;
     let mut updated_wusels = vec![];
 
     // apply on all wusels:
-    // - need decrease.
 
     for wusel0 in last_save.wusels_iter() {
         let mut wusel: Wusel;
@@ -38,27 +37,6 @@ fn decrease_needs(wusel: &Wusel) -> Wusel {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // #[test]
-    // fn should_simulate_time_within_the_run() {
-    //     let save = World::from( 7, vec![Wusel::new(WuselId::generate())],);
-    //
-    //     let simulation_done = crate::wusel::run(
-    //         Config {
-    //             velocity: 1,
-    //             max_iterations: 11,
-    //             renderer: 0u8,
-    //         },
-    //         &save,
-    //         |_, _| Ok(()),
-    //     )
-    //     .unwrap();
-    //     assert_eq!(
-    //         18u64, simulation_done.time,
-    //         "Time Passed within the save on normal time."
-    //     );
-    //     assert_eq!(7u64, save.time, "Initial Save is untouched.");
-    // }
 
     #[test]
     fn should_simulate_time_within_the_tick() {

@@ -1,5 +1,5 @@
-use crate::creature::*;
-use crate::world::*;
+use crate::model::creature::*;
+use crate::model::world::*;
 
 pub type Save = World;
 

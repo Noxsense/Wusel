@@ -1,4 +1,4 @@
-use crate::{creature::Wusel, WuselId};
+use crate::model::creature::*;
 
 /// World.
 /// View of the World and life.

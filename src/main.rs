@@ -7,7 +7,10 @@
 //! ## Author
 //! Ngoc (Nox) Le <noxsense@gmail.com>
 
-use wusel::*;
+use wusel::config::*;
+use wusel::save::*;
+use wusel::renderer::*;
+use wusel::simulation::*;
 
 /// The main method of the wusel world.
 fn main() -> Result<(), std::io::Error> {
@@ -51,4 +54,33 @@ pub fn run(
     }
 
     Ok(simulating)
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use wusel::model::creature::*;
+    use wusel::model::world::*;
+
+    use super::*;
+
+    #[test]
+    fn should_simulate_time_within_the_run() {
+        // arrange.
+        let save = World::from(7, vec![Wusel::new(WuselId::generate())]);
+        let config = Config::new(1, 11, 0u8);
+        let renderer = |_: &_, _| { Ok(()) };
+
+        // act.
+        let simulation_done = run(config, &save, renderer).unwrap();
+
+        // assert.
+        assert_eq!(
+            18u64,
+            simulation_done.time(),
+            "Time Passed within the save on normal time."
+        );
+        assert_eq!(7u64, save.time(), "Initial Save is untouched.");
+    }
 }

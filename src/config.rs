@@ -26,6 +26,14 @@ pub fn load_configuration(config_file_name: &str) -> Result<Config, std::io::Err
 ///////////////////////////////////////////////////////////////////////////////
 
 impl Config {
+    pub fn new(velocity: usize, max_iterations: usize, renderer: u8) -> Self {
+        Self {
+            velocity,
+            max_iterations,
+            renderer,
+        }
+    }
+
     pub fn velocity(&self) -> usize {
         self.velocity
     }
